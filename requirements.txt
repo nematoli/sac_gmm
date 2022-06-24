@@ -1,0 +1,10 @@
+hydra-core
+hydra-colorlog
+torch
+torchvision
+pytorch-lightning
+numpy
+pybulletX
+gym
+tqdm
+scipy
