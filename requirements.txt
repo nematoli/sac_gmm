@@ -3,6 +3,8 @@ hydra-colorlog
 torch
 torchvision
 pytorch-lightning
+gmr
+scikit-learn
 numpy
 pybulletX
 gym
