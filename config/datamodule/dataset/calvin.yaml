@@ -1,0 +1,4 @@
+_target_: sac_gmm.datasets.calvin_dataset.CalvinDataset
+_recursive_: false
+
+data_dir:     ~/sac_gmm/dataset/calvin/
