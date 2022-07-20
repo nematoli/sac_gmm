@@ -2,9 +2,9 @@ defaults:
   - dataset: calvin
   - transforms: calvin
 
-_target_: sac_gmm.datasets.sac_gmm_datamodule.SACGMMDataModule
+_target_: sac_gmm.datasets.calvin_datamodule.CalvinDataModule
 _recursive_: false
 batch_size:   32
-num_workers:  8
+num_workers:  1
 step_len:     1
-skill: open_drawer
+skill: ${skill}

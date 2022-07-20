@@ -13,7 +13,7 @@ sys.path.insert(0, parent_path.as_posix())
 import hydra
 from omegaconf import DictConfig
 from pytorch_lightning import seed_everything
-
+import pdb
 
 logger = logging.getLogger(__name__)
 os.chdir(cwd_path)
@@ -57,7 +57,7 @@ def extract_demos(cfg: DictConfig) -> None:
     seed_everything(cfg.seed, workers=True)
     datamodule = hydra.utils.instantiate(cfg.datamodule)
     datamodule.setup(stage="fit")
-    save_demonstrations(datamodule, cfg.save_dir)
+    save_demonstrations(datamodule, cfg.demos_dir)
 
 
 if __name__ == "__main__":
