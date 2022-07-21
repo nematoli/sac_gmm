@@ -39,8 +39,31 @@ class GMMTrainer(object):
         gmm = self.gmm(n_components=self.cfg.gmm_components, random_state=self.cfg.seed)
         return gmm.from_samples(X=data)
 
-    def evaluate(self, gmm, data):
-        return None
+    def evaluate(self, gmm, env, max_steps=500, num_episodes=10, render=False):
+        sampling_dt = 0.2  # increases sampling frequency
+        succesful_episodes, episodes_returns, episodes_lengths = 0, [], []
+        for episode in tqdm(range(1, num_episodes + 1), desc="Evaluating GMM model"):
+            observation = env.reset()
+            observation = observation['robot_obs'][:3]
+            action = gmm.priors
+            episode_return = 0
+            for step in range(max_steps):
+                cgmm = gmm.condition([0, 1, 2], observation)
+                action = action + sampling_dt * cgmm.sample_confidence_region(1, alpha=0.7)[0]
+                pdb.set_trace()
+                observation, reward, done, info = env.step(action)
+                observation = observation['robot_obs'][:3]
+                episode_return += reward
+                if render:
+                    env.render()
+                if done:
+                    break
+            if info["success"]:
+                succesful_episodes += 1
+            episodes_returns.append(episode_return)
+            episodes_lengths.append(step)
+        accuracy = succesful_episodes / num_episodes
+        return accuracy, np.mean(episodes_returns), np.mean(episodes_lengths)
 
 
     def run(self):
@@ -61,6 +84,7 @@ class GMMTrainer(object):
         train_data = train_data.reshape(1, -1, train_data.shape[-1]).squeeze(0)
         val_data = np.load(Path(self.cfg.demos_dir) / self.cfg.skill / 'val.npy')
         # Get velocities from pose
+        train_data = train_data[:, :3]
         dt = 1.0
         X_dot = (train_data[2:] - train_data[:-2]) / dt
         X = train_data[1:-1]
@@ -68,7 +92,7 @@ class GMMTrainer(object):
         fitted_gmm = self.fit_gmm(X_train)
 
         # Evaluate in Calvin environment
-        self.evaluate(fitted_gmm, val_data)
+        self.evaluate(fitted_gmm, self.env)
 
 @hydra.main(config_path="../config", config_name="gmm")
 def main(cfg: DictConfig) -> None:
