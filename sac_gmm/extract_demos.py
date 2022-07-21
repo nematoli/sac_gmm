@@ -47,7 +47,7 @@ def save_demonstrations(datamodule, save_dir):
         np.save(save_dir, demos)
 
 
-@hydra.main(config_path="../config", config_name="demos", version_base=None)
+@hydra.main(config_path="../config", config_name="demos")
 def extract_demos(cfg: DictConfig) -> None:
     """
     This is called to extract demonstrations for a specific skill.

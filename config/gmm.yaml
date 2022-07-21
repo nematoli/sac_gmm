@@ -1,6 +1,6 @@
 defaults:
   - datamodule: default
-  - calvin_env/conf: config_data_collection
+  - calvin_env: full_default
   - _self_
 
   - override hydra/job_logging: colorlog
@@ -11,21 +11,17 @@ log_dir: ../
 slurm: false
 
 # Skill extraction params
-demos_dir: ../demonstrations
-use_existing_demos: false
+demos_dir: ${root}/demonstrations
+use_existing_demos: true
 skill: 'turn_off_lightbulb'
 
 # GMM params
 gmm_type: base
 gmm_components: 3
 
-
+root: E:/Uni-Freiburg/Research/sac_gmm
 # Environment params
-# cameras: static_and_gripper
-# use_egl: false
-# use_vr: false
-# show_gui: false
-# use_scene_info: True
+
 
 hydra:
   run:
