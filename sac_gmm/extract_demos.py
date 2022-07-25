@@ -21,7 +21,7 @@ os.chdir(cwd_path)
 
 def save_demonstrations(datamodule, save_dir):
     mode = ["train", "val"]
-    p = Path(Path(save_dir) / datamodule.skill)
+    p = Path(Path(save_dir).expanduser() / datamodule.skill)
     p.mkdir(parents=True, exist_ok=True)
 
     for m in mode:

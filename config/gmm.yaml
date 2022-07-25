@@ -19,7 +19,7 @@ skill: 'turn_off_lightbulb'
 gmm_type: base
 gmm_components: 3
 
-root: E:/Uni-Freiburg/Research/sac_gmm
+root: ~/sac_gmm
 # Environment params
 
 
