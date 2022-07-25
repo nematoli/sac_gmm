@@ -16,6 +16,7 @@ from utils.env_maker import make_env
 from sklearn.mixture import BayesianGaussianMixture
 from gmm import GMM
 from envs.turn_off_bulb import TurnOffBulbEnv
+from gmm.utils.utils import plot_3d_trajectories
 
 # from . import ModifiedGMM
 
@@ -54,21 +55,27 @@ class GMMTrainer(object):
         return gmm.from_samples(X=data)
 
     def evaluate(self, gmm, env, init_poses, max_steps=500, num_episodes=5, render=False):
-        sampling_dt = 0.2  # increases sampling frequency
+        sampling_dt = 1 / 30  # increases sampling frequency
         succesful_episodes, episodes_returns, episodes_lengths = 0, [], []
         for episode in tqdm(range(1, num_episodes + 1), desc="Evaluating GMM model"):
             observation = env.reset()
-            pose = init_poses[episode % len(init_poses)]
-            action = np.array([pose, np.zeros(3), -1], dtype=object)
-            observation, reward, done, info = env.step(action)
-            observation = observation[:3]
+            current_pose = observation[:6]
+            init_pose = init_poses[episode % len(init_poses)]
+            init_pos, init_orn = init_pose[:3], init_pose[3:]
+            action = np.array([init_pos, init_orn, -1], dtype=object)
+            while np.linalg.norm(current_pose - init_pose) > 0.005:
+                observation, reward, done, info = env.step(action)
+                current_pose = observation[:6]
+            current_pos = current_pose[:3]
             episode_return = 0
             for step in range(max_steps):
-                cgmm = gmm.condition([0, 1, 2], observation)
-                pose = pose + sampling_dt * cgmm.sample_confidence_region(1, alpha=0.7)[0]
-                action = np.append(pose, np.append(np.zeros(3), -1))
+                cgmm = gmm.condition([0, 1, 2], current_pos)
+                delta_pos = sampling_dt * cgmm.sample_confidence_region(1, alpha=0.7)[0]
+                new_pos = current_pos + delta_pos
+                action = np.append(delta_pos, np.append(np.zeros(3), -1))
+                # action = np.array([new_pos, np.zeros(3), -1], dtype=object)
                 observation, reward, done, info = env.step(action)
-                observation = observation[:3]
+                current_pos = observation[:3]
                 episode_return += reward
                 if render:
                     env.render()
@@ -81,7 +88,7 @@ class GMMTrainer(object):
         accuracy = succesful_episodes / num_episodes
         return accuracy, np.mean(episodes_returns), np.mean(episodes_lengths)
 
-    def run(self):
+    def run(self, plot_gmr=False):
         demos_dir = Path(self.cfg.demos_dir).expanduser()
         # Extract demonstrations
         if self.cfg.use_existing_demos:
@@ -97,21 +104,33 @@ class GMMTrainer(object):
             extract_demos(self.cfg)
 
         # Train a GMM
-        train_data = np.load(demos_dir / self.cfg.skill / "train.npy")
+        train_data = np.load(demos_dir / self.cfg.skill / "train.npy")[:1]
+        # plot_3d_trajectories(train_data[:, :, 1:4])
+        init_poses = train_data[:, 0, 1:7]
         train_data = train_data.reshape(1, -1, train_data.shape[-1]).squeeze(0)
         val_data = np.load(demos_dir / self.cfg.skill / "val.npy")
         # Get velocities from pose
         train_data = train_data[:, 1:4]
-        dt = 1.0
+        dt = 2 / 30
         X_dot = (train_data[2:] - train_data[:-2]) / dt
         X = train_data[1:-1]
         X_train = np.hstack((X, X_dot))
         fitted_gmm = self.fit_gmm(X_train)
 
+        if plot_gmr:
+            sampled_path = []
+            x = init_poses[0, :3]
+            sampling_dt = 1 / 30
+            for t in range(64):
+                sampled_path.append(x)
+                cgmm = fitted_gmm.condition([0, 1, 2], x)
+                x_dot = cgmm.sample_confidence_region(1, alpha=0.7).reshape(-1)
+                x = x + sampling_dt * x_dot
+            sampled_path = np.array(sampled_path)
+            plot_3d_trajectories(X, sampled_path)
+
         # Evaluate in Calvin environment
-        train_data = np.load(demos_dir / self.cfg.skill / "train.npy")
-        init_poses = train_data[:, 0, 1:4]
-        acc, ep_returns, ep_lens = self.evaluate(gmm=fitted_gmm, env=self.env, init_poses=init_poses)
+        acc, ep_returns, ep_lens = self.evaluate(gmm=fitted_gmm, env=self.env, init_poses=init_poses, render=True)
         logger.info(
             f"Evaluation Results - Accuracy: {acc}, Avg. Episode Returns: {ep_returns}, Avg. Episode Lenths: {ep_lens}"
         )
@@ -126,7 +145,7 @@ def main(cfg: DictConfig) -> None:
     env = TurnOffBulbEnv(**new_env_cfg)
 
     trainer = GMMTrainer(cfg, env)
-    trainer.run()
+    trainer.run(plot_gmr=True)
 
 
 if __name__ == "__main__":
