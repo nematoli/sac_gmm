@@ -1,8 +1,8 @@
 defaults:
-  - dataset: calvin
+  - dataset: calvin_debug
   - transforms: calvin
 
-_target_: sac_gmm.datasets.calvin_datamodule.CalvinDataModule
+_target_: sac_gmm.datasets.skill_datamodule.SkillDataModule
 _recursive_: false
 batch_size:   32
 num_workers:  1

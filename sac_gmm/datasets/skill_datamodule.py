@@ -31,8 +31,8 @@ class SkillDataModule(pl.LightningDataModule):
         if not root_data_path.is_absolute():
             root_data_path = Path(sac_gmm.__file__).parent / root_data_path
 
-        self.train_dir = root_data_path / "task_D_D" / "training"
-        self.val_dir = root_data_path / "task_D_D" / "validation"
+        self.train_dir = root_data_path / "training"
+        self.val_dir = root_data_path / "validation"
 
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -47,7 +47,7 @@ class SkillDataModule(pl.LightningDataModule):
             skill=self.skill,
             step_len=self.step_len,
             train=True,
-            transforms=self.transforms
+            transforms=self.transforms,
         )
         self.val_dataset = hydra.utils.instantiate(
             self.dataset,
@@ -55,7 +55,7 @@ class SkillDataModule(pl.LightningDataModule):
             skill=self.skill,
             step_len=self.step_len,
             train=False,
-            transforms=self.transforms
+            transforms=self.transforms,
         )
 
     def train_dataloader(self):

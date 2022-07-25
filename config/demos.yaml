@@ -8,7 +8,10 @@ defaults:
 seed: 42
 log_dir: ../
 slurm: false
-save_dir: ../demonstrations
+demos_dir: ${root}/demonstrations
+skill: 'turn_off_lightbulb'
+
+root: ~/sac_gmm
 
 hydra:
   run:
