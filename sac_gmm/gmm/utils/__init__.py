@@ -18,13 +18,10 @@ except NameError:
 
 
 if not __GMR_SETUP__:
-    from . import gmm, mvn, utils
+    from . import mvn, utils
 
-    __all__ = ["gmm", "mvn", "utils", "sklearn"]
+    __all__ = ["mvn", "utils", "sklearn"]
 
     from .mvn import MVN, plot_error_ellipse
-    from .gmm import (GMM, plot_error_ellipses, kmeansplusplus_initialization,
-                      covariance_initialization)
 
-    __all__.extend(["MVN", "plot_error_ellipse", "GMM", "plot_error_ellipses",
-                    "kmeansplusplus_initialization", "covariance_initialization"])
+    __all__.extend(["MVN", "plot_error_ellipse", "plot_error_ellipses"])

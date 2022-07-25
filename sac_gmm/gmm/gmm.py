@@ -1,8 +1,18 @@
+
+# gmr
+# 
+# Copyright Alexander Fabisch
+# 
+# The following code is a derative work from the Alexander Fabisch, 
+# which is licensed "New BSD / BSD 3-clause". 
+#
+# Source: https://github.com/AlexanderFabisch/gmr
+
 import numpy as np
 from scipy.spatial.distance import cdist, pdist
 from scipy.stats import chi2, norm
-from .utils import check_random_state
-from .mvn import MVN, invert_indices, regression_coefficients
+from .utils.utils import check_random_state
+from .utils.mvn import MVN, invert_indices, regression_coefficients
 
 
 def kmeansplusplus_initialization(X, n_components, random_state=None):
