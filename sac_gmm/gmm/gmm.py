@@ -1,10 +1,9 @@
-
 # gmr
-# 
+#
 # Copyright Alexander Fabisch
-# 
-# The following code is a derative work from the Alexander Fabisch, 
-# which is licensed "New BSD / BSD 3-clause". 
+#
+# The following code is a derative work from the Alexander Fabisch,
+# which is licensed "New BSD / BSD 3-clause".
 #
 # Source: https://github.com/AlexanderFabisch/gmr
 
@@ -43,9 +42,7 @@ def kmeansplusplus_initialization(X, n_components, random_state=None):
     if n_components <= 0:
         raise ValueError("Only n_components > 0 allowed.")
     if n_components > len(X):
-        raise ValueError(
-            "More components (%d) than samples (%d) are not allowed."
-            % (n_components, len(X)))
+        raise ValueError("More components (%d) than samples (%d) are not allowed." % (n_components, len(X)))
 
     random_state = check_random_state(random_state)
 
@@ -58,8 +55,7 @@ def kmeansplusplus_initialization(X, n_components, random_state=None):
     return X[np.array(selected_centers, dtype=int)]
 
 
-def _select_next_center(X, centers, random_state, excluded_indices,
-                        all_indices):
+def _select_next_center(X, centers, random_state, excluded_indices, all_indices):
     """Sample with probability proportional to the squared distance to closest center."""
     squared_distances = cdist(X, centers, metric="sqeuclidean")
     selection_probability = squared_distances.max(axis=1)
@@ -88,16 +84,13 @@ def covariance_initialization(X, n_components):
         Initial covariances
     """
     if n_components <= 0:
-        raise ValueError(
-            "It does not make sense to initialize 0 or fewer covariances.")
+        raise ValueError("It does not make sense to initialize 0 or fewer covariances.")
     n_features = X.shape[1]
     average_distances = np.empty(n_features)
     for i in range(n_features):
-        average_distances[i] = np.mean(
-            pdist(X[:, i, np.newaxis], metric="euclidean"))
+        average_distances[i] = np.mean(pdist(X[:, i, np.newaxis], metric="euclidean"))
     initial_covariances = np.empty((n_components, n_features, n_features))
-    initial_covariances[:] = (np.eye(n_features) *
-                              (average_distances / n_components) ** 2)
+    initial_covariances[:] = np.eye(n_features) * (average_distances / n_components) ** 2
     return initial_covariances
 
 
@@ -125,8 +118,8 @@ class GMM(object):
         If an integer is given, it fixes the seed. Defaults to the global numpy
         random number generator.
     """
-    def __init__(self, n_components, priors=None, means=None, covariances=None,
-                 verbose=0, random_state=None):
+
+    def __init__(self, n_components, priors=None, means=None, covariances=None, verbose=0, random_state=None):
         self.n_components = n_components
         self.priors = priors
         self.means = means
@@ -149,8 +142,7 @@ class GMM(object):
         if self.covariances is None:
             raise ValueError("Covariances have not been initialized")
 
-    def from_samples(self, X, R_diff=1e-4, n_iter=100, init_params="random",
-                     oracle_approximating_shrinkage=False):
+    def from_samples(self, X, R_diff=1e-4, n_iter=100, init_params="random", oracle_approximating_shrinkage=False):
         """MLE of the mean and covariance.
 
         Expectation-maximization is used to infer the model parameters. The
@@ -193,30 +185,24 @@ class GMM(object):
         n_samples, n_features = X.shape
 
         if self.priors is None:
-            self.priors = np.ones(self.n_components,
-                                  dtype=float) / self.n_components
+            self.priors = np.ones(self.n_components, dtype=float) / self.n_components
 
         if init_params not in ["random", "kmeans++"]:
-            raise ValueError("'init_params' must be 'random' or 'kmeans++' "
-                             "but is '%s'" % init_params)
+            raise ValueError("'init_params' must be 'random' or 'kmeans++' " "but is '%s'" % init_params)
 
         if self.means is None:
             if init_params == "random":
-                indices = self.random_state.choice(
-                    np.arange(n_samples), self.n_components)
+                indices = self.random_state.choice(np.arange(n_samples), self.n_components)
                 self.means = X[indices]
             else:
-                self.means = kmeansplusplus_initialization(
-                    X, self.n_components, self.random_state)
+                self.means = kmeansplusplus_initialization(X, self.n_components, self.random_state)
 
         if self.covariances is None:
             if init_params == "random":
-                self.covariances = np.empty(
-                    (self.n_components, n_features, n_features))
+                self.covariances = np.empty((self.n_components, n_features, n_features))
                 self.covariances[:] = np.eye(n_features)
             else:
-                self.covariances = covariance_initialization(
-                    X, self.n_components)
+                self.covariances = covariance_initialization(X, self.n_components)
 
         R = np.zeros((n_samples, self.n_components))
         for _ in range(n_iter):
@@ -240,8 +226,7 @@ class GMM(object):
                 self.covariances[k] = (R_n[:, k, np.newaxis] * Xm).T.dot(Xm)
 
             if oracle_approximating_shrinkage:
-                n_samples_eff = (np.sum(R_n, axis=0) ** 2 /
-                                 np.sum(R_n ** 2, axis=0))
+                n_samples_eff = np.sum(R_n, axis=0) ** 2 / np.sum(R_n**2, axis=0)
                 self.apply_oracle_approximating_shrinkage(n_samples_eff)
 
         return self
@@ -281,13 +266,13 @@ class GMM(object):
         for k in range(self.n_components):
             emp_cov = self.covariances[k]
             mu = np.trace(emp_cov) / n_features
-            alpha = np.mean(emp_cov ** 2)
-            num = alpha + mu ** 2
-            den = (n_samples_eff[k] + 1.) * (alpha - (mu ** 2) / n_features)
+            alpha = np.mean(emp_cov**2)
+            num = alpha + mu**2
+            den = (n_samples_eff[k] + 1.0) * (alpha - (mu**2) / n_features)
 
-            shrinkage = 1. if den == 0 else min(num / den, 1.)
-            shrunk_cov = (1. - shrinkage) * emp_cov
-            shrunk_cov.flat[::n_features + 1] += shrinkage * mu
+            shrinkage = 1.0 if den == 0 else min(num / den, 1.0)
+            shrunk_cov = (1.0 - shrinkage) * emp_cov
+            shrunk_cov.flat[:: n_features + 1] += shrinkage * mu
 
             self.covariances[k] = shrunk_cov
 
@@ -306,18 +291,16 @@ class GMM(object):
         """
         self._check_initialized()
 
-        mvn_indices = self.random_state.choice(
-            self.n_components, size=(n_samples,), p=self.priors)
+        mvn_indices = self.random_state.choice(self.n_components, size=(n_samples,), p=self.priors)
         mvn_indices.sort()
-        split_indices = np.hstack(
-            ((0,), np.nonzero(np.diff(mvn_indices))[0] + 1, (n_samples,)))
+        split_indices = np.hstack(((0,), np.nonzero(np.diff(mvn_indices))[0] + 1, (n_samples,)))
         clusters = np.unique(mvn_indices)
         lens = np.diff(split_indices)
         samples = np.empty((n_samples, self.means.shape[1]))
         for i, (k, n_samples) in enumerate(zip(clusters, lens)):
-            samples[split_indices[i]:split_indices[i + 1]] = MVN(
-                mean=self.means[k], covariance=self.covariances[k],
-                random_state=self.random_state).sample(n_samples=n_samples)
+            samples[split_indices[i] : split_indices[i + 1]] = MVN(
+                mean=self.means[k], covariance=self.covariances[k], random_state=self.random_state
+            ).sample(n_samples=n_samples)
         return samples
 
     def sample_confidence_region(self, n_samples, alpha):
@@ -343,19 +326,16 @@ class GMM(object):
         """
         self._check_initialized()
 
-        mvn_indices = self.random_state.choice(
-            self.n_components, size=(n_samples,), p=self.priors)
+        mvn_indices = self.random_state.choice(self.n_components, size=(n_samples,), p=self.priors)
         mvn_indices.sort()
-        split_indices = np.hstack(
-            ((0,), np.nonzero(np.diff(mvn_indices))[0] + 1, (n_samples,)))
+        split_indices = np.hstack(((0,), np.nonzero(np.diff(mvn_indices))[0] + 1, (n_samples,)))
         clusters = np.unique(mvn_indices)
         lens = np.diff(split_indices)
         samples = np.empty((n_samples, self.means.shape[1]))
         for i, (k, n_samples) in enumerate(zip(clusters, lens)):
-            samples[split_indices[i]:split_indices[i + 1]] = MVN(
-                mean=self.means[k], covariance=self.covariances[k],
-                random_state=self.random_state).sample_confidence_region(
-                n_samples=n_samples, alpha=alpha)
+            samples[split_indices[i] : split_indices[i + 1]] = MVN(
+                mean=self.means[k], covariance=self.covariances[k], random_state=self.random_state
+            ).sample_confidence_region(n_samples=n_samples, alpha=alpha)
         return samples
 
     def is_in_confidence_region(self, x, alpha):
@@ -380,18 +360,17 @@ class GMM(object):
             Is the sample in the alpha confidence region?
         """
         self._check_initialized()
-        dists = [MVN(mean=self.means[k], covariance=self.covariances[k]
-                     ).squared_mahalanobis_distance(x)
-                 for k in range(self.n_components)]
+        dists = [
+            MVN(mean=self.means[k], covariance=self.covariances[k]).squared_mahalanobis_distance(x)
+            for k in range(self.n_components)
+        ]
         # we have one degree of freedom less than number of dimensions
         n_dof = len(x) - 1
         if n_dof >= 1:
             return min(dists) <= chi2(n_dof).ppf(alpha)
         else:  # 1D
             idx = np.argmin(dists)
-            lo, hi = norm.interval(
-                alpha, loc=self.means[idx, 0],
-                scale=self.covariances[idx, 0, 0])
+            lo, hi = norm.interval(alpha, loc=self.means[idx, 0], scale=self.covariances[idx, 0, 0])
             return lo <= x[0] <= hi
 
     def to_responsibilities(self, X):
@@ -415,8 +394,8 @@ class GMM(object):
 
         for k in range(self.n_components):
             norm_factors[k], exponents[:, k] = MVN(
-                mean=self.means[k], covariance=self.covariances[k],
-                random_state=self.random_state).to_norm_factor_and_exponents(X)
+                mean=self.means[k], covariance=self.covariances[k], random_state=self.random_state
+            ).to_norm_factor_and_exponents(X)
 
         return _safe_probability_density(self.priors * norm_factors, exponents)
 
@@ -435,9 +414,12 @@ class GMM(object):
         """
         self._check_initialized()
 
-        p = [MVN(mean=self.means[k], covariance=self.covariances[k],
-                 random_state=self.random_state).to_probability_density(X)
-             for k in range(self.n_components)]
+        p = [
+            MVN(
+                mean=self.means[k], covariance=self.covariances[k], random_state=self.random_state
+            ).to_probability_density(X)
+            for k in range(self.n_components)
+        ]
         return np.dot(self.priors, p)
 
     def condition(self, indices, x):
@@ -469,21 +451,24 @@ class GMM(object):
         marginal_prior_exponents = np.empty(self.n_components)
 
         for k in range(self.n_components):
-            mvn = MVN(mean=self.means[k], covariance=self.covariances[k],
-                      random_state=self.random_state)
+            mvn = MVN(mean=self.means[k], covariance=self.covariances[k], random_state=self.random_state)
             conditioned = mvn.condition(indices, x)
             means[k] = conditioned.mean
             covariances[k] = conditioned.covariance
 
-            marginal_norm_factors[k], marginal_prior_exponents[k] = \
-                mvn.marginalize(indices).to_norm_factor_and_exponents(x)
+            marginal_norm_factors[k], marginal_prior_exponents[k] = mvn.marginalize(
+                indices
+            ).to_norm_factor_and_exponents(x)
 
-        priors = _safe_probability_density(
-            self.priors * marginal_norm_factors,
-            marginal_prior_exponents[np.newaxis])[0]
+        priors = _safe_probability_density(self.priors * marginal_norm_factors, marginal_prior_exponents[np.newaxis])[0]
 
-        return GMM(n_components=self.n_components, priors=priors, means=means,
-                   covariances=covariances, random_state=self.random_state)
+        return GMM(
+            n_components=self.n_components,
+            priors=priors,
+            means=means,
+            covariances=covariances,
+            random_state=self.random_state,
+        )
 
     def predict(self, indices, X):
         """Predict means of posteriors.
@@ -510,30 +495,24 @@ class GMM(object):
 
         n_samples = len(X)
         output_indices = invert_indices(self.means.shape[1], indices)
-        regression_coeffs = np.empty((
-            self.n_components, len(output_indices), len(indices)))
+        regression_coeffs = np.empty((self.n_components, len(output_indices), len(indices)))
 
         marginal_norm_factors = np.empty(self.n_components)
         marginal_exponents = np.empty((n_samples, self.n_components))
 
         for k in range(self.n_components):
-            regression_coeffs[k] = regression_coefficients(
-                self.covariances[k], output_indices, indices)
-            mvn = MVN(mean=self.means[k], covariance=self.covariances[k],
-                      random_state=self.random_state)
-            marginal_norm_factors[k], marginal_exponents[:, k] = \
-                mvn.marginalize(indices).to_norm_factor_and_exponents(X)
+            regression_coeffs[k] = regression_coefficients(self.covariances[k], output_indices, indices)
+            mvn = MVN(mean=self.means[k], covariance=self.covariances[k], random_state=self.random_state)
+            marginal_norm_factors[k], marginal_exponents[:, k] = mvn.marginalize(indices).to_norm_factor_and_exponents(
+                X
+            )
 
         # posterior_means = mean_y + cov_xx^-1 * cov_xy * (x - mean_x)
-        posterior_means = (
-                self.means[:, output_indices][:, :, np.newaxis].T +
-                np.einsum(
-                    "ijk,lik->lji",
-                    regression_coeffs,
-                    X[:, np.newaxis] - self.means[:, indices]))
+        posterior_means = self.means[:, output_indices][:, :, np.newaxis].T + np.einsum(
+            "ijk,lik->lji", regression_coeffs, X[:, np.newaxis] - self.means[:, indices]
+        )
 
-        priors = _safe_probability_density(
-            self.priors * marginal_norm_factors, marginal_exponents)
+        priors = _safe_probability_density(self.priors * marginal_norm_factors, marginal_exponents)
         priors = priors.reshape(n_samples, 1, self.n_components)
         return np.sum(priors * posterior_means, axis=-1)
 
@@ -558,8 +537,7 @@ class GMM(object):
 
         res = []
         for k in range(self.n_components):
-            mvn = MVN(mean=self.means[k], covariance=self.covariances[k],
-                      random_state=self.random_state)
+            mvn = MVN(mean=self.means[k], covariance=self.covariances[k], random_state=self.random_state)
             res.append((self.means[k], mvn.to_ellipse(factor)))
         return res
 
@@ -579,8 +557,7 @@ class GMM(object):
         covariance += np.sum(self.priors[:, np.newaxis, np.newaxis] * self.covariances, axis=0)
         covariance += self.means.T.dot(np.diag(self.priors)).dot(self.means)
         covariance -= np.outer(mean, mean)
-        return MVN(mean=mean, covariance=covariance,
-                   verbose=self.verbose, random_state=self.random_state)
+        return MVN(mean=mean, covariance=covariance, verbose=self.verbose, random_state=self.random_state)
 
     def extract_mvn(self, component_idx):
         """Extract one of the Gaussians from the mixture.
@@ -597,12 +574,13 @@ class GMM(object):
         """
         self._check_initialized()
         if component_idx < 0 or component_idx >= self.n_components:
-            raise ValueError("Index of Gaussian must be in [%d, %d)"
-                             % (0, self.n_components))
+            raise ValueError("Index of Gaussian must be in [%d, %d)" % (0, self.n_components))
         return MVN(
             mean=self.means[component_idx],
-            covariance=self.covariances[component_idx], verbose=self.verbose,
-            random_state=self.random_state)
+            covariance=self.covariances[component_idx],
+            verbose=self.verbose,
+            random_state=self.random_state,
+        )
 
 
 def plot_error_ellipses(ax, gmm, colors=None, alpha=0.25, factors=np.linspace(0.25, 2.0, 8)):
@@ -627,12 +605,12 @@ def plot_error_ellipses(ax, gmm, colors=None, alpha=0.25, factors=np.linspace(0.
     """
     from matplotlib.patches import Ellipse
     from itertools import cycle
+
     if colors is not None:
         colors = cycle(colors)
     for factor in factors:
         for mean, (angle, width, height) in gmm.to_ellipses(factor):
-            ell = Ellipse(xy=mean, width=2.0 * width, height=2.0 * height,
-                          angle=np.degrees(angle))
+            ell = Ellipse(xy=mean, width=2.0 * width, height=2.0 * height, angle=np.degrees(angle))
             ell.set_alpha(alpha)
             if colors is not None:
                 ell.set_color(next(colors))

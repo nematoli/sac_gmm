@@ -9,7 +9,7 @@ from scipy.linalg import pinvh
 def invert_indices(n_features, indices):
     inv = np.ones(n_features, dtype=bool)
     inv[indices] = False
-    inv, = np.where(inv)
+    (inv,) = np.where(inv)
     return inv
 
 
@@ -35,8 +35,8 @@ class MVN(object):
         If an integer is given, it fixes the seed. Defaults to the global numpy
         random number generator.
     """
-    def __init__(self, mean=None, covariance=None, verbose=0,
-                 random_state=None):
+
+    def __init__(self, mean=None, covariance=None, verbose=0, random_state=None):
         self.mean = mean
         self.covariance = covariance
         self.verbose = verbose
@@ -90,8 +90,7 @@ class MVN(object):
             Samples from the MVN.
         """
         self._check_initialized()
-        return self.random_state.multivariate_normal(
-            self.mean, self.covariance, size=(n_samples,))
+        return self.random_state.multivariate_normal(self.mean, self.covariance, size=(n_samples,))
 
     def sample_confidence_region(self, n_samples, alpha):
         """Sample from alpha confidence region.
@@ -111,8 +110,7 @@ class MVN(object):
         X : array, shape (n_samples, n_features)
             Samples from the confidence region.
         """
-        return np.array([self._one_sample_confidence_region(alpha)
-                         for _ in range(n_samples)])
+        return np.array([self._one_sample_confidence_region(alpha) for _ in range(n_samples)])
 
     def _one_sample_confidence_region(self, alpha):
         x = self.sample(1)[0]
@@ -144,8 +142,7 @@ class MVN(object):
         if n_dof >= 1:
             return self.squared_mahalanobis_distance(x) <= chi2(n_dof).ppf(alpha)
         else:  # 1D
-            lo, hi = norm.interval(
-                alpha, loc=self.mean[0], scale=self.covariance[0, 0])
+            lo, hi = norm.interval(alpha, loc=self.mean[0], scale=self.covariance[0, 0])
             return lo <= x[0] <= hi
 
     def to_norm_factor_and_exponents(self, X):
@@ -177,8 +174,7 @@ class MVN(object):
             L = sp.linalg.cholesky(self.covariance, lower=True)
         except np.linalg.LinAlgError:
             # Degenerated covariance, try to add regularization
-            L = sp.linalg.cholesky(
-                self.covariance + 1e-3 * np.eye(n_features), lower=True)
+            L = sp.linalg.cholesky(self.covariance + 1e-3 * np.eye(n_features), lower=True)
 
         X_minus_mean = X - self.mean
 
@@ -192,10 +188,9 @@ class MVN(object):
         # We can avoid covariance inversion when computing
         # (X - mean) Sigma^-1 (X - mean)^T  with this trick,
         # since Sigma^-1 = L^T^-1 L^-1.
-        X_normalized = sp.linalg.solve_triangular(
-            L, X_minus_mean.T, lower=True).T
+        X_normalized = sp.linalg.solve_triangular(L, X_minus_mean.T, lower=True).T
 
-        exponent = -0.5 * np.sum(X_normalized ** 2, axis=1)
+        exponent = -0.5 * np.sum(X_normalized**2, axis=1)
 
         return self.norm, exponent
 
@@ -229,8 +224,7 @@ class MVN(object):
             Marginal MVN distribution.
         """
         self._check_initialized()
-        return MVN(mean=self.mean[indices],
-                   covariance=self.covariance[np.ix_(indices, indices)])
+        return MVN(mean=self.mean[indices], covariance=self.covariance[np.ix_(indices, indices)])
 
     def condition(self, indices, x):
         """Conditional distribution over given indices.
@@ -250,10 +244,9 @@ class MVN(object):
         """
         self._check_initialized()
         mean, covariance = condition(
-            self.mean, self.covariance,
-            invert_indices(self.mean.shape[0], indices), indices, x)
-        return MVN(mean=mean, covariance=covariance,
-                   random_state=self.random_state)
+            self.mean, self.covariance, invert_indices(self.mean.shape[0], indices), indices, x
+        )
+        return MVN(mean=mean, covariance=covariance, random_state=self.random_state)
 
     def predict(self, indices, X):
         """Predict means and covariance of posteriors.
@@ -279,9 +272,7 @@ class MVN(object):
         self._check_initialized()
         indices = np.asarray(indices, dtype=int)
         X = np.asarray(X)
-        return condition(
-            self.mean, self.covariance,
-            invert_indices(self.mean.shape[0], indices), indices, X)
+        return condition(self.mean, self.covariance, invert_indices(self.mean.shape[0], indices), indices, X)
 
     def squared_mahalanobis_distance(self, x):
         """Squared Mahalanobis distance between point and this MVN.
@@ -340,8 +331,8 @@ class MVN(object):
         sqrt(C) : array, shape (n_features, n_features)
             Square root of covariance. The square root of a square
             matrix is defined as
-            :math:`\Sigma^{\frac{1}{2}} = B \sqrt(D) B^T`, where
-            :math:`\Sigma = B D B^T` is the Eigen decomposition of the
+            :math:`Sigma^{\frac{1}{2}} = B sqrt(D) B^T`, where
+            :math:`Sigma = B D B^T` is the Eigen decomposition of the
             covariance.
         """
         D, B = np.linalg.eigh(C)
@@ -377,14 +368,14 @@ class MVN(object):
         self._check_initialized()
 
         n_features = len(self.mean)
-        lmbda = alpha ** 2 * (n_features + kappa) - n_features
+        lmbda = alpha**2 * (n_features + kappa) - n_features
         offset = self._sqrt_cov((n_features + lmbda) * self.covariance)
 
         points = np.empty(((2 * n_features + 1), n_features))
         points[0, :] = self.mean
         for i in range(n_features):
             points[1 + i, :] = self.mean + offset[i]
-            points[1 + n_features + i:, :] = self.mean - offset[i]
+            points[1 + n_features + i :, :] = self.mean - offset[i]
         return points
 
     def estimate_from_sigma_points(self, transformed_sigma_points, alpha=1e-3, beta=2.0, kappa=0.0, random_state=None):
@@ -423,10 +414,10 @@ class MVN(object):
         self._check_initialized()
 
         n_features = len(self.mean)
-        lmbda = alpha ** 2 * (n_features + kappa) - n_features
+        lmbda = alpha**2 * (n_features + kappa) - n_features
 
         mean_weight_0 = lmbda / (n_features + lmbda)
-        cov_weight_0 = lmbda / (n_features + lmbda) + (1 - alpha ** 2 + beta)
+        cov_weight_0 = lmbda / (n_features + lmbda) + (1 - alpha**2 + beta)
         weights_i = 1.0 / (2.0 * (n_features + lmbda))
         mean_weights = np.empty(len(transformed_sigma_points))
         mean_weights[0] = mean_weight_0
@@ -435,19 +426,16 @@ class MVN(object):
         cov_weights[0] = cov_weight_0
         cov_weights[1:] = weights_i
 
-        mean = np.sum(mean_weights[:, np.newaxis] * transformed_sigma_points,
-                      axis=0)
+        mean = np.sum(mean_weights[:, np.newaxis] * transformed_sigma_points, axis=0)
         sigma_points_minus_mean = transformed_sigma_points - mean
-        covariance = sigma_points_minus_mean.T.dot(
-            np.diag(cov_weights)).dot(sigma_points_minus_mean)
+        covariance = sigma_points_minus_mean.T.dot(np.diag(cov_weights)).dot(sigma_points_minus_mean)
 
         if random_state is None:
             random_state = self.random_state
         return MVN(mean=mean, covariance=covariance, random_state=random_state)
 
 
-def plot_error_ellipse(ax, mvn, color=None, alpha=0.25,
-                       factors=np.linspace(0.25, 2.0, 8)):
+def plot_error_ellipse(ax, mvn, color=None, alpha=0.25, factors=np.linspace(0.25, 2.0, 8)):
     """Plot error ellipse of MVN.
 
     Parameters
@@ -468,10 +456,10 @@ def plot_error_ellipse(ax, mvn, color=None, alpha=0.25,
         Multiples of the standard deviations that should be plotted.
     """
     from matplotlib.patches import Ellipse
+
     for factor in factors:
         angle, width, height = mvn.to_ellipse(factor)
-        ell = Ellipse(xy=mvn.mean, width=2.0 * width, height=2.0 * height,
-                      angle=np.degrees(angle))
+        ell = Ellipse(xy=mvn.mean, width=2.0 * width, height=2.0 * height, angle=np.degrees(angle))
         ell.set_alpha(alpha)
         if color is not None:
             ell.set_color(color)
@@ -540,8 +528,7 @@ def condition(mean, covariance, i_out, i_in, X):
     """
     cov_12 = covariance[np.ix_(i_out, i_in)]
     cov_11 = covariance[np.ix_(i_out, i_out)]
-    regression_coeffs = regression_coefficients(
-        covariance, i_out, i_in, cov_12=cov_12)
+    regression_coeffs = regression_coefficients(covariance, i_out, i_in, cov_12=cov_12)
 
     mean = mean[i_out] + regression_coeffs.dot((X - mean[i_in]).T).T
     covariance = cov_11 - regression_coeffs.dot(cov_12.T)
