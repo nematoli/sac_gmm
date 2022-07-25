@@ -82,10 +82,10 @@ class GMMTrainer(object):
         return accuracy, np.mean(episodes_returns), np.mean(episodes_lengths)
 
     def run(self):
+        demos_dir = Path(self.cfg.demos_dir).expanduser()
         # Extract demonstrations
         if self.cfg.use_existing_demos:
             # print(Path().absolute())
-            demos_dir = Path(self.cfg.demos_dir).expanduser()
             print((demos_dir / self.cfg.skill / "train.npy").is_file())
             if (demos_dir / self.cfg.skill / "train.npy").is_file() & (
                 demos_dir / self.cfg.skill / "val.npy"
@@ -97,9 +97,9 @@ class GMMTrainer(object):
             extract_demos(self.cfg)
 
         # Train a GMM
-        train_data = np.load(Path(self.cfg.demos_dir) / self.cfg.skill / "train.npy")
+        train_data = np.load(demos_dir / self.cfg.skill / "train.npy")
         train_data = train_data.reshape(1, -1, train_data.shape[-1]).squeeze(0)
-        val_data = np.load(Path(self.cfg.demos_dir) / self.cfg.skill / "val.npy")
+        val_data = np.load(demos_dir / self.cfg.skill / "val.npy")
         # Get velocities from pose
         train_data = train_data[:, 1:4]
         dt = 1.0
@@ -109,7 +109,7 @@ class GMMTrainer(object):
         fitted_gmm = self.fit_gmm(X_train)
 
         # Evaluate in Calvin environment
-        train_data = np.load(Path(self.cfg.demos_dir) / self.cfg.skill / "train.npy")
+        train_data = np.load(demos_dir / self.cfg.skill / "train.npy")
         init_poses = train_data[:, 0, 1:4]
         acc, ep_returns, ep_lens = self.evaluate(gmm=fitted_gmm, env=self.env, init_poses=init_poses)
         logger.info(
