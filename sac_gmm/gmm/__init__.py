@@ -22,8 +22,14 @@ if not __GMR_SETUP__:
 
     __all__ = ["gmm"]
 
-    from .gmm import (GMM, plot_error_ellipses, kmeansplusplus_initialization,
-                      covariance_initialization)
+    from .gmm import GMM, plot_error_ellipses, kmeansplusplus_initialization, covariance_initialization
 
-    __all__.extend(["plot_error_ellipse", "GMM", "plot_error_ellipses",
-                    "kmeansplusplus_initialization", "covariance_initialization"])
+    __all__.extend(
+        [
+            "plot_error_ellipse",
+            "GMM",
+            "plot_error_ellipses",
+            "kmeansplusplus_initialization",
+            "covariance_initialization",
+        ]
+    )

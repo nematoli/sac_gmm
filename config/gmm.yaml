@@ -7,8 +7,10 @@ defaults:
   - override hydra/hydra_logging: colorlog
 
 seed: 42
-log_dir: ../
+log_dir: ${root}
 slurm: false
+
+root: ~/sac_gmm
 
 # Skill extraction params
 demos_dir: ${root}/demonstrations
@@ -18,10 +20,10 @@ skill: 'turn_off_lightbulb'
 # GMM params
 gmm_type: base
 gmm_components: 3
+plot_gmr: true
 
-root: ~/sac_gmm
 # Environment params
-
+render: false
 
 hydra:
   run:
