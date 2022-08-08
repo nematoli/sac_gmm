@@ -1,0 +1,38 @@
+defaults:
+  - calvin_env: full_default
+  - agent: sac
+  - dyn_sys: base_gmm
+
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+# train and eval
+num_train_steps: 1e6
+replay_buffer_capacity: ${num_train_steps}
+num_seed_steps: 5000
+eval_frequency: 10000
+num_eval_episodes: 10
+
+device: cuda
+
+# logger
+log_frequency: 10000
+
+# video recorder
+save_video: true
+
+seed: 1
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M}/${agent}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M}/${agent}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir
+          - datamodule.dataset.data_dir
+          - datamodule.dataset.num_workers

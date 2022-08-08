@@ -1,0 +1,6 @@
+dyn_sys:
+  name: base_gmm
+  _target_: sac_gmm.gmm.GMM
+  gmm_type: base
+  gmm_components: 3
+  plot_gmr: true
