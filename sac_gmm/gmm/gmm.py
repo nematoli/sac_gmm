@@ -8,10 +8,13 @@
 # Source: https://github.com/AlexanderFabisch/gmr
 
 import numpy as np
+from sklearn.mixture import BayesianGaussianMixture
 from scipy.spatial.distance import cdist, pdist
 from scipy.stats import chi2, norm
 from .utils.utils import check_random_state
 from .utils.mvn import MVN, invert_indices, regression_coefficients
+from gym import spaces
+from utils.posdef import isPD, nearestPD
 
 
 def kmeansplusplus_initialization(X, n_components, random_state=None):
@@ -142,6 +145,48 @@ class GMM(object):
         if self.covariances is None:
             raise ValueError("Covariances have not been initialized")
 
+    def init_params(self, X, init_params):
+        """Initialize GMM parameters
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+            Samples from the true distribution.
+
+        init_params : str, optional (default: 'random')
+            Parameter initialization strategy. If means and covariances are
+            given in the constructor, this parameter will have no effect.
+            'random' will sample initial means randomly from the dataset
+            and set covariances to identity matrices. This is the
+            computationally cheap solution.
+            'kmeans++' will use k-means++ initialization for means and
+            initialize covariances to diagonal matrices with variances
+            set based on the average distances of samples in each dimensions.
+            This is computationally more expensive but often gives much
+            better results.
+        """
+        n_samples, n_features = X.shape
+
+        if self.priors is None:
+            self.priors = np.ones(self.n_components, dtype=float) / self.n_components
+
+        if init_params not in ["random", "kmeans++"]:
+            raise ValueError("'init_params' must be 'random' or 'kmeans++' " "but is '%s'" % init_params)
+
+        if self.means is None:
+            if init_params == "random":
+                indices = self.random_state.choice(np.arange(n_samples), self.n_components)
+                self.means = X[indices]
+            else:
+                self.means = kmeansplusplus_initialization(X, self.n_components, self.random_state)
+
+        if self.covariances is None:
+            if init_params == "random":
+                self.covariances = np.empty((self.n_components, n_features, n_features))
+                self.covariances[:] = np.eye(n_features)
+            else:
+                self.covariances = covariance_initialization(X, self.n_components)
+
     def from_samples(self, X, R_diff=1e-4, n_iter=100, init_params="random", oracle_approximating_shrinkage=False):
         """MLE of the mean and covariance.
 
@@ -182,27 +227,9 @@ class GMM(object):
         self : GMM
             This object.
         """
+        self.init_params(X, init_params)
+
         n_samples, n_features = X.shape
-
-        if self.priors is None:
-            self.priors = np.ones(self.n_components, dtype=float) / self.n_components
-
-        if init_params not in ["random", "kmeans++"]:
-            raise ValueError("'init_params' must be 'random' or 'kmeans++' " "but is '%s'" % init_params)
-
-        if self.means is None:
-            if init_params == "random":
-                indices = self.random_state.choice(np.arange(n_samples), self.n_components)
-                self.means = X[indices]
-            else:
-                self.means = kmeansplusplus_initialization(X, self.n_components, self.random_state)
-
-        if self.covariances is None:
-            if init_params == "random":
-                self.covariances = np.empty((self.n_components, n_features, n_features))
-                self.covariances[:] = np.eye(n_features)
-            else:
-                self.covariances = covariance_initialization(X, self.n_components)
 
         R = np.zeros((n_samples, self.n_components))
         for _ in range(n_iter):
@@ -581,6 +608,93 @@ class GMM(object):
             verbose=self.verbose,
             random_state=self.random_state,
         )
+
+    def get_params_range(self):
+        """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
+
+        Returns
+        -------
+        param_space : gym.spaces.Dict
+            Range of GMM parameters parameters
+        """
+        param_space = {}
+        param_space["priors"] = spaces.Box(low=-0.1, high=0.1, shape=(self.priors.size,))
+        param_space["means"] = spaces.Box(low=-0.01, high=0.01, shape=(self.means.size,))
+        # dim = self.means.shape[0] // 2
+        # num_gaussians = self.means.shape[1]
+        # sigma_change_size = int(
+        #     num_gaussians * dim * (dim + 1) / 2 + dim * dim * num_gaussians
+        # )
+        # param_space["covariances"] = spaces.Box(
+        #     low=-1e-6, high=1e-6, shape=(sigma_change_size,)
+        # )
+        return spaces.Dict(param_space)
+
+    def copy_model(self, model):
+        """Copies argument's GMM params into current GMM object
+
+        Parameters
+        ----------
+        model : GMM
+            A GMM object
+        """
+        self.n_components = model.n_components
+        self.priors = np.copy(model.priors)
+        self.means = np.copy(model.means)
+        self.covariances = np.copy(model.covariances)
+
+    def copy_bgm_model(self, model):
+        """Copies argument's Bayesian GMM params into current GMM object
+
+        Parameters
+        ----------
+        model : GMM
+            A GMM object
+        """
+        self.n_components = model.n_components
+        self.priors = np.copy(model.weights_)
+        self.means = np.copy(model.means_)
+        self.covariances = np.copy(model.covariances_)
+
+    def fit_bgmm(self, X, n_components, max_iter, random_state):
+        bgmm = BayesianGaussianMixture(n_components=n_components, max_iter=max_iter, random_state=random_state).fit(X)
+
+        return bgmm
+
+    def update_gmm(self, changes):
+        # Priors
+        delta_priors = changes["priors"].reshape(self.priors.shape)
+        self.priors += delta_priors
+        self.priors[self.priors < 0] = 0
+        self.priors /= self.priors.sum()
+
+        # Means
+        delta_means = changes["means"].reshape(self.means.shape)
+        self.means += delta_means
+
+        # Covariances
+        # delta_cov = changes['covariances'].reshape(self.covariances.shape)
+        # dim = self.means.shape[0] // 2
+        # num_gaussians = self.means.shape[1]
+
+        # # Create sigma_state symmetric matrix
+        # half_mat_size = int(dim * (dim + 1) / 2)
+        # for i in range(num_gaussians):
+        #     d_sigma_state = delta_cov[half_mat_size * i : half_mat_size * (i + 1)]
+        #     mat_d_sigma_state = np.zeros((dim, dim))
+        #     mat_d_sigma_state[np.triu_indices(dim)] = d_sigma_state
+        #     mat_d_sigma_state = mat_d_sigma_state + mat_d_sigma_state.T
+        #     mat_d_sigma_state[np.diag_indices(dim)] = (
+        #         mat_d_sigma_state[np.diag_indices(dim)] / 2
+        #     )
+        #     self.sigma[:dim, :dim, i] += mat_d_sigma_state
+        # if not isPD(self.sigma[:dim, :dim, i]):
+        #     self.covariances[:dim, :dim, i] = nearestPD(self.sigma[:dim, :dim, i])
+
+        # # Create sigma cross correlation matrix
+        # delta_cov_cc = np.array(delta_cov[half_mat_size * num_gaussians :])
+        # delta_cov_cc = delta_cov_cc.reshape((dim, dim, num_gaussians))
+        # self.covariances[dim : 2 * dim, 0:dim] += delta_cov_cc
 
 
 def plot_error_ellipses(ax, gmm, colors=None, alpha=0.25, factors=np.linspace(0.25, 2.0, 8)):

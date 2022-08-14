@@ -7,7 +7,7 @@
 #
 # Source: https://github.com/denisyarats/pytorch_sac
 
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 from collections import defaultdict
 import json
 import os
@@ -28,7 +28,7 @@ COMMON_EVAL_FORMAT = [("episode", "E", "int"), ("step", "S", "int"), ("episode_r
 
 
 AGENT_TRAIN_FORMAT = {
-    "sac": [
+    "sac_gmm": [
         ("batch_reward", "B_REW", "float"),
         ("actor_loss", "A_LOSS", "float"),
         ("critic_loss", "C_LOSS", "float"),
@@ -124,17 +124,18 @@ class Logger(object):
     def __init__(self, log_dir, save_tb=False, log_frequency=10000, agent="sac"):
         self._log_dir = log_dir
         self._log_frequency = log_frequency
-        if save_tb:
-            tb_dir = os.path.join(log_dir, "tb")
-            if os.path.exists(tb_dir):
-                try:
-                    shutil.rmtree(tb_dir)
-                except:
-                    print("logger.py warning: Unable to remove tb directory")
-                    pass
-            self._sw = SummaryWriter(tb_dir)
-        else:
-            self._sw = None
+        # if save_tb:
+        #     tb_dir = os.path.join(log_dir, "tb")
+        #     if os.path.exists(tb_dir):
+        #         try:
+        #             shutil.rmtree(tb_dir)
+        #         except:
+        #             print("logger.py warning: Unable to remove tb directory")
+        #             pass
+        #     self._sw = SummaryWriter(tb_dir)
+        # else:
+        #     self._sw = None
+        self._sw = None
         # each agent has specific output format for training
         assert agent in AGENT_TRAIN_FORMAT
         train_format = COMMON_TRAIN_FORMAT + AGENT_TRAIN_FORMAT[agent]

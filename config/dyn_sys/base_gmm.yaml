@@ -1,6 +1,6 @@
-dyn_sys:
-  name: base_gmm
+gmm_components: 3
+gmm_type: base
+plot_gmr: false
+cfg:
   _target_: sac_gmm.gmm.GMM
-  gmm_type: base
-  gmm_components: 3
-  plot_gmr: true
+  n_components: 3

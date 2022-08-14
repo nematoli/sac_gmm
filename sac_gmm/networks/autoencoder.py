@@ -21,10 +21,8 @@ class AutoEncoder(object):
 
 class Encoder(nn.Module):
     def __init__(self, in_channels, obs_space, out_dim, late_fusion):
-        if isinstance(obs_space, Tuple):
-            h, w = obs_space[0].shape
-        else:
-            h, w = obs_space.shape
+        super(Encoder, self).__init__()
+        h, w = obs_space
         h, w = utils.misc.calc_out_size(h, w, 8, stride=4)
         h, w = utils.misc.calc_out_size(h, w, 4, stride=2)
         self.net = nn.Sequential(
@@ -66,10 +64,7 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.out_channels = out_channels
         self.late_fusion = late_fusion
-        if isinstance(obs_space, Tuple):
-            self.i_h, self.i_w = obs_space[0].shape
-        else:
-            self.i_h, self.i_w = obs_space.shape
+        self.i_h, self.i_w = obs_space
         h, w = self.i_h, self.i_w
         h, w = utils.misc.calc_out_size(h, w, 8, stride=4)
         self.h, self.w = utils.misc.calc_out_size(h, w, 4, stride=2)

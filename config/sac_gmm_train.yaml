@@ -1,33 +1,48 @@
 defaults:
   - calvin_env: full_default
-  - agent: sac
+  - agent: sac_gmm
   - dyn_sys: base_gmm
-
+  - datamodule: default
+  - _self_
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 
-# train and eval
-num_train_steps: 1e6
-replay_buffer_capacity: ${num_train_steps}
-num_seed_steps: 5000
-eval_frequency: 10000
-num_eval_episodes: 10
+# skill params
+use_existing_demos: true
+skill: 'turn_off_lightbulb'
 
+# train and eval
+num_train_steps: 5e4
+replay_buffer_capacity: 5e6
+num_seed_steps: 256
+eval_frequency: 10000
+num_eval_episodes: 100
+gmm_window_size: 32
+
+# gpu
 device: cuda
 
 # logger
 log_frequency: 10000
+log_save_tb: false
 
 # video recorder
 save_video: true
+
+# directories
+root: ~/sac_gmm
+log_dir: ${root}
+demos_dir: ${root}/demonstrations
+
+name: sac_gmm
 
 seed: 1
 
 hydra:
   run:
-    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M}/${agent}
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M}/${name}
   sweep:
-    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M}/${agent}
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M}/${name}
     subdir: ${hydra.job.override_dirname}
   job:
     config:

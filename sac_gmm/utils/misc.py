@@ -40,6 +40,15 @@ class train_mode(object):
         return False
 
 
+def make_dir(*path_parts):
+    dir_path = os.path.join(*path_parts)
+    try:
+        os.mkdir(dir_path)
+    except OSError:
+        pass
+    return dir_path
+
+
 def set_seed_everywhere(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():

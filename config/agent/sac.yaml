@@ -40,18 +40,3 @@ diag_gaussian_actor:
     hidden_depth: 2
     hidden_dim: 256
     log_std_bounds: [-5, 2]
-
-autoencoder:
-  _target_: sac_gmm.networks.autoencoder.AutoEncoder
-  params:
-    hd_input_space: ??? # to be specified later
-    in_channels: ??? # to be specified later
-    hidden_dim: 8
-    late_fusion: false
-    latent_lambda: 0
-
-
-hd_input_network:
-  _target_: sac_gmm.networks.hd_input_net.HDInputNetwork
-  params:
-    autoencoder_cfg: ${autoencoder}

@@ -6,7 +6,8 @@ pytorch-lightning
 gmr
 scikit-learn
 numpy
-pybulletX
 gym
 tqdm
 scipy
+imageio
+termcolor

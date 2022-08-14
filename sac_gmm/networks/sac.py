@@ -13,10 +13,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
-from agent import Agent
+from . import Agent
 import utils
 
 import hydra
+import pdb
 
 
 class SACAgent(Agent):
@@ -85,6 +86,7 @@ class SACAgent(Agent):
         self.training = training
         self.actor.train(training)
         self.critic.train(training)
+        self.autoencoder.train(training)
 
     @property
     def alpha(self):
@@ -111,7 +113,7 @@ class SACAgent(Agent):
         # get current Q estimates
         current_Q1, current_Q2 = self.critic(obs, action)
         critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(current_Q2, target_Q)
-        # logger.log('train_critic/loss', critic_loss, step)
+        logger.log("train_critic/loss", critic_loss, step)
 
         # Optimize the critic
         self.critic_optimizer.zero_grad()
@@ -129,9 +131,9 @@ class SACAgent(Agent):
         actor_Q = torch.min(actor_Q1, actor_Q2)
         actor_loss = (self.alpha.detach() * log_prob - actor_Q).mean()
 
-        # logger.log('train_actor/loss', actor_loss, step)
-        # logger.log('train_actor/target_entropy', self.target_entropy, step)
-        # logger.log('train_actor/entropy', -log_prob.mean(), step)
+        logger.log("train_actor/loss", actor_loss, step)
+        logger.log("train_actor/target_entropy", self.target_entropy, step)
+        logger.log("train_actor/entropy", -log_prob.mean(), step)
 
         # optimize the actor
         self.actor_optimizer.zero_grad()
@@ -143,8 +145,8 @@ class SACAgent(Agent):
         if self.learnable_temperature:
             self.log_alpha_optimizer.zero_grad()
             alpha_loss = (self.alpha * (-log_prob - self.target_entropy).detach()).mean()
-            # logger.log('train_alpha/loss', alpha_loss, step)
-            # logger.log('train_alpha/value', self.alpha, step)
+            logger.log("train_alpha/loss", alpha_loss, step)
+            logger.log("train_alpha/value", self.alpha, step)
             alpha_loss.backward()
             self.log_alpha_optimizer.step()
 
@@ -156,9 +158,9 @@ class SACAgent(Agent):
         latent_loss = (0.5 * hidden.pow(2).sum(1)).mean()
         ae_loss = rec_loss + self.autoencoder.latent_lambda * latent_loss
 
-        # logger.log('train_ae/loss', ae_loss, step)
-        # logger.log('train_ae/rec_loss', rec_loss, step)
-        # logger.log('train_ae/latent_loss', latent_loss, step)
+        logger.log("train_ae/loss", ae_loss, step)
+        logger.log("train_ae/rec_loss", rec_loss, step)
+        logger.log("train_ae/latent_loss", latent_loss, step)
 
         self.ae_optimizer.zero_grad()
         ae_loss.backward()
@@ -167,7 +169,7 @@ class SACAgent(Agent):
     def update(self, replay_buffer, logger, step):
         obs, action, reward, next_obs, not_done, not_done_no_max = replay_buffer.sample(self.batch_size)
 
-        # logger.log('train/batch_reward', reward.mean(), step)
+        logger.log("train/batch_reward", reward.mean(), step)
 
         self.update_critic(obs, action, reward, next_obs, not_done_no_max, logger, step)
 
