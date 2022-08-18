@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from torchvision import transforms
 
 
 class AddGaussianNoise(object):
@@ -26,3 +27,18 @@ class ArrayToTensor(object):
     def __call__(self, array: np.ndarray, device: torch.device = "cpu") -> torch.Tensor:
         assert isinstance(array, np.ndarray)
         return torch.from_numpy(array).to(device)
+
+
+class PreprocessImage(object):
+    """Preprocesses np image to tensor image."""
+
+    def __call__(self, array: np.ndarray) -> torch.Tensor:
+        assert isinstance(array, np.ndarray)
+        array = np.transpose(array, (2, 0, 1))
+        tensor = torch.from_numpy(array).type(torch.FloatTensor)
+        mean, std = tensor.mean([1, 2]), tensor.std([1, 2])
+        tensor = transforms.Normalize(mean, std)(tensor)
+        tensor = transforms.Resize(64)(tensor)
+        tensor = transforms.Grayscale(1)(tensor)
+        tensor = tensor.unsqueeze(0)
+        return tensor

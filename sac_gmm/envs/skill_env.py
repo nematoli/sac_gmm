@@ -3,15 +3,20 @@ from calvin_env.envs.play_table_env import PlayTableSimEnv
 import hydra
 
 
-class TurnOffBulbEnv(PlayTableSimEnv):
+class SkillSpecificEnv(PlayTableSimEnv):
     def __init__(self, tasks: dict = {}, **kwargs):
-        super(TurnOffBulbEnv, self).__init__(**kwargs)
+        super(SkillSpecificEnv, self).__init__(**kwargs)
         # For this example we will modify the observation to
         # only retrieve the end effector pose
         self.action_space = spaces.Box(low=-1, high=1, shape=(7,))
         self.observation_space = spaces.Box(low=-1, high=1, shape=(7,))
         # We can use the task utility to know if the task was executed correctly
         self.tasks = hydra.utils.instantiate(tasks)
+        self.skill_name = None
+        self.max_episode_steps = 1000
+
+    def set_skill(self, skill):
+        self.skill_name = skill
 
     def reset(self):
         obs = super().reset()
@@ -23,12 +28,24 @@ class TurnOffBulbEnv(PlayTableSimEnv):
         robot_obs, robot_info = self.robot.get_observation()
         return robot_obs[:7]
 
+    def get_camera_obs(self):
+        """Collect camera, robot and scene observations."""
+        assert self.cameras is not None
+        rgb_obs = {}
+        depth_obs = {}
+        for cam in self.cameras:
+            rgb, depth = cam.render()
+            rgb_obs[f"rgb_{cam.name}"] = rgb
+            depth_obs[f"depth_{cam.name}"] = depth
+        obs = {"rgb_obs": rgb_obs, "depth_obs": depth_obs}
+        return obs
+
     def _success(self):
         """Returns a boolean indicating if the task was performed correctly"""
         current_info = self.get_info()
-        task_filter = ["turn_off_lightbulb"]
+        task_filter = [self.skill_name]
         task_info = self.tasks.get_task_info_for_set(self.start_info, current_info, task_filter)
-        return "turn_off_lightbulb" in task_info
+        return self.skill_name in task_info
 
     def _reward(self):
         """Returns the reward function that will be used

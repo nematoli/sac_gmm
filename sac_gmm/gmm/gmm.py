@@ -14,7 +14,7 @@ from scipy.stats import chi2, norm
 from .utils.utils import check_random_state
 from .utils.mvn import MVN, invert_indices, regression_coefficients
 from gym import spaces
-from utils.posdef import isPD, nearestPD
+from .utils.posdef import isPD, nearestPD
 
 
 def kmeansplusplus_initialization(X, n_components, random_state=None):
@@ -609,6 +609,14 @@ class GMM(object):
             random_state=self.random_state,
         )
 
+    def get_params(self):
+        """Returns GMM parameters"""
+        priors = self.priors
+        means = self.means.flatten()
+        # covariance = self.covariances.flatten()
+        params = np.concatenate((priors, means), axis=-1)
+        return params
+
     def get_params_range(self):
         """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
 
@@ -630,7 +638,7 @@ class GMM(object):
         # )
         return spaces.Dict(param_space)
 
-    def copy_model(self, model):
+    def copy_from(self, model):
         """Copies argument's GMM params into current GMM object
 
         Parameters
@@ -643,7 +651,7 @@ class GMM(object):
         self.means = np.copy(model.means)
         self.covariances = np.copy(model.covariances)
 
-    def copy_bgm_model(self, model):
+    def copy_from_bgm(self, model):
         """Copies argument's Bayesian GMM params into current GMM object
 
         Parameters
@@ -695,6 +703,22 @@ class GMM(object):
         # delta_cov_cc = np.array(delta_cov[half_mat_size * num_gaussians :])
         # delta_cov_cc = delta_cov_cc.reshape((dim, dim, num_gaussians))
         # self.covariances[dim : 2 * dim, 0:dim] += delta_cov_cc
+        return None
+
+    def predict_action(self, obs, relative=True):
+        sampling_dt = 1 / 30
+        cgmm = self.condition([0, 1, 2], obs[0:3])
+        if list(np.isnan(cgmm.priors)) != [False, False, False]:
+            print("CGMM has Nans. This is bad news!")
+            cgmm.priors = np.ones((1, cgmm.priors.shape[0])) / cgmm.priors.shape[0]
+            cgmm.priors = cgmm.priors.ravel()
+        x_dot = cgmm.sample_confidence_region(1, alpha=0.7).reshape(-1)
+        delta_pos = sampling_dt * x_dot
+        if relative:
+            action = np.append(delta_pos, np.append(np.zeros(3), -1))
+        else:
+            action = np.array([obs[:3] + delta_pos, obs[3:6], obs[-1]], dtype=object)
+        return action
 
 
 def plot_error_ellipses(ax, gmm, colors=None, alpha=0.25, factors=np.linspace(0.25, 2.0, 8)):

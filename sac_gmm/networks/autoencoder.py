@@ -6,38 +6,56 @@ from collections import OrderedDict
 
 import numpy as np
 import utils
+import pdb
 
 
-class AutoEncoder(object):
-    def __init__(self, hd_input_space, in_channels, hidden_dim, late_fusion, latent_lambda):
-        self.encoder = Encoder(in_channels, hd_input_space, hidden_dim, late_fusion)
-        self.decoder = Decoder(hidden_dim, hd_input_space, in_channels, late_fusion)
+class AutoEncoder(nn.Module):
+    def __init__(self, hd_input_space, in_channels, hidden_dim, late_fusion, latent_lambda, device):
+        super(AutoEncoder, self).__init__()
+        self.encoder = Encoder(in_channels, hd_input_space, hidden_dim, late_fusion, device).to(device)
+        self.decoder = Decoder(hidden_dim, hd_input_space, in_channels, late_fusion, device).to(device)
         self.latent_lambda = latent_lambda
 
     def forward(self, x):
         x = self.encoder.forward(x)
         x = self.decoder.forward(x)
+        return x
+
+    def get_image_rep(self, x):
+        return self.encoder.forward(x).detach()
 
 
 class Encoder(nn.Module):
-    def __init__(self, in_channels, obs_space, out_dim, late_fusion):
+    def __init__(self, in_channels, obs_space, out_dim, late_fusion, device):
         super(Encoder, self).__init__()
+        self.late_fusion = late_fusion
+        self.device = device
+        self.in_channels = in_channels
         h, w = obs_space
         h, w = utils.misc.calc_out_size(h, w, 8, stride=4)
         h, w = utils.misc.calc_out_size(h, w, 4, stride=2)
+        if late_fusion:
+            num_channels = 1
+        else:
+            num_channels = in_channels
         self.net = nn.Sequential(
             OrderedDict(
                 [
-                    ("enc_cnn_1", nn.Conv2d(in_channels, 16, 8, stride=4)),
+                    ("enc_cnn_1", nn.Conv2d(num_channels, 16, 8, stride=4)),
                     ("enc_cnn_elu_1", nn.ELU()),
                     ("enc_cnn_2", nn.Conv2d(16, 32, 4, stride=2)),
                     (
                         "spatial_softmax",
-                        SpatialSoftmax(h, w),
+                        SpatialSoftmax(h, w, self.device).to(self.device),
                     ),
                 ]
             )
-        )
+        ).to(self.device)
+
+        if self.late_fusion:
+            self.fc = nn.Linear(64 * in_channels, out_dim).to(self.device)
+        else:
+            self.fc = nn.Linear(64, out_dim).to(self.device)
 
     def forward(self, x, detach_encoder=False):
         if x.ndim == 3:
@@ -60,8 +78,9 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, input_dim, obs_space, out_channels, late_fusion):
+    def __init__(self, input_dim, obs_space, out_channels, late_fusion, device):
         super(Decoder, self).__init__()
+        self.device = device
         self.out_channels = out_channels
         self.late_fusion = late_fusion
         self.i_h, self.i_w = obs_space
@@ -70,11 +89,11 @@ class Decoder(nn.Module):
         self.h, self.w = utils.misc.calc_out_size(h, w, 4, stride=2)
 
         if self.late_fusion:
-            self.fc = nn.Linear(input_dim, 64 * out_channels)
+            self.fc = nn.Linear(input_dim, 64 * out_channels).to(self.device)
             out_channels = 1
         else:
-            self.fc = nn.Linear(input_dim, 64)
-        self.fc2 = nn.Linear(64, self.h * self.w * 32)
+            self.fc = nn.Linear(input_dim, 64).to(self.device)
+        self.fc2 = nn.Linear(64, self.h * self.w * 32).to(self.device)
 
         self.net = nn.Sequential(
             OrderedDict(
@@ -87,7 +106,7 @@ class Decoder(nn.Module):
                     ),
                 ]
             )
-        )
+        ).to(self.device)
 
     def forward(self, x):
         if len(list(x.size())) <= 1:  # if latent space have just one sample
@@ -115,7 +134,7 @@ class Decoder(nn.Module):
 
 class SpatialSoftmax(nn.Module):
     # reference: https://arxiv.org/pdf/1509.06113.pdf
-    def __init__(self, height, width):
+    def __init__(self, height, width, device):
         super(SpatialSoftmax, self).__init__()
         x_map = np.empty([height, width], np.float32)
         y_map = np.empty([height, width], np.float32)
@@ -125,8 +144,8 @@ class SpatialSoftmax(nn.Module):
                 x_map[i, j] = (i - height / 2.0) / height
                 y_map[i, j] = (j - width / 2.0) / width
 
-        self.x_map = torch.from_numpy(np.array(x_map.reshape((-1)), np.float32))  # W*H
-        self.y_map = torch.from_numpy(np.array(x_map.reshape((-1)), np.float32))  # W*H
+        self.x_map = torch.from_numpy(np.array(x_map.reshape((-1)), np.float32)).to(device)  # W*H
+        self.y_map = torch.from_numpy(np.array(x_map.reshape((-1)), np.float32)).to(device)  # W*H
 
     def forward(self, x):
         x = x.view(x.shape[0], x.shape[1], x.shape[2] * x.shape[3])  # batch, C, W*H

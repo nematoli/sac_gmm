@@ -10,14 +10,16 @@ defaults:
 # skill params
 use_existing_demos: true
 skill: 'turn_off_lightbulb'
+skill_length: 64
 
 # train and eval
 num_train_steps: 5e4
-replay_buffer_capacity: 5e6
-num_seed_steps: 256
-eval_frequency: 10000
+replay_buffer_capacity: 1e2
+num_seed_steps: 4
+eval_frequency: 10
 num_eval_episodes: 100
 gmm_window_size: 32
+gmm_max_episode_steps: 200
 
 # gpu
 device: cuda
