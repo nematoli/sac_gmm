@@ -9,5 +9,7 @@ numpy
 gym
 tqdm
 scipy
-imageio
+imageio[ffmpeg]
 termcolor
+pymanopt
+mayavi

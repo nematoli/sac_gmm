@@ -1,0 +1,54 @@
+defaults:
+  - dyn_sys: manifold_gmm # clfds or manifold_gmm
+  - dataset: calvin_ds
+  - _self_
+
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+seed: 42
+log_dir: ${root}/logs
+slurm: false
+
+root: /home/lagandua/projects/sac_gmm
+
+# Skill Demos
+demos_dir: ${root}/data
+
+# Skill params
+skills_dir: ${root}/skills_ds
+skills_list: ${skills_dir}/skillnames_open.txt
+state_type: 'pos'
+dim: none
+
+# Dataset params:
+skill: none
+train: true # false to load validation dataset
+goal_centered: true # this must be false during evaluation
+dt: 0.0666
+sampling_dt: 0.0333
+normalized: false
+is_quaternion: false
+
+# Evaluation and DS params
+max_steps: 240
+
+# GMM params
+gmm_components: 5
+plot: true
+
+# Environment params
+render: false
+record: false
+
+hydra:
+  run:
+    dir: ${log_dir}/train-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/train-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir

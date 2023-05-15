@@ -1,0 +1,4 @@
+_target_:  sac_gmm.gmm.gmm.ManifoldGMM
+_recursive_: true
+n_components: ${gmm_components}
+plot: ${plot}

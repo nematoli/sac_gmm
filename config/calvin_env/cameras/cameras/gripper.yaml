@@ -6,5 +6,3 @@ nearval: 0.01
 farval: 2
 width: 84
 height: 84
-robot_id: 0
-cid: 0

@@ -1,6 +1,0 @@
-gmm_components: 3
-gmm_type: base
-plot_gmr: false
-cfg:
-  _target_: sac_gmm.gmm.GMM
-  n_components: 3
