@@ -150,6 +150,5 @@ cython_debug/
 nohup.out
 temp/
 
-dataset/
 demonstrations/
 runs/
