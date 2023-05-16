@@ -126,37 +126,37 @@ class ManifoldGMM(object):
         dx, _, __ = manifold_gmr(x.reshape(1, -1), self.manifold, self.means, self.covariances, self.priors)
         return dx
 
-    def plot_gmm_mlab(self, input_space=True):
-        from mayavi import mlab
-        from SkillsSequencing.utils.plot_sphere_mayavi import plot_sphere, plot_gaussian_mesh_on_tangent_plane
+    # def plot_gmm_mlab(self, input_space=True):
+    #     from mayavi import mlab
+    #     from SkillsSequencing.utils.plot_sphere_mayavi import plot_sphere, plot_gaussian_mesh_on_tangent_plane
 
-        if input_space:
-            dim = 0
-        else:
-            dim = 1
-        nb_data = self.dataset.X[0].shape[0]
-        X = np.concatenate(self.data[:, dim]).reshape(self.data.shape[0], len(self.data[0, 0]))
-        mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(700, 700))
-        fig = mlab.gcf()
-        mlab.clf()
-        plot_sphere(figure=fig)
-        # Plot data on the sphere
-        for p in range():
-            mlab.points3d(X[p * nb_data:(p + 1) * nb_data, 0],
-                          X[p * nb_data:(p + 1) * nb_data, 1],
-                          X[p * nb_data:(p + 1) * nb_data, 2],
-                          color=(0., 0., 0.),
-                          scale_factor=0.03)
-        # Plot Gaussians
-        for k in range(self.n_comp):
-            mlab.points3d(self.means[k, dim][0],
-                          self.means[k, dim][1],
-                          self.means[k, dim][2],
-                          color=(1, 0., 0.),
-                          scale_factor=0.05)
-            plot_gaussian_mesh_on_tangent_plane(self.means[k, dim], self.covariances[k, :self.dim, :self.dim], color=(0.5, 0, 0.2))
-        mlab.view(30, 120)
-        mlab.show()
+    #     if input_space:
+    #         dim = 0
+    #     else:
+    #         dim = 1
+    #     nb_data = self.dataset.X[0].shape[0]
+    #     X = np.concatenate(self.data[:, dim]).reshape(self.data.shape[0], len(self.data[0, 0]))
+    #     mlab.figure(1, bgcolor=(1, 1, 1), fgcolor=(0, 0, 0), size=(700, 700))
+    #     fig = mlab.gcf()
+    #     mlab.clf()
+    #     plot_sphere(figure=fig)
+    #     # Plot data on the sphere
+    #     for p in range():
+    #         mlab.points3d(X[p * nb_data:(p + 1) * nb_data, 0],
+    #                       X[p * nb_data:(p + 1) * nb_data, 1],
+    #                       X[p * nb_data:(p + 1) * nb_data, 2],
+    #                       color=(0., 0., 0.),
+    #                       scale_factor=0.03)
+    #     # Plot Gaussians
+    #     for k in range(self.n_comp):
+    #         mlab.points3d(self.means[k, dim][0],
+    #                       self.means[k, dim][1],
+    #                       self.means[k, dim][2],
+    #                       color=(1, 0., 0.),
+    #                       scale_factor=0.05)
+    #         plot_gaussian_mesh_on_tangent_plane(self.means[k, dim], self.covariances[k, :self.dim, :self.dim], color=(0.5, 0, 0.2))
+    #     mlab.view(30, 120)
+    #     mlab.show()
 
     def plot_gmm(self):
         # Pick 15 random datapoints from X to plot
