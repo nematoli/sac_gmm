@@ -29,7 +29,26 @@ sh install.sh
 ```
 
 ## Download
+Download the [CALVIN dataset](https://github.com/mees/calvin) and place it inside [dataset/](./dataset/). 
 
+## Skill Library
+
+### Step 1: Extract skill demos from the CALVIN dataset
+Configure [config/demos.yaml](./config/demos.yaml).
+```
+> python sacgmm/extract_demos.py skill='open_drawer'
+```
+
+### Step 2: Train and evaluate skill libraries (Dynamical Systems) with ManifoldGMM 
+Configure [config/train_ds.yaml](./config/train_ds.yaml).
+```
+> python sac_gmm/dynsys/train_skills.py skill='open_drawer'
+```
+
+Configure [config/eval_ds.yaml](./config/eval_ds.yaml).
+```
+> python sac_gmm/dynsys/eval_skills.py skill='open_drawer'
+```
 
 ### Pre-trained Models
 We provide our final models for ...

@@ -1,33 +1,31 @@
-import logging
-from pathlib import Path
-import sys
-from typing import List, Union
 import os
-import numpy as np
-
-cwd_path = Path(__file__).absolute().parents[0]
-parent_path = cwd_path.parents[0]
-# This is for using the locally installed repo clone when using slurm
-sys.path.insert(0, parent_path.as_posix())
-
+import sys
 import hydra
+import logging
+import numpy as np
+from pathlib import Path
 from omegaconf import DictConfig
 from pytorch_lightning import seed_everything
-import pdb
+
+cwd_path = Path(__file__).absolute().parents[0]
+root = cwd_path.parents[0]
+# This is for using the locally installed repo clone when using slurm
+sys.path.insert(0, root.as_posix())  # root
+
 
 logger = logging.getLogger(__name__)
 os.chdir(cwd_path)
 
 
 def save_demonstrations(datamodule, save_dir):
-    mode = ["train", "val"]
+    mode = ["training", "validation"]
     p = Path(Path(save_dir).expanduser() / datamodule.skill)
     p.mkdir(parents=True, exist_ok=True)
 
     for m in mode:
-        if m == "train":
+        if "train" in m:
             data_loader = datamodule.train_dataloader()
-        elif m == "val":
+        elif "val" in m:
             data_loader = datamodule.val_dataloader()
 
         split_iter = iter(data_loader)
@@ -47,7 +45,7 @@ def save_demonstrations(datamodule, save_dir):
         np.save(save_dir, demos)
 
 
-@hydra.main(config_path="../config", config_name="demos")
+@hydra.main(version_base="1.1", config_path="../../config", config_name="demos")
 def extract_demos(cfg: DictConfig) -> None:
     """
     This is called to extract demonstrations for a specific skill.
@@ -55,6 +53,13 @@ def extract_demos(cfg: DictConfig) -> None:
         cfg: hydra config
     """
     seed_everything(cfg.seed, workers=True)
+    cfg.log_dir = Path(cfg.log_dir).expanduser()
+    cfg.demos_dir = Path(cfg.demos_dir).expanduser()
+    import pdb
+
+    pdb.set_trace()
+    os.makedirs(cfg.log_dir, exist_ok=True)
+    os.makedirs(cfg.demos_dir, exist_ok=True)
     datamodule = hydra.utils.instantiate(cfg.datamodule)
     datamodule.setup(stage="fit")
     save_demonstrations(datamodule, cfg.demos_dir)

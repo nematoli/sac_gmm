@@ -29,9 +29,7 @@ class SkillEvaluator(object):
     def __init__(self, cfg, env):
         self.cfg = cfg
         self.env = env
-        f = open(cfg.skills_list, "r")
-        skill_set = f.read()
-        self.skill_set = skill_set.split("\n")
+        self.skill = self.cfg.skill
         self.logger = logging.getLogger("SkillEvaluator")
 
     def evaluate(self, ds, dataset, max_steps, sampling_dt, render=False, record=False):
@@ -75,18 +73,9 @@ class SkillEvaluator(object):
                     delta_x = sampling_dt * d_x
                     new_x = x + delta_x
                 else:
-                    # goal = np.array([0.16425726, -0.23430869,  0.3718335])
-                    # goal = np.array([0.17921756, -0.21936302,  0.38075492])
-                    # First Goal-Centering and then Normalize (GCN Space)
-                    # d_x = ds.predict_dx(dataset.normalize(x-goal))
                     d_x = ds.predict(x - goal)
                     delta_x = sampling_dt * d_x
-                    # Get next position in GCN space
-                    # new_x = dataset.normalize(x-goal) + delta_x
                     new_x = x + delta_x
-                    # Come back to original data space from GCN space
-                    # new_x = dataset.undo_normalize(new_x) + goal
-                    # pdb.set_trace()
                 if dataset.state_type == "pos":
                     temp = np.append(new_x, np.append(dataset.fixed_ori, -1))
                 else:
@@ -120,52 +109,44 @@ class SkillEvaluator(object):
 
     def run(self):
         skill_accs = {}
-        for skill in self.skill_set:
-            self.env.set_skill(skill)
+        self.env.set_skill(self.skill)
 
-            # Get validation dataset
-            self.cfg.dataset.skill = skill
-            val_dataset = hydra.utils.instantiate(self.cfg.dataset)
+        # Get validation dataset
+        self.cfg.dataset.skill = self.skill
+        val_dataset = hydra.utils.instantiate(self.cfg.dataset)
 
-            # Create and load models to evaluate
-            self.cfg.dim = val_dataset.X.shape[-1]
-            ds = hydra.utils.instantiate(self.cfg.dyn_sys)
-            ds.model_dir = os.path.join(self.cfg.skills_dir, self.cfg.state_type, skill, ds.name)
+        # Create and load models to evaluate
+        self.cfg.dim = val_dataset.X.shape[-1]
+        ds = hydra.utils.instantiate(self.cfg.dyn_sys)
+        ds.model_dir = os.path.join(self.cfg.skills_dir, self.cfg.state_type, self.skill, ds.name)
 
-            if ds.name == "clfds":
-                clf_file = os.path.join(ds.model_dir, "clf")
-                reg_file = os.path.join(ds.model_dir, "ds")
-                ds.load_models(clf_file=clf_file, reg_file=reg_file)
-            else:
-                # Obtain X_mins and X_maxs from training data to normalize in real-time
-                self.cfg.dataset.train = True
-                # self.cfg.dataset.normalized = True
-                # self.cfg.dataset.goal_centered = True
-                train_dataset = hydra.utils.instantiate(self.cfg.dataset)
-                val_dataset.goal = train_dataset.goal
-                # val_dataset.X_mins = train_dataset.X_mins
-                # val_dataset.X_maxs = train_dataset.X_maxs
+        # Obtain X_mins and X_maxs from training data to normalize in real-time
+        self.cfg.dataset.train = True
+        train_dataset = hydra.utils.instantiate(self.cfg.dataset)
+        val_dataset.goal = train_dataset.goal
 
-                ds.skills_dir = ds.model_dir
-                ds.load_model()
-                ds.state_type = self.cfg.state_type
-                ds.manifold = ds.make_manifold(self.cfg.dim)
-            self.logger.info(f"Evaluating {skill} skill with {self.cfg.state_type} input on CALVIN environment")
-            self.logger.info(f"Test/Val Data: {val_dataset.X.size()}")
-            # Evaluate by simulating in the CALVIN environment
-            acc, avg_return, avg_len = self.evaluate(
-                ds,
-                val_dataset,
-                max_steps=self.cfg.max_steps,
-                render=self.cfg.render,
-                record=self.cfg.record,
-                sampling_dt=self.cfg.sampling_dt,
-            )
-            skill_accs[skill] = [str(acc), str(avg_return), str(avg_len)]
-            self.env.count = 0
+        ds.skills_dir = ds.model_dir
+        ds.load_model()
+        ds.state_type = self.cfg.state_type
+        ds.manifold = ds.make_manifold(self.cfg.dim)
 
-            # Log evaluation output
-            self.logger.info(f"{skill} Skill Accuracy: {round(acc, 2)}")
+        self.logger.info(f"Evaluating {self.skill} skill with {self.cfg.state_type} input on CALVIN environment")
+        self.logger.info(f"Test/Val Data: {val_dataset.X.size()}")
+
+        # Evaluate by simulating in the CALVIN environment
+        acc, avg_return, avg_len = self.evaluate(
+            ds,
+            val_dataset,
+            max_steps=self.cfg.max_steps,
+            render=self.cfg.render,
+            record=self.cfg.record,
+            sampling_dt=self.cfg.sampling_dt,
+        )
+        skill_accs[self.skill] = [str(acc), str(avg_return), str(avg_len)]
+        self.env.count = 0
+
+        # Log evaluation output
+        self.logger.info(f"{self.skill} Skill Accuracy: {round(acc, 2)}")
 
         # Write accuracies to a file
         with open(os.path.join(self.env.outdir, f"skill_ds_acc_{self.cfg.state_type}.txt"), "w") as f:
@@ -176,6 +157,10 @@ class SkillEvaluator(object):
 
 @hydra.main(version_base="1.1", config_path="../../config", config_name="eval_ds")
 def main(cfg: DictConfig) -> None:
+    cfg.log_dir = Path(cfg.log_dir).expanduser()
+    cfg.demos_dir = Path(cfg.demos_dir).expanduser()
+    cfg.skills_dir = Path(cfg.skills_dir).expanduser()
+
     new_env_cfg = {**cfg.calvin_env.env}
     new_env_cfg["use_egl"] = False
     new_env_cfg["show_gui"] = False

@@ -1,5 +1,5 @@
 [flake8]
-exclude = .git
+exclude = .git, ./calvin_env/
 # Default is 79 in PEP 8
 max-line-length = 120
 select = E,F,W,C

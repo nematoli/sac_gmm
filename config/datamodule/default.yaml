@@ -1,5 +1,5 @@
 defaults:
-  - dataset: calvin_debug
+  - dataset: calvin
   - transforms: calvin
 
 _target_: sac_gmm.datasets.skill_datamodule.SkillDataModule
