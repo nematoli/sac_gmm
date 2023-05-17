@@ -31,7 +31,6 @@ class CalvinDataset(BaseDataset):
         return self.num_demos
 
     def __getitem__(self, idx: Union[int, Tuple[int, int]]) -> Dict:
-
         return self.get_sequences(idx)
 
     def lookup_naming_pattern(self):

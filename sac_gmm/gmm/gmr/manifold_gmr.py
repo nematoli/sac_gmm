@@ -5,9 +5,18 @@ from pymanopt.manifolds import Euclidean, Sphere, Product
 from sac_gmm.gmm.gmr.statistics import multivariate_normal
 
 
-def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, in_manifold_idx=[0],
-                 out_manifold_idx=[1], nbiter_mu=10, regularization_factor=1e-10, convergence_threshold=1e-6):
-
+def manifold_gmr(
+    input_data,
+    manifold,
+    gmm_means,
+    gmm_covariances,
+    gmm_priors,
+    in_manifold_idx=[0],
+    out_manifold_idx=[1],
+    nbiter_mu=10,
+    regularization_factor=1e-10,
+    convergence_threshold=1e-6,
+):
     nb_data = input_data.shape[0]
     nb_states = len(gmm_means)
     H = np.zeros((nb_states, nb_data))
@@ -33,9 +42,12 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
     # Compute weights
     for n in range(nb_data):
         for k in range(nb_states):
-            H[k, n] = gmm_priors[k] * multivariate_normal(in_manifold.log(gmm_means[k][in_manifold_idx], input_data[n]),
-                                                       np.zeros_like(input_data[n]),
-                                                       gmm_covariances[k][in_idx][:, in_idx], log=False)
+            H[k, n] = gmm_priors[k] * multivariate_normal(
+                in_manifold.log(gmm_means[k][in_manifold_idx], input_data[n]),
+                np.zeros_like(input_data[n]),
+                gmm_covariances[k][in_idx][:, in_idx],
+                log=False,
+            )
     H = H / np.sum(H, 0)
 
     # Eigendecomposition of the covariances for parallel transport
@@ -58,7 +70,7 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
                 eigvec_in = np.empty(len(in_manifold.manifolds), dtype=object)
                 idx = 0
                 for m in range(len(in_manifold.manifolds)):
-                    eigvec_in[m] = gmm_covariances_eigenvectors[k][in_idx[idx: idx + input_point[m].shape[0]], j]
+                    eigvec_in[m] = gmm_covariances_eigenvectors[k][in_idx[idx : idx + input_point[m].shape[0]], j]
                     idx += input_point[m].shape[0]
             else:
                 eigvec_in = np.empty(1, dtype=object)
@@ -68,7 +80,7 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
                 eigvec_out = np.empty(len(out_manifold.manifolds), dtype=object)
                 idx = 0
                 for m in range(len(out_manifold.manifolds)):
-                    eigvec_out[m] = gmm_covariances_eigenvectors[k][out_idx[idx: idx + exp_data[m].shape[0]], j]
+                    eigvec_out[m] = gmm_covariances_eigenvectors[k][out_idx[idx : idx + exp_data[m].shape[0]], j]
                     idx += exp_data[m].shape[0]
             else:
                 eigvec_out = np.empty(1, dtype=object)
@@ -95,9 +107,7 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
             basis_origin = np.eye(len(in_idx))[:, :-1]
             basis_transported = np.zeros_like(basis_origin)
             for j in range(basis_origin.shape[1]):
-                basis_transported[:, j] = in_manifold.transport(manifold_origin,
-                                                                          input_point,
-                                                                          basis_origin[:, j])
+                basis_transported[:, j] = in_manifold.transport(manifold_origin, input_point, basis_origin[:, j])
         elif isinstance(in_manifold, Product):
             if any([isinstance(in_manifold.manifolds[m], Sphere) for m in range(len(in_manifold.manifolds))]):
                 change_of_basis = True
@@ -112,8 +122,9 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
                         basis_origin = np.eye(input_point[m].shape[0])[:, :-1]
                         basis_trsp = np.zeros_like(basis_origin)
                         for j in range(basis_origin.shape[1]):
-                            basis_trsp[:, j] = in_manifold.manifolds[m].transport(manifold_origin, input_point[m],
-                                                                                  basis_origin[:, j])
+                            basis_trsp[:, j] = in_manifold.manifolds[m].transport(
+                                manifold_origin, input_point[m], basis_origin[:, j]
+                            )
                         basis_transported.append(basis_trsp)
                     else:
                         raise NotImplementedError
@@ -134,19 +145,20 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
                     transport_to = [input_point, exp_data]
                 else:
                     temp = []
-                    for x in reversed(exp_data): 
+                    for x in reversed(exp_data):
                         temp.insert(0, x)
                     if input_point.ndim == 1:
                         temp.insert(0, input_point)
                     else:
-                        for x in reversed(input_point): 
+                        for x in reversed(input_point):
                             temp.insert(0, x)
                     transport_to = np.array(temp, dtype=object)
 
                 for j in range(gmm_covariances_eigenvectors[k].shape[1]):
                     # Transport
-                    trsp_eigvec_j = manifold.transport(gmm_means[k], transport_to,
-                                                       gmm_covariances_eigenvectors_product[k][j])
+                    trsp_eigvec_j = manifold.transport(
+                        gmm_means[k], transport_to, gmm_covariances_eigenvectors_product[k][j]
+                    )
                     trsp_eigvec[:, j] = np.hstack(trsp_eigvec_j) * gmm_covariances_eigenvalues[k][j] ** 0.5
 
                 # Reconstruction of parallel transported covariance from eigenvectors
@@ -162,10 +174,13 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
                 if not change_of_basis:
                     inv_trsp_sigma_in = np.linalg.inv(trsp_sigma_in)
                 else:
-                    inv_trsp_sigma_in = np.dot(basis_transported,
-                                               np.dot(np.linalg.inv(np.dot(basis_transported.T,
-                                                                           np.dot(trsp_sigma_in, basis_transported))),
-                                                      basis_transported.T))
+                    inv_trsp_sigma_in = np.dot(
+                        basis_transported,
+                        np.dot(
+                            np.linalg.inv(np.dot(basis_transported.T, np.dot(trsp_sigma_in, basis_transported))),
+                            basis_transported.T,
+                        ),
+                    )
 
                 if isinstance(in_manifold, Product):
                     log_mean_in = np.concatenate(in_manifold.log(gmm_means[k][in_manifold_idx], input_point))
@@ -184,7 +199,7 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
                 exp_u_reshaped = np.empty(len(out_manifold.manifolds), dtype=object)
                 idx = 0
                 for m in range(len(out_manifold.manifolds)):
-                    exp_u_reshaped[m] = exp_u[idx: idx + exp_data[m].shape[0]]
+                    exp_u_reshaped[m] = exp_u[idx : idx + exp_data[m].shape[0]]
                     idx += exp_data[m].shape[0]
                 exp_u = exp_u_reshaped
 
@@ -207,19 +222,20 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
                 transport_to = [input_point, exp_data]
             else:
                 temp = []
-                for x in reversed(exp_data): 
+                for x in reversed(exp_data):
                     temp.insert(0, x)
                 if input_point.ndim == 1:
                     temp.insert(0, input_point)
                 else:
-                    for x in reversed(input_point): 
+                    for x in reversed(input_point):
                         temp.insert(0, x)
                 transport_to = np.array(temp, dtype=object)
 
             for j in range(gmm_covariances_eigenvectors[k].shape[1]):
                 # Transport
-                trsp_eigvec_j = manifold.transport(gmm_means[k], transport_to,
-                                                   gmm_covariances_eigenvectors_product[k][j])
+                trsp_eigvec_j = manifold.transport(
+                    gmm_means[k], transport_to, gmm_covariances_eigenvectors_product[k][j]
+                )
                 trsp_eigvec[:, j] = np.hstack(trsp_eigvec_j) * gmm_covariances_eigenvalues[k][j] ** 0.5
 
             # Reconstruction of parallel transported covariance from eigenvectors
@@ -235,10 +251,13 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
             if not change_of_basis:
                 inv_trsp_sigma_in = np.linalg.inv(trsp_sigma_in)
             else:
-                inv_trsp_sigma_in = np.dot(basis_transported,
-                                           np.dot(np.linalg.inv(np.dot(basis_transported.T,
-                                                                       np.dot(trsp_sigma_in, basis_transported))),
-                                                  basis_transported.T))
+                inv_trsp_sigma_in = np.dot(
+                    basis_transported,
+                    np.dot(
+                        np.linalg.inv(np.dot(basis_transported.T, np.dot(trsp_sigma_in, basis_transported))),
+                        basis_transported.T,
+                    ),
+                )
             if isinstance(in_manifold, Product):
                 log_mean_in = np.concatenate(in_manifold.log(gmm_means[k][in_manifold_idx], input_point))
             else:
@@ -251,13 +270,14 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
             exp_u += u_out[:, k] * H[k, n]
 
             # Covariance part obtained from parallel transported component covariance
-            sigma_tmp = trsp_sigma[k][out_idx][:, out_idx] - \
-                        np.dot(trsp_sigma_out_in, np.dot(inv_trsp_sigma_in, trsp_sigma_out_in.T))
+            sigma_tmp = trsp_sigma[k][out_idx][:, out_idx] - np.dot(
+                trsp_sigma_out_in, np.dot(inv_trsp_sigma_in, trsp_sigma_out_in.T)
+            )
             # Add component mean contribution
             exp_cov += H[k, n] * (sigma_tmp + np.dot(u_out[:, k][:, None], u_out[:, k][None]))
 
         # Add expected mean contribution
-        exp_cov += - np.dot(exp_u[:, None], exp_u[None]) + np.eye(len(out_idx)) * regularization_factor
+        exp_cov += -np.dot(exp_u[:, None], exp_u[None]) + np.eye(len(out_idx)) * regularization_factor
 
         if isinstance(out_manifold, Product):
             exp_data = np.concatenate(exp_data)
@@ -266,4 +286,3 @@ def manifold_gmr(input_data, manifold, gmm_means, gmm_covariances, gmm_priors, i
         estimated_covariances[n] = exp_cov
 
     return estimated_outputs, estimated_covariances, H
-
