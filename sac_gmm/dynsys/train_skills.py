@@ -45,12 +45,11 @@ class SkillTrainer(object):
             self.cfg.dim = train_dataset.X.shape[-1]
             ds = hydra.utils.instantiate(self.cfg.dyn_sys)
             # Make output dir where trained models will be saved
-            self.ds_out_dir = os.path.join(self.cfg.skills_dir, self.state_type, skill, ds.name)
-            os.makedirs(self.ds_out_dir, exist_ok=True)
-            ds.skills_dir = self.ds_out_dir
-            ds.train(dataset=train_dataset)
+            ds.model_dir = os.path.join(self.cfg.skills_dir, self.state_type, skill, ds.name)
+            os.makedirs(ds.model_dir, exist_ok=True)
+            ds.fit(dataset=train_dataset)
         self.logger.info(
-            f"Training complete. Trained DS models are saved in the {os.path.join(self.ds_out_dir)} directory"
+            f"Training complete. Trained DS models are saved in the {os.path.join(ds.model_dir)} directory"
         )
 
 

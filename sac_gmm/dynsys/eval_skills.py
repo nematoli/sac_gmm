@@ -79,7 +79,7 @@ class SkillEvaluator(object):
                     # goal = np.array([0.17921756, -0.21936302,  0.38075492])
                     # First Goal-Centering and then Normalize (GCN Space)
                     # d_x = ds.predict_dx(dataset.normalize(x-goal))
-                    d_x = ds.predict_dx(x - goal)
+                    d_x = ds.predict(x - goal)
                     delta_x = sampling_dt * d_x
                     # Get next position in GCN space
                     # new_x = dataset.normalize(x-goal) + delta_x
@@ -130,11 +130,11 @@ class SkillEvaluator(object):
             # Create and load models to evaluate
             self.cfg.dim = val_dataset.X.shape[-1]
             ds = hydra.utils.instantiate(self.cfg.dyn_sys)
-            ds_model_dir = os.path.join(self.cfg.skills_dir, self.cfg.state_type, skill, ds.name)
+            ds.model_dir = os.path.join(self.cfg.skills_dir, self.cfg.state_type, skill, ds.name)
 
             if ds.name == "clfds":
-                clf_file = os.path.join(ds_model_dir, "clf")
-                reg_file = os.path.join(ds_model_dir, "ds")
+                clf_file = os.path.join(ds.model_dir, "clf")
+                reg_file = os.path.join(ds.model_dir, "ds")
                 ds.load_models(clf_file=clf_file, reg_file=reg_file)
             else:
                 # Obtain X_mins and X_maxs from training data to normalize in real-time
@@ -146,8 +146,8 @@ class SkillEvaluator(object):
                 # val_dataset.X_mins = train_dataset.X_mins
                 # val_dataset.X_maxs = train_dataset.X_maxs
 
-                ds.skills_dir = ds_model_dir
-                ds.load_params()
+                ds.skills_dir = ds.model_dir
+                ds.load_model()
                 ds.state_type = self.cfg.state_type
                 ds.manifold = ds.make_manifold(self.cfg.dim)
             self.logger.info(f"Evaluating {skill} skill with {self.cfg.state_type} input on CALVIN environment")
