@@ -28,9 +28,7 @@ class SkillEvaluatorDemos(object):
     def __init__(self, cfg, env):
         self.cfg = cfg
         self.env = env
-        f = open(cfg.skills_list, "r")
-        skill_set = f.read()
-        self.skill_set = skill_set.split("\n")
+        self.skill = self.cfg.skill
         self.logger = logging.getLogger("SkillEvaluatorDemos")
 
     def evaluate(self, dataset, max_steps=500, sampling_dt=2 / 30, render=False, record=False):
@@ -103,27 +101,26 @@ class SkillEvaluatorDemos(object):
 
     def run(self):
         skill_accs = {}
-        for skill in self.skill_set:
-            self.env.set_skill(skill)
+        self.env.set_skill(self.skill)
 
-            # Get validation dataset
-            self.cfg.dataset.skill = skill
-            val_dataset = hydra.utils.instantiate(self.cfg.dataset)
+        # Get validation dataset
+        self.cfg.dataset.skill = self.skill
+        val_dataset = hydra.utils.instantiate(self.cfg.dataset)
 
-            self.logger.info(f"Evaluating {skill} skill with {self.cfg.state_type} input on CALVIN environment")
-            self.logger.info(f"Test/Val Data: {val_dataset.X.size()}")
-            # Evaluate demos by simulating in the CALVIN environment
-            acc, avg_return, avg_len = self.evaluate(
-                val_dataset,
-                max_steps=self.cfg.max_steps,
-                render=self.cfg.render,
-                record=self.cfg.record,
-                sampling_dt=self.cfg.sampling_dt,
-            )
-            skill_accs[skill] = [str(acc), str(avg_return), str(avg_len)]
-            self.env.count = 0
-            # Log evaluation output
-            self.logger.info(f"{skill} Demos Accuracy: {round(acc, 2)}")
+        self.logger.info(f"Evaluating {self.skill} skill with {self.cfg.state_type} input on CALVIN environment")
+        self.logger.info(f"Test/Val Data: {val_dataset.X.size()}")
+        # Evaluate demos by simulating in the CALVIN environment
+        acc, avg_return, avg_len = self.evaluate(
+            val_dataset,
+            max_steps=self.cfg.max_steps,
+            render=self.cfg.render,
+            record=self.cfg.record,
+            sampling_dt=self.cfg.sampling_dt,
+        )
+        skill_accs[self.skill] = [str(acc), str(avg_return), str(avg_len)]
+        self.env.count = 0
+        # Log evaluation output
+        self.logger.info(f"{self.skill} Demos Accuracy: {round(acc, 2)}")
 
         # Write accuracies to a file
         with open(os.path.join(self.env.outdir, f"skill_ds_acc_{self.cfg.state_type}.txt"), "w") as f:
@@ -134,7 +131,10 @@ class SkillEvaluatorDemos(object):
 
 @hydra.main(version_base="1.1", config_path="../../config", config_name="eval_ds")
 def main(cfg: DictConfig) -> None:
-    # pdb.set_trace()
+    cfg.log_dir = Path(cfg.log_dir).expanduser()
+    cfg.demos_dir = Path(cfg.demos_dir).expanduser()
+    cfg.skills_dir = Path(cfg.skills_dir).expanduser()
+
     new_env_cfg = {**cfg.calvin_env.env}
     new_env_cfg["use_egl"] = False
     new_env_cfg["show_gui"] = False

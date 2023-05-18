@@ -150,4 +150,6 @@ nohup.out
 temp/
 
 demonstrations/
-runs/
+logs/
+skills_ds/
+dataset/

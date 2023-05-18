@@ -13,7 +13,7 @@ class CALVINDynSysDataset(Dataset):
         skill,
         train=True,
         state_type="pos",
-        demos_dir="/work/dlclarge1/lagandua-refine-skills/calvin_demos/",
+        demos_dir="",
         goal_centered=False,
         dt=2 / 30,
         sampling_dt=1 / 30,
@@ -37,6 +37,7 @@ class CALVINDynSysDataset(Dataset):
             fname = "training"
         else:
             fname = "validation"
+        assert os.path.isdir(self.demos_dir), "Demos directory does not exist!"
         self.data_file = glob.glob(os.path.join(self.demos_dir, self.skill, f"{fname}.npy"))[0]
         self.state_type = state_type
 

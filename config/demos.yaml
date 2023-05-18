@@ -6,18 +6,20 @@ defaults:
   - override hydra/hydra_logging: colorlog
 
 seed: 42
-log_dir: ../
 slurm: false
-demos_dir: ${root}/demonstrations
-skill: 'turn_off_lightbulb'
 
 root: ~/sac_gmm
 
+log_dir: ${root}/logs
+demos_dir: ${root}/demonstrations
+skill: null
+
+
 hydra:
   run:
-    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${log_dir}/extract-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweep:
-    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${log_dir}/extract-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.override_dirname}
   job:
     config:
