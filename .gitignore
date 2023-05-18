@@ -153,3 +153,10 @@ demonstrations/
 logs/
 skills_ds/
 dataset/
+runs/
+
+
+# artifacts
+*.npy
+*.npz
+*.gif
