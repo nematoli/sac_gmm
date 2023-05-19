@@ -1,6 +1,6 @@
 defaults:
   - dataset: calvin_ds
-  - dyn_sys: manifold_gmm # clfds or manifold_gmm
+  - dyn_sys: bayesian_gmm # clfds or manifold_gmm or bayesian_gmm
   - _self_
 
   - override hydra/job_logging: colorlog

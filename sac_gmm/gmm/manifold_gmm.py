@@ -16,26 +16,19 @@ from pymanopt.manifolds import Euclidean, Sphere, Product
 from sac_gmm.gmm.base_gmm import BaseGMM
 from sac_gmm.gmm.gmr.manifold_clustering import manifold_k_means, manifold_gmm_em
 from sac_gmm.gmm.gmr.manifold_gmr import manifold_gmr
-from sac_gmm.gmm.utils.plot_utils import visualize_3d_gmm
 
 import logging
 
 
 class ManifoldGMM(BaseGMM):
     def __init__(self, n_components, plot, model_dir):
-        super(ManifoldGMM, self).__init__(n_components=n_components, model_dir=model_dir)
+        super(ManifoldGMM, self).__init__(n_components=n_components, plot=plot, model_dir=model_dir)
 
         self.name = "ManifoldGMM"
-        self.plot = plot
 
-        # Data and Manifold
-        self.dataset = None
-        self.state_type = None
-        self.dim = None
         self.manifold = None
-        self.data = None
 
-        self.logger = logging.getLogger("ManifoldGMM")
+        self.logger = logging.getLogger(f"{self.name}")
 
     def make_manifold(self, dim):
         if self.state_type in ["pos", "joint"]:
@@ -49,60 +42,10 @@ class ManifoldGMM(BaseGMM):
         manifold = Product([in_manifold, out_manifold])
         return manifold
 
-    def preprocess_data(self, dataset, normalize=False):
-        # Stack position and velocity data
-        demos_xdx = [np.hstack([dataset.X[i], dataset.dX[i]]) for i in range(dataset.X.shape[0])]
-        # Stack demos
-        demos = demos_xdx[0]
-        for i in range(1, dataset.X.shape[0]):
-            demos = np.vstack([demos, demos_xdx[i]])
-
-        X = demos[:, : self.dim]
-        Y = demos[:, self.dim :]
-
-        data = np.empty((X.shape[0], 2), dtype=object)
-        for n in range(X.shape[0]):
-            data[n] = [X[n], Y[n]]
-        return data
-
-    def set_data_params(self, dataset):
-        self.dataset = dataset
-        self.state_type = self.dataset.state_type
-        self.dim = self.dataset.X.numpy().shape[-1]
-        self.manifold = self.make_manifold(self.dim)
-        self.data = self.preprocess_data(dataset, normalize=False)
-
-    def plot_gmm(self):
-        # Pick 15 random datapoints from X to plot
-        rand_idx = np.random.choice(np.arange(1, len(self.dataset.X)), size=15, replace=False, p=None)
-        plot_data = self.dataset.X[rand_idx[0]].numpy()
-        for i in rand_idx[1:]:
-            plot_data = np.vstack([plot_data, self.dataset.X[i].numpy()])
-
-        plot_means = np.empty((self.n_components, 3))
-        for i in range(plot_means.shape[0]):
-            for j in range(plot_means.shape[1]):
-                plot_means[i, j] = self.means[i, 0][j]
-
-        temp = self.covariances[:, : self.dim, : self.dim]
-        plot_covariances = np.empty((self.n_components, 3))
-        for i in range(plot_covariances.shape[0]):
-            for j in range(plot_covariances.shape[1]):
-                plot_covariances[i, j] = temp[i][j, j]
-
-        return visualize_3d_gmm(
-            points=plot_data,
-            w=self.priors,
-            mu=plot_means.T,
-            stdev=plot_covariances.T,
-            skill=self.dataset.skill,
-            export_dir=self.model_dir,
-            export_type="gif",
-        )
-
     def fit(self, dataset):
         # Dataset
         self.set_data_params(dataset)
+        self.manifold = self.make_manifold(self.dim)
 
         # K-Means
         km_means, km_assignments = manifold_k_means(self.manifold, self.data, nb_clusters=self.n_components)
