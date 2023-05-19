@@ -1,38 +1,10 @@
 defaults:
-  - dyn_sys: manifold_gmm # clfds or manifold_gmm
-  - dataset: calvin_ds
-  - _self_
-
-  - override hydra/job_logging: colorlog
-  - override hydra/hydra_logging: colorlog
-
-seed: 42
-slurm: false
-
-root: ~/sac_gmm
-log_dir: ${root}/logs
-demos_dir: ${root}/demonstrations
-
-# Skill params
-skills_dir: ${root}/skills_ds
-state_type: 'pos'
-dim: none
+  - setup
+  - skills_setup
 
 # Dataset params:
-skill: null
 train: true # false to load validation dataset
 goal_centered: true # this must be false during evaluation
-dt: 0.0666
-sampling_dt: 0.0333
-normalized: false
-is_quaternion: false
-
-# Evaluation and DS params
-max_steps: 240
-
-# GMM params
-gmm_components: 5
-plot: true
 
 # Environment params
 render: false

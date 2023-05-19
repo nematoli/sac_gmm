@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 import torch
 import pdb
 import pybullet as p
+from pathlib import Path
 
 
 class CALVINDynSysDataset(Dataset):
@@ -21,7 +22,7 @@ class CALVINDynSysDataset(Dataset):
         is_quaternion=False,
     ):
         self.skill = skill
-        self.demos_dir = demos_dir
+        self.demos_dir = Path(demos_dir).expanduser()
         self.goal_centered = goal_centered
         self.dt = dt
         self.sampling_dt = sampling_dt
@@ -37,8 +38,8 @@ class CALVINDynSysDataset(Dataset):
             fname = "training"
         else:
             fname = "validation"
-        assert os.path.isdir(self.demos_dir), "Demos directory does not exist!"
-        self.data_file = glob.glob(os.path.join(self.demos_dir, self.skill, f"{fname}.npy"))[0]
+        assert self.demos_dir.is_dir(), "Demos directory does not exist!"
+        self.data_file = glob.glob(str(self.demos_dir / self.skill / f"{fname}.npy"))[0]
         self.state_type = state_type
 
         start_idx, end_idx = self.get_valid_columns(self.state_type)

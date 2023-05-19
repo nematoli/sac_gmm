@@ -55,9 +55,7 @@ def extract_demos(cfg: DictConfig) -> None:
     seed_everything(cfg.seed, workers=True)
     cfg.log_dir = Path(cfg.log_dir).expanduser()
     cfg.demos_dir = Path(cfg.demos_dir).expanduser()
-    import pdb
 
-    pdb.set_trace()
     os.makedirs(cfg.log_dir, exist_ok=True)
     os.makedirs(cfg.demos_dir, exist_ok=True)
     datamodule = hydra.utils.instantiate(cfg.datamodule)
