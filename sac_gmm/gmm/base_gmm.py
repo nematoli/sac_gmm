@@ -132,6 +132,8 @@ class BaseGMM(object):
     def plot_gmm(self, obj_type=True):
         if not obj_type:
             means = self.float_to_object(self.means)
+        else:
+            means = self.means
 
         # Pick 15 random datapoints from X to plot
         rand_idx = np.random.choice(np.arange(1, len(self.dataset.X)), size=15, replace=False, p=None)
