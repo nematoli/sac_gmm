@@ -2,8 +2,8 @@ import numpy as np
 
 from pymanopt.manifolds import Product
 
-from sac_gmm.gmm.gmr.statistics import multivariate_normal
-from sac_gmm.gmm.gmr.manifold_statistics import compute_frechet_mean, compute_weighted_frechet_mean
+from sac_gmm.gmm.utils.statistics import multivariate_normal
+from sac_gmm.gmm.utils.manifold_statistics import compute_frechet_mean, compute_weighted_frechet_mean
 
 
 def manifold_k_means(manifold, data, nb_clusters, initial_means=None, nb_iter_max=100):
