@@ -29,15 +29,10 @@ def save_demonstrations(datamodule, save_dir):
             data_loader = datamodule.val_dataloader()
 
         split_iter = iter(data_loader)
-        time_step = 0.005
-        time = np.expand_dims(np.arange(64 / datamodule.step_len) * time_step, axis=1)
         demos = []
         for i in range(len(split_iter)):
             demo = next(split_iter)
-            demo = np.concatenate(
-                [np.repeat(time[np.newaxis, :, :], demo["robot_obs"].size(0), axis=0), demo["robot_obs"]], axis=2
-            )
-            demos += [demo]
+            demos += [demo["robot_obs"].numpy()]
 
         demos = np.concatenate(demos, axis=0)
         logger.info(f"Dimensions of {m} demonstrations (NxSxD): {demos.shape}.")
@@ -55,7 +50,6 @@ def extract_demos(cfg: DictConfig) -> None:
     seed_everything(cfg.seed, workers=True)
     cfg.log_dir = Path(cfg.log_dir).expanduser()
     cfg.demos_dir = Path(cfg.demos_dir).expanduser()
-
     os.makedirs(cfg.log_dir, exist_ok=True)
     os.makedirs(cfg.demos_dir, exist_ok=True)
     datamodule = hydra.utils.instantiate(cfg.datamodule)

@@ -1,19 +1,8 @@
 defaults:
+  - setup
+  - skills_setup
   - datamodule: default
   - _self_
-
-  - override hydra/job_logging: colorlog
-  - override hydra/hydra_logging: colorlog
-
-seed: 42
-slurm: false
-
-root: ~/sac_gmm
-
-log_dir: ${root}/logs
-demos_dir: ${root}/demonstrations
-skill: null
-
 
 hydra:
   run:

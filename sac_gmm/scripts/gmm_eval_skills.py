@@ -128,7 +128,8 @@ class SkillEvaluator(object):
         ds.skills_dir = ds.model_dir
         ds.load_model()
         ds.state_type = self.cfg.state_type
-        ds.manifold = ds.make_manifold(self.cfg.dim)
+        if ds.name == "ManifoldGMM":
+            ds.manifold = ds.make_manifold(self.cfg.dim)
 
         self.logger.info(f"Evaluating {self.skill} skill with {self.cfg.state_type} input on CALVIN environment")
         self.logger.info(f"Test/Val Data: {val_dataset.X.size()}")
