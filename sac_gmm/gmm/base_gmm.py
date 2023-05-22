@@ -136,28 +136,16 @@ class BaseGMM(object):
             means = self.means
 
         # Pick 15 random datapoints from X to plot
-        rand_idx = np.random.choice(np.arange(1, len(self.dataset.X)), size=15, replace=False, p=None)
-        plot_data = self.dataset.X[rand_idx[0]].numpy()
-        for i in rand_idx[1:]:
-            plot_data = np.vstack([plot_data, self.dataset.X[i].numpy()])
-
-        plot_means = np.empty((self.n_components, 3))
-        for i in range(plot_means.shape[0]):
-            for j in range(plot_means.shape[1]):
-                plot_means[i, j] = means[i, 0][j]
-
-        temp = self.covariances[:, : self.dim, : self.dim]
-        plot_covariances = np.empty((self.n_components, 3))
-        for i in range(plot_covariances.shape[0]):
-            for j in range(plot_covariances.shape[1]):
-                plot_covariances[i, j] = temp[i][j, j]
+        points = self.dataset.X.numpy()[:, :, :3]
+        rand_idx = np.random.choice(np.arange(0, len(points)), size=15)
+        points = np.vstack(points[rand_idx, :, :])
+        means = np.vstack(self.means[:, 0])
+        covariances = self.covariances[:, :3, :3]
 
         return visualize_3d_gmm(
-            points=plot_data,
-            w=self.priors,
-            mu=plot_means.T,
-            stdev=plot_covariances.T,
-            skill=self.dataset.skill,
-            export_dir=self.model_dir,
-            export_type="gif",
+            points=points,
+            priors=self.priors,
+            means=means,
+            covariances=covariances,
+            save_dir=self.model_dir,
         )
