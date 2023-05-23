@@ -56,18 +56,23 @@ class CALVINDynSysDataset(Dataset):
             oris = np.apply_along_axis(p.getQuaternionFromEuler, -1, self.X[:, :, 3:])
             self.X = np.concatenate([self.X[:, :, :3], oris], axis=-1)
 
-        self.start = np.mean(self.X[:, 0, :], axis=0)
-        self.goal = np.mean(self.X[:, -1, :], axis=0)
+        self.start = np.mean(self.X[:, 0, :3], axis=0)
+        self.goal = np.mean(self.X[:, -1, :3], axis=0)
         if self.goal_centered:
             # Make X goal centered i.e., subtract each trajectory with its goal
-            self.X = self.X - np.expand_dims(self.X[:, -1, :], axis=1)
+            self.X[:, :, :3] = self.X[:, :, :3] - np.expand_dims(self.X[:, -1, :3], axis=1)
 
         if self.normalized:
             self.set_mins_and_maxs(self.X)
             self.X = self.normalize(self.X)
 
-        self.dX = (self.X[:, 2:, :] - self.X[:, :-2, :]) / self.dt
+        self.dX = (self.X[:, 2:, :3] - self.X[:, :-2, :3]) / self.dt
         self.X = self.X[:, 1:-1, :]
+
+        if self.state_type == "pos_ori":
+            self.Ori = self.X[:, :, 3:]
+            self.Ori = torch.from_numpy(self.Ori).type(torch.FloatTensor)
+            self.X = self.X[:, :, :3]
 
         self.X = torch.from_numpy(self.X).type(torch.FloatTensor)
         self.dX = torch.from_numpy(self.dX).type(torch.FloatTensor)

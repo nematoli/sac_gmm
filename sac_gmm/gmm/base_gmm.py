@@ -58,19 +58,30 @@ class BaseGMM(object):
             self.covariances = np.asarray(self.covariances)
 
     def preprocess_data(self, dataset, obj_type=True, normalize=False):
-        # Stack position and velocity data
-        demos_xdx = [np.hstack([dataset.X[i], dataset.dX[i]]) for i in range(dataset.X.shape[0])]
+        if self.state_type == "pos_ori":
+            # Stack position, velocity and quaternion data
+            demos_xdx = [np.hstack([dataset.X[i], dataset.dX[i], dataset.Ori[i]]) for i in range(dataset.X.shape[0])]
+        else:
+            # Stack position and velocity data
+            demos_xdx = [np.hstack([dataset.X[i], dataset.dX[i]]) for i in range(dataset.X.shape[0])]
+
         # Stack demos
         demos = demos_xdx[0]
         for i in range(1, dataset.X.shape[0]):
             demos = np.vstack([demos, demos_xdx[i]])
 
         X = demos[:, : self.dim]
-        Y = demos[:, self.dim :]
+        Y = demos[:, self.dim : self.dim + self.dim]
 
-        data = np.hstack((X, Y))
+        if self.state_type == "pos_ori":
+            Y_Ori = demos[:, self.dim + self.dim :]
+            data = np.empty((X.shape[0], 3), dtype=object)
+            for n in range(X.shape[0]):
+                data[n] = [X[n], Y[n], Y_Ori[n]]
+        else:
+            data = np.hstack((X, Y))
 
-        if obj_type:
+        if obj_type and (data.dtype != "O"):
             data = self.float_to_object(data)
 
         return data

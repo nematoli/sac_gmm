@@ -38,7 +38,14 @@ class ManifoldGMM(BaseGMM):
             in_manifold = Sphere(dim)
             out_manifold = Sphere(dim)
         elif self.state_type == "pos_ori":
-            manifold = None
+            in_dim = 3
+            out_dim_e = 3
+            out_dim_q = 4
+            in_manifold = Euclidean(in_dim)
+            out_manifold1 = Euclidean(out_dim_e)
+            out_manifold2 = Sphere(out_dim_q)
+            manifold = Product([in_manifold, out_manifold1, out_manifold2])
+            return manifold
         manifold = Product([in_manifold, out_manifold])
         return manifold
 
@@ -50,8 +57,11 @@ class ManifoldGMM(BaseGMM):
         # K-Means
         km_means, km_assignments = manifold_k_means(self.manifold, self.data, nb_clusters=self.n_components)
         # GMM
+        total_dim = self.dim + self.dim
+        if self.state_type == "pos_ori":
+            total_dim += 4
         self.logger.info("Manifold GMM with K-Means priors")
-        init_covariances = np.concatenate(self.n_components * [np.eye(self.dim + self.dim)[None]], 0)
+        init_covariances = np.concatenate(self.n_components * [np.eye(total_dim)[None]], 0)
         init_priors = np.zeros(self.n_components)
         for k in range(self.n_components):
             init_priors[k] = np.sum(km_assignments == k) / len(km_assignments)
@@ -73,5 +83,17 @@ class ManifoldGMM(BaseGMM):
             outfile = self.plot_gmm()
 
     def predict(self, x):
-        dx, _, __ = manifold_gmr(x.reshape(1, -1), self.manifold, self.means, self.covariances, self.priors)
-        return dx
+        if self.state_type == "pos_ori":
+            out_manifold_idx = [1, 2]
+        else:
+            out_manifold_idx = [1]
+        dx, _, __ = manifold_gmr(
+            x.reshape(1, -1),
+            self.manifold,
+            self.means,
+            self.covariances,
+            self.priors,
+            in_manifold_idx=[0],
+            out_manifold_idx=out_manifold_idx,
+        )
+        return dx[0]

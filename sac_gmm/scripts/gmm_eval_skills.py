@@ -35,33 +35,29 @@ class SkillEvaluator(object):
     def evaluate(self, ds, dataset, max_steps, sampling_dt, render=False, record=False):
         dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
         succesful_rollouts, rollout_returns, rollout_lengths = 0, [], []
-        start_idx, end_idx = self.env.get_valid_columns()
         for idx, (xi, d_xi) in enumerate(dataloader):
             if (idx % 5 == 0) or (idx == len(dataset)):
                 self.logger.info(f"Test Trajectory {idx+1}/{len(dataset)}")
-            x0 = xi.squeeze()[0, :].numpy()
+            x0 = dataset.xi.squeeze()[0, :].numpy()
             goal = dataset.goal
             rollout_return = 0
             observation = self.env.reset()
-            current_state = observation[start_idx:end_idx]
-            if dataset.state_type == "pos":
-                temp = np.append(x0, np.append(dataset.fixed_ori, -1))
-            else:
-                temp = np.append(x0, -1)
+            current_state = observation[:3]
+            temp = np.append(x0, np.append(dataset.fixed_ori, -1))
             action = self.env.prepare_action(temp, type="abs")
             # self.logger.info(f'Adjusting EE position to match the initial pose from the dataset')
             count = 0
             error_margin = 0.01
             while np.linalg.norm(current_state - x0) >= error_margin:
                 observation, reward, done, info = self.env.step(action)
-                current_state = observation[start_idx:end_idx]
+                current_state = observation[:3]
                 count += 1
                 if count >= 200:
                     # x0 = current_state
                     self.logger.info("CALVIN is struggling to place the EE at the right initial pose")
                     self.logger.info(x0, current_state, np.linalg.norm(current_state - x0))
                     break
-            x = observation[start_idx:end_idx]
+            x = observation[:3]
             # self.logger.info(f'Simulating with DS')
             if record:
                 self.logger.info("Recording Robot Camera Obs")
@@ -74,15 +70,15 @@ class SkillEvaluator(object):
                     new_x = x + delta_x
                 else:
                     d_x = ds.predict(x - goal)
-                    delta_x = sampling_dt * d_x
+                    delta_x = sampling_dt * d_x[:3]
                     new_x = x + delta_x
                 if dataset.state_type == "pos":
                     temp = np.append(new_x, np.append(dataset.fixed_ori, -1))
-                else:
-                    temp = np.append(new_x, -1)
+                elif dataset.state_type == "pos_ori":
+                    temp = np.append(new_x, np.append(d_x[3:], -1))
                 action = self.env.prepare_action(temp, type="abs")
                 observation, reward, done, info = self.env.step(action)
-                x = observation[start_idx:end_idx]
+                x = observation[:3]
                 rollout_return += reward
                 if record:
                     self.env.record_frame()
