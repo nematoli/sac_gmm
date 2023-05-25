@@ -34,7 +34,7 @@ class SACGMMTrainer(object):
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.stats_logger = Logger(
-            self.exp_dir, save_tb=cfg.log_save_tb, log_frequency=cfg.log_frequency, agent=cfg.name
+            self.exp_dir, save_wb=cfg.wandb, cfg=self.cfg, log_frequency=cfg.log_frequency, agent=cfg.name
         )
 
         set_seed_everywhere(self.cfg.seed)
@@ -71,7 +71,6 @@ class SACGMMTrainer(object):
         # cam_obs_shape = self.env.obs_space[cam_obs].shape
         self.cfg.agent.autoencoder.hd_input_space = (64, 64)  # networks work with only 64 now
         self.cfg.agent.autoencoder.in_channels = 1  # grayscale image
-
         self.agent = hydra.utils.instantiate(self.cfg.agent)
 
         self.replay_buffer = ReplayBuffer(
@@ -82,11 +81,12 @@ class SACGMMTrainer(object):
             self.device,
         )
 
-        self.step = 0
         self.robot_obs_dim = robot_obs_dim
         if self.cfg.record:
             self.video_dir = os.path.join(self.exp_dir, "videos")
             os.makedirs(self.video_dir, exist_ok=True)
+        self.step = 0
+        self.env_step = 0
 
     def get_action_space(self, param_space):
         priors_high = np.ones(param_space["priors"].shape[0])
@@ -155,7 +155,8 @@ class SACGMMTrainer(object):
         self.logger.info(
             f"Evaluation Results - Accuracy: {total_reward/self.cfg.num_eval_episodes}, Avg. Episode Lenths: {total_steps/self.cfg.num_eval_episodes}"
         )
-        self.stats_logger.log("eval/episode_reward", total_reward, self.step)
+        self.stats_logger.log("eval/episode_reward", total_reward)
+        self.stats_logger.log(f"eval/video/{self.step}", video_path)
         self.stats_logger.dump(self.step)
 
     def run(self):
@@ -165,16 +166,18 @@ class SACGMMTrainer(object):
             if done:
                 # Log training duration
                 if self.step > 0:
-                    self.stats_logger.log("train/duration", time.time() - start_time, self.step)
+                    self.stats_logger.log("train/duration", time.time() - start_time)
                     start_time = time.time()
                     self.stats_logger.dump(self.step, save=(self.step > self.cfg.num_seed_steps))
 
                 # Evaluate agent periodically
                 if self.step > 0 and self.step % self.cfg.eval_frequency == 0:
-                    self.stats_logger.log("eval/episode", episode, self.step)
+                    self.stats_logger.log("eval/episode", episode)
                     self.evaluate()
 
-                self.stats_logger.log("train/episode_reward", episode_reward, self.step)
+                self.stats_logger.log("train/episode_reward", episode_reward)
+                self.stats_logger.log("train/env_step", self.env_step)
+                self.stats_logger.log("train/step", self.step)
 
                 obs = self.env.reset()
                 # First absolute action step
@@ -200,9 +203,10 @@ class SACGMMTrainer(object):
                 episode_reward = 0
                 episode_step = 0
                 episode += 1
-                self.logger.info(f"Episode {episode}, Step {episode_step}:")
-                self.stats_logger.log("train/episode", episode, self.step)
+                self.stats_logger.log("train/episode", episode)
 
+            if self.step % 1000 == 0:
+                self.logger.info(f"Steps: {self.step}; EnvSteps: {self.env_step}")
             # Change GMM
             self.dyn_sys.copy_model(self.initial_dyn_sys)
             agent_in = preprocess_agent_in(self, obs)
@@ -214,6 +218,8 @@ class SACGMMTrainer(object):
             dynsys_reward = 0
             step = 0
             curr_obs = obs
+            # This saves time as the env doesn't have to capture camera obs every step
+            self.env.obs_allowed = [self.robot_obs]
             while step < self.cfg.gmm_window_size:
                 d_x = self.dyn_sys.predict(curr_obs[self.robot_obs][: self.robot_obs_dim] - self.dyn_sys.dataset.goal)
                 delta_x = self.cfg.sampling_dt * d_x[: self.robot_obs_dim]
@@ -224,12 +230,14 @@ class SACGMMTrainer(object):
                 curr_obs, reward, done, info = self.env.step(action)
                 dynsys_reward += reward
                 step += 1
+                self.env_step += 1
                 if done:
                     break
-            self.step += step
-            episode_step += step
             # Store GMM experience in replay buffer
             # Prepare and store agent observation and next observation vectors
+            # Make env capture camera obs now
+            self.env.obs_allowed = [self.robot_obs, self.cam_obs]
+            curr_obs = self.env.get_obs()
             agent_obs = agent_in.cpu().numpy()
             agent_next_obs = preprocess_agent_in(self, curr_obs).cpu().numpy()
             # Get current camera observations (image)
@@ -249,6 +257,13 @@ class SACGMMTrainer(object):
             obs = curr_obs
             episode_step += 1
             self.step += 1
+
+            self.stats_logger.log("train/env_step", self.env_step)
+            self.stats_logger.log("train/step", self.step)
+
+        self.stats_logger.log_params(self.agent, actor=True, critic=True)
+        self.stats_logger.log("train/episode", episode)
+        self.evaluate()
 
 
 @hydra.main(config_path="../config", config_name="sac_gmm_train")

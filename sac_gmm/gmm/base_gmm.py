@@ -103,11 +103,12 @@ class BaseGMM(object):
         self.dim = self.dataset.X.numpy().shape[-1]
         self.data = self.preprocess_data(dataset, obj_type=obj_type, normalize=False)
 
-    def fit(self, dataset):
+    def fit(self, dataset, wandb_flag=False):
         """
         fits a GMM on demonstrations
         Args:
             dataset: skill demonstrations
+            wandb_flag: weights and biases logging flag
         """
         raise NotImplementedError
 

@@ -3,6 +3,7 @@ from gmr import GMM
 from sac_gmm.gmm.base_gmm import BaseGMM
 import numpy as np
 import logging
+import wandb
 
 
 class BayesianGMM(BaseGMM):
@@ -20,7 +21,7 @@ class BayesianGMM(BaseGMM):
 
         self.logger = logging.getLogger(f"{self.name}")
 
-    def fit(self, dataset):
+    def fit(self, dataset, wandb_flag=False):
         self.set_data_params(dataset, obj_type=False)
         self.bgmm = self.bgmm.fit(self.data)
         self.means, self.covariances, self.priors = self.bgmm.means_, self.bgmm.covariances_, self.bgmm.weights_
@@ -39,6 +40,17 @@ class BayesianGMM(BaseGMM):
         # Plot GMM
         if self.plot:
             outfile = self.plot_gmm(obj_type=False)
+
+        if wandb_flag:
+            config = {"n_comp": self.n_comp}
+            wandb.init(
+                project="ds-training",
+                entity="in-ac",
+                name=f"{dataset.skill}_{dataset.state_type}_gmm",
+                config=config,
+            )
+            wandb.log({"GMM-Viz": wandb.Video(outfile)})
+            wandb.finish()
 
     def predict(self, x):
         cgmm = self.gmm.condition([0, 1, 2], x.reshape(1, -1))

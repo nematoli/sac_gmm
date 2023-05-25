@@ -1,5 +1,6 @@
 import os
 import sys
+import wandb
 from pathlib import Path
 
 cwd_path = Path(__file__).absolute().parents[0]
@@ -51,7 +52,7 @@ class ManifoldGMM(BaseGMM):
         manifold = Product([in_manifold, out_manifold])
         return manifold
 
-    def fit(self, dataset):
+    def fit(self, dataset, wandb_flag=False):
         # Dataset
         self.set_data_params(dataset)
         self.manifold = self.make_manifold(self.dim)
@@ -87,6 +88,17 @@ class ManifoldGMM(BaseGMM):
         # Plot GMM
         if self.plot:
             outfile = self.plot_gmm()
+
+        if wandb_flag:
+            config = {"n_comp": self.n_components}
+            wandb.init(
+                project="ds-training",
+                entity="in-ac",
+                name=f"{dataset.skill}_{dataset.state_type}_gmm",
+                config=config,
+            )
+            wandb.log({"GMM-Viz": wandb.Video(outfile)})
+            wandb.finish()
 
     def predict(self, x):
         if self.state_type == "pos_ori":

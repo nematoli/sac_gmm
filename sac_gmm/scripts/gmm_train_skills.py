@@ -43,7 +43,7 @@ class SkillTrainer(object):
         # Make output dir where trained models will be saved
         ds.model_dir = os.path.join(self.cfg.skills_dir, self.state_type, self.skill, ds.name)
         os.makedirs(ds.model_dir, exist_ok=True)
-        ds.fit(dataset=train_dataset)
+        ds.fit(dataset=train_dataset, wandb_flag=self.cfg.wandb)
         self.logger.info(
             f"Training complete. Trained DS params are saved in the {os.path.join(ds.model_dir)} directory"
         )

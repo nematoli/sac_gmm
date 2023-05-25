@@ -25,7 +25,7 @@ class SkillSpecificEnv(PlayTableSimEnv):
         # For this example we will modify the observation to
         # only retrieve the end effector pose
         self.action_space = gym.spaces.Box(low=-1, high=1, shape=(7,))
-        self.obs_allowed = None
+        self.obs_allowed = ["pos"]
         self.observation_space = None
         # We can use the task utility to know if the task was executed correctly
         self.tasks = hydra.utils.instantiate(tasks)
@@ -56,19 +56,24 @@ class SkillSpecificEnv(PlayTableSimEnv):
     def get_obs(self):
         """Overwrite robot obs to only retrieve end effector position"""
         obs = {}
-        robot_obs_allowed, cam_obs_allowed = self.obs_allowed
+        if len(self.obs_allowed) == 1:
+            robot_obs_allowed = self.obs_allowed[0]
+            cam_obs_allowed = None
+        else:
+            robot_obs_allowed, cam_obs_allowed = self.obs_allowed
         robot_obs, robot_info = self.robot.get_observation()
-        rgb_obs, depth_obs = self.get_camera_obs()
 
         if robot_obs_allowed == "pos":
             obs[robot_obs_allowed] = robot_obs[:3]
         elif robot_obs_allowed == "pos_ori":
             obs[robot_obs_allowed] = robot_obs[:7]
 
-        if "rgb" in cam_obs_allowed:
-            obs[cam_obs_allowed] = rgb_obs[cam_obs_allowed]
-        else:
-            obs[cam_obs_allowed] = depth_obs[cam_obs_allowed]
+        if cam_obs_allowed is not None:
+            rgb_obs, depth_obs = self.get_camera_obs()
+            if "rgb" in cam_obs_allowed:
+                obs[cam_obs_allowed] = rgb_obs[cam_obs_allowed]
+            elif "depth" in cam_obs_allowed:
+                obs[cam_obs_allowed] = depth_obs[cam_obs_allowed]
         return obs
 
     def get_camera_obs(self):

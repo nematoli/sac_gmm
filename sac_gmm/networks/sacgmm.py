@@ -62,7 +62,7 @@ class SACGMMAgent(SACAgent):
         super().train(training)
         self.ae.train(training)
 
-    def update_autoencoder(self, obs, logger, step):
+    def update_autoencoder(self, obs, logger):
         hidden = self.ae.encoder(obs)
         pred_obs = self.ae.decoder(hidden)
 
@@ -70,9 +70,9 @@ class SACGMMAgent(SACAgent):
         latent_loss = (0.5 * hidden.detach().pow(2).sum(1)).mean()
         ae_loss = rec_loss + self.ae.latent_lambda * latent_loss
 
-        logger.log("train_ae/loss", ae_loss, step)
-        logger.log("train_ae/rec_loss", rec_loss, step)
-        logger.log("train_ae/latent_loss", latent_loss, step)
+        logger.log("train_ae/loss", ae_loss)
+        logger.log("train_ae/rec_loss", rec_loss)
+        logger.log("train_ae/latent_loss", latent_loss)
 
         self.ae_optimizer.zero_grad()
         ae_loss.backward()
@@ -81,14 +81,14 @@ class SACGMMAgent(SACAgent):
     def update(self, replay_buffer, logger, step):
         obs, cam_obs, action, reward, next_obs, not_done, not_done_no_max = replay_buffer.sample(self.batch_size)
 
-        logger.log("train/batch_reward", reward.mean(), step)
+        logger.log("train/batch_reward", reward.mean())
 
-        self.update_critic(obs, action, reward, next_obs, not_done_no_max, logger, step)
+        self.update_critic(obs, action, reward, next_obs, not_done_no_max, logger)
 
         if step % self.actor_update_frequency == 0:
-            self.update_actor_and_alpha(obs, logger, step)
+            self.update_actor_and_alpha(obs, logger)
 
-            self.update_autoencoder(cam_obs, logger, step)
+            self.update_autoencoder(cam_obs, logger)
 
         if step % self.critic_target_update_frequency == 0:
             self.soft_update_critic()

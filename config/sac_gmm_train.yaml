@@ -18,8 +18,8 @@ adapt_cov: false
 
 # train and eval
 num_train_steps: 5e4
-replay_buffer_capacity: 1e2
-num_seed_steps: 4
+replay_buffer_capacity: ${num_train_steps}
+num_seed_steps: 1000
 eval_frequency: 10
 num_eval_episodes: 10
 gmm_window_size: 32
@@ -34,6 +34,9 @@ log_save_tb: false
 
 # video recorder (only for evaluation)
 record: true
+
+#weight and biases
+wandb: true
 
 
 name: sac_gmm
