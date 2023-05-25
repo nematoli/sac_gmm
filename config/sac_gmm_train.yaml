@@ -1,23 +1,27 @@
 defaults:
-  - calvin_env: full_default
-  - agent: sac_gmm
-  - dyn_sys: base_gmm
-  - datamodule: default
+  - agent: sacgmm
+  - calvin_env: default
+  - setup
+  - skills_setup
   - _self_
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 
 # skill params
-use_existing_demos: true
-skill: 'turn_off_lightbulb'
-skill_length: 64
+skill: 'open_drawer'
+
+# env params
+obs_allowed: ["pos", "rgb_static"] # Order is important = [robot_obs, camera_obs]
+
+# sacgmm
+adapt_cov: false
 
 # train and eval
 num_train_steps: 5e4
 replay_buffer_capacity: 1e2
 num_seed_steps: 4
 eval_frequency: 10
-num_eval_episodes: 100
+num_eval_episodes: 10
 gmm_window_size: 32
 gmm_max_episode_steps: 200
 
@@ -28,13 +32,9 @@ device: cuda
 log_frequency: 10000
 log_save_tb: false
 
-# video recorder
-save_video: true
+# video recorder (only for evaluation)
+record: true
 
-# directories
-root: ~/sac_gmm
-log_dir: ${root}
-demos_dir: ${root}/demonstrations
 
 name: sac_gmm
 

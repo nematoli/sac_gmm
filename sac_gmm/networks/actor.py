@@ -72,6 +72,11 @@ class DiagGaussianActor(nn.Module):
 
         self.log_std_bounds = log_std_bounds
         self.trunk = mlp(obs_dim, hidden_dim, 2 * action_dim, hidden_depth)
+        # https://arxiv.org/pdf/2006.05990.pdf
+        # recommends initializing the policy MLP with smaller weights in the last layer
+        init_w = 1e-3
+        self.trunk[-1].weight.data.uniform_(-init_w, init_w)
+        self.trunk[-1].bias.data.uniform_(-init_w, init_w)
 
         self.outputs = dict()
         self.apply(weight_init)

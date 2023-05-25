@@ -4,7 +4,7 @@
 #  - actor: diag_gaussian_actor
 #  - autoencoder: autoencoder
 #  - _self_ 
-_target_: sac_gmm.networks.sac.SACAgent
+_target_: sac_gmm.networks.sacgmm.SACGMMAgent
 obs_dim: ??? # to be specified later
 action_dim: ??? # to be specified later
 action_range: ??? # to be specified later

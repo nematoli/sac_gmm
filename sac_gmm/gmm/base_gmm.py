@@ -1,7 +1,9 @@
 import os
 import sys
 from pathlib import Path
+import gym
 from sac_gmm.gmm.utils.plot_utils import visualize_3d_gmm
+from sac_gmm.utils.posdef import isPD, nearestPD
 
 cwd_path = Path(__file__).absolute().parents[0]
 sac_gmm_path = cwd_path.parents[0]
@@ -33,7 +35,9 @@ class BaseGMM(object):
 
     """
 
-    def __init__(self, n_components=3, priors=None, means=None, covariances=None, plot=None, model_dir=None):
+    def __init__(
+        self, n_components=3, priors=None, means=None, covariances=None, plot=None, model_dir=None, state_size=None
+    ):
         # GMM
         self.n_components = n_components
         self.priors = priors
@@ -41,6 +45,7 @@ class BaseGMM(object):
         self.covariances = covariances
         self.plot = plot
         self.model_dir = model_dir
+        self.state_size = state_size
 
         self.name = "GMM"
 
@@ -140,6 +145,96 @@ class BaseGMM(object):
         self.means = np.array(gmm["mu"])
         self.covariances = np.array(gmm["sigma"])
 
+    def copy_model(self, dynsys):
+        """Copies GMM params to self from the input GMM class object
+
+        Args:
+            dynsys (BaseGMM|ManifoldGMM|BayesianGMM): GMM class object
+
+        Returns:
+            None
+        """
+        self.priors = dynsys.priors
+        self.means = dynsys.means
+        self.covariances = dynsys.covariances
+
+    def update_model(self, delta):
+        """Updates GMM parameters by given delta changes (i.e. SAC's output)
+
+        Args:
+            delta (dict): Changes given by the SAC agent to be made to the GMM parameters
+
+        Returns:
+            None
+        """
+        # Priors
+        if "priors" in delta:
+            delta_priors = delta["priors"].reshape(self.priors.shape)
+            self.priors += delta_priors
+            self.priors[self.priors < 0] = 0
+            self.priors /= self.priors.sum()
+
+        # Means
+        if "mu" in delta:
+            delta_means = delta["mu"].reshape(self.means.shape)
+            self.means += delta_means
+
+        # Covariances
+        if "sigma" in delta:
+            d_sigma = delta["sigma"]
+            dim = self.means.shape[2] // 2
+            num_gaussians = self.means.shape[0]
+
+            # Create sigma_state symmetric matrix
+            half_mat_size = int(dim * (dim + 1) / 2)
+            for i in range(num_gaussians):
+                d_sigma_state = d_sigma[half_mat_size * i : half_mat_size * (i + 1)]
+                mat_d_sigma_state = np.zeros((dim, dim))
+                mat_d_sigma_state[np.triu_indices(dim)] = d_sigma_state
+                mat_d_sigma_state = mat_d_sigma_state + mat_d_sigma_state.T
+                mat_d_sigma_state[np.diag_indices(dim)] = mat_d_sigma_state[np.diag_indices(dim)] / 2
+                self.sigma[:dim, :dim, i] += mat_d_sigma_state
+                if not isPD(self.sigma[:dim, :dim, i]):
+                    self.sigma[:dim, :dim, i] = nearestPD(self.sigma[:dim, :dim, i])
+
+            # Create sigma cross correlation matrix
+            d_sigma_cc = np.array(d_sigma[half_mat_size * num_gaussians :])
+            d_sigma_cc = d_sigma_cc.reshape((dim, dim, num_gaussians))
+            self.covariances[dim : 2 * dim, 0:dim] += d_sigma_cc
+
+    def model_params(self, cov=False):
+        """Returns GMM priors and means as a flattened vector
+
+        Args:
+            None
+
+        Returns:
+            params (np.array): GMM params flattened
+        """
+        priors = self.priors
+        means = self.means.flatten()
+        params = np.concatenate((priors, means), axis=-1)
+
+        return params
+
+    def get_update_range_parameter_space(self):
+        """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
+
+        Returns:
+            param_space : gym.spaces.Dict
+                Range of GMM parameters parameters
+        """
+        param_space = {}
+        param_space["priors"] = gym.spaces.Box(low=-0.1, high=0.1, shape=(self.priors.size,))
+        param_space["mu"] = gym.spaces.Box(low=-0.01, high=0.01, shape=(self.means.size,))
+        param_space["sigma"] = gym.spaces.Box(low=-1e-6, high=1e-6, shape=(self.covariances.size,))
+
+        dim = self.means.shape[2] // 2
+        num_gaussians = self.means.shape[0]
+        sigma_change_size = int(num_gaussians * dim * (dim + 1) / 2 + dim * dim * num_gaussians)
+        param_space["sigma"] = gym.spaces.Box(low=-1e-6, high=1e-6, shape=(sigma_change_size,))
+        return gym.spaces.Dict(param_space)
+
     def plot_gmm(self, obj_type=True):
         if not obj_type:
             means = self.float_to_object(self.means)
@@ -160,3 +255,17 @@ class BaseGMM(object):
             covariances=covariances,
             save_dir=self.model_dir,
         )
+
+    def sample_starts(self, size=1, scale=0.15):
+        """Samples starting points from dataset's average starting points.
+        At the moment, only works for position.
+        """
+        start = self.dataset.start
+        sampled = np.hstack(
+            (
+                np.random.normal(loc=start[0], scale=scale, size=size).reshape(size, -1),
+                np.random.normal(loc=start[1], scale=scale, size=size).reshape(size, -1),
+                np.random.normal(loc=start[2], scale=scale, size=size).reshape(size, -1),
+            )
+        )
+        return sampled

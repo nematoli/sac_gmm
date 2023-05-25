@@ -22,7 +22,8 @@ class AutoEncoder(nn.Module):
         return x
 
     def get_image_rep(self, x):
-        return self.encoder.forward(x).detach()
+        self.encoder.eval()
+        return self.encoder.forward(x, detach_encoder=True).detach()
 
 
 class Encoder(nn.Module):

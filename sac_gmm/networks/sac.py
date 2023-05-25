@@ -9,18 +9,13 @@
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import math
 
 from . import Agent
 import utils
 
-import hydra
-import pdb
 from sac_gmm.networks.actor import DiagGaussianActor
 from sac_gmm.networks.critic import DoubleQCritic
-from sac_gmm.networks.autoencoder import AutoEncoder
 
 
 class SACAgent(Agent):
@@ -45,13 +40,11 @@ class SACAgent(Agent):
         critic_target_update_frequency,
         batch_size,
         learnable_temperature,
-        ae_lr,
         critic,
         actor,
-        autoencoder,
     ):
         super().__init__()
-        # pdb.set_trace()
+        self.obs_dim = obs_dim
         self.action_range = action_range
         self.device = torch.device(device)
         self.discount = discount
@@ -72,9 +65,6 @@ class SACAgent(Agent):
         self.log_alpha = torch.tensor(np.log(init_temperature)).to(self.device)
         self.log_alpha.requires_grad = True
 
-        # self.autoencoder = hydra.utils.instantiate(autoencoder).to(self.device)
-        self.autoencoder = AutoEncoder(**autoencoder).to(self.device)
-
         # set target entropy to -|A|
         self.target_entropy = -action_dim
 
@@ -85,29 +75,18 @@ class SACAgent(Agent):
 
         self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=alpha_lr, betas=alpha_betas)
 
-        self.ae_optimizer = torch.optim.Adam(self.autoencoder.parameters(), lr=ae_lr, betas=critic_betas)
-        self.train()
         self.critic_target.train()
 
     def train(self, training=True):
         self.training = training
         self.actor.train(training)
         self.critic.train(training)
-        self.autoencoder.train(training)
 
     @property
     def alpha(self):
         return self.log_alpha.exp()
 
-    def prepare_obs(self, obs_dict):
-        gmm_params = torch.from_numpy(obs_dict["gmm_params"]).to(self.device)
-        pose = torch.from_numpy(obs_dict["pose"]).to(self.device)
-        image_rep = self.autoencoder.get_image_rep(obs_dict["image"].to(self.device))
-        obs = torch.concat((gmm_params, pose, image_rep), axis=-1)
-        return obs
-
     def act(self, obs, sample=False):
-        obs = self.prepare_obs(obs)
         obs = obs.type(torch.FloatTensor).to(self.device)
         obs = obs.unsqueeze(0)
         dist = self.actor(obs)
@@ -165,26 +144,8 @@ class SACAgent(Agent):
             alpha_loss.backward()
             self.log_alpha_optimizer.step()
 
-    def update_autoencoder(self, obs, logger, step):
-        hidden = self.autoencoder.encoder(obs)
-        pred_obs = self.autoencoder.decoder(hidden)
-
-        rec_loss = F.mse_loss(pred_obs, obs.detach())
-        latent_loss = (0.5 * hidden.detach().pow(2).sum(1)).mean()
-        ae_loss = rec_loss + self.autoencoder.latent_lambda * latent_loss
-
-        logger.log("train_ae/loss", ae_loss, step)
-        logger.log("train_ae/rec_loss", rec_loss, step)
-        logger.log("train_ae/latent_loss", latent_loss, step)
-
-        self.ae_optimizer.zero_grad()
-        ae_loss.backward()
-        self.ae_optimizer.step()
-
     def update(self, replay_buffer, logger, step):
-        obs, cam_obs, action, reward, next_obs, next_cam_obs, not_done, not_done_no_max = replay_buffer.sample(
-            self.batch_size
-        )
+        obs, action, reward, next_obs, not_done, not_done_no_max = replay_buffer.sample(self.batch_size)
 
         logger.log("train/batch_reward", reward.mean(), step)
 
@@ -192,9 +153,6 @@ class SACAgent(Agent):
 
         if step % self.actor_update_frequency == 0:
             self.update_actor_and_alpha(obs, logger, step)
-
-            all_cam_obs = torch.concat((cam_obs.unsqueeze(1), next_cam_obs.unsqueeze(1)))
-            self.update_autoencoder(all_cam_obs, logger, step)
 
         if step % self.critic_target_update_frequency == 0:
             self.soft_update_critic()

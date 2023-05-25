@@ -6,8 +6,10 @@ import logging
 
 
 class BayesianGMM(BaseGMM):
-    def __init__(self, n_components, max_iter, plot, model_dir):
-        super(BayesianGMM, self).__init__(n_components=n_components, plot=plot, model_dir=model_dir)
+    def __init__(self, n_components, max_iter, plot, model_dir, state_size):
+        super(BayesianGMM, self).__init__(
+            n_components=n_components, plot=plot, model_dir=model_dir, state_size=state_size
+        )
 
         self.name = "BayesianGMM"
         self.random_state = np.random.RandomState(0)

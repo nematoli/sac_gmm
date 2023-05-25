@@ -21,8 +21,10 @@ import logging
 
 
 class ManifoldGMM(BaseGMM):
-    def __init__(self, n_components, plot, model_dir):
-        super(ManifoldGMM, self).__init__(n_components=n_components, plot=plot, model_dir=model_dir)
+    def __init__(self, n_components, plot, model_dir, state_size):
+        super(ManifoldGMM, self).__init__(
+            n_components=n_components, plot=plot, model_dir=model_dir, state_size=state_size
+        )
 
         self.name = "ManifoldGMM"
 
@@ -74,9 +76,13 @@ class ManifoldGMM(BaseGMM):
             initial_priors=init_priors,
             logger=self.logger,
         )
+        # Reshape means from (n_components, 2) to (n_components, 2, state_size)
+        self.means = self.get_reshaped_means()
 
         # Save GMM params
+        self.reshape_params(to="generic")
         self.save_model()
+        self.reshape_params(to="gmr-specific")
 
         # Plot GMM
         if self.plot:
@@ -97,3 +103,32 @@ class ManifoldGMM(BaseGMM):
             out_manifold_idx=out_manifold_idx,
         )
         return dx[0]
+
+    def load_model(self):
+        super().load_model()
+        self.reshape_params(to="gmr-specific")
+
+    def get_reshaped_means(self):
+        """Reshape means from (n_components, 2) to (n_components, 2, state_size)"""
+        new_means = np.empty((self.n_components, 2, self.state_size))
+        for i in range(new_means.shape[0]):
+            for j in range(new_means.shape[1]):
+                new_means[i, j, :] = self.means[i][j]
+        return new_means
+
+    def reshape_params(self, to="generic"):
+        """Reshapes model params to/from generic/gmr-specific shapes.
+        E.g., For N GMM components, S state size, generic shapes are
+        self.priors = (N,);
+        self.means = (N, 2*S);
+        self.covariances = (N, 2*S, 2*S)
+
+        Gmr-specific: self.means = (N, 2, S)
+        """
+        # priors and covariances already match shape
+        shape = None
+        if to == "generic":
+            shape = (self.n_components, 2 * self.state_size)
+        else:
+            shape = (self.n_components, 2, self.state_size)
+        self.means = self.means.reshape(shape)
