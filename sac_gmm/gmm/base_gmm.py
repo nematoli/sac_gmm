@@ -256,17 +256,3 @@ class BaseGMM(object):
             covariances=covariances,
             save_dir=self.model_dir,
         )
-
-    def sample_starts(self, size=1, scale=0.15):
-        """Samples starting points from dataset's average starting points.
-        At the moment, only works for position.
-        """
-        start = self.dataset.start
-        sampled = np.hstack(
-            (
-                np.random.normal(loc=start[0], scale=scale, size=size).reshape(size, -1),
-                np.random.normal(loc=start[1], scale=scale, size=size).reshape(size, -1),
-                np.random.normal(loc=start[2], scale=scale, size=size).reshape(size, -1),
-            )
-        )
-        return sampled

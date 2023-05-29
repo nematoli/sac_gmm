@@ -9,47 +9,6 @@ import math
 from utils.transforms import PreprocessImage
 
 
-class eval_mode(object):
-    def __init__(self, *models):
-        self.models = models
-
-    def __enter__(self):
-        self.prev_states = []
-        for model in self.models:
-            self.prev_states.append(model.training)
-            model.train(False)
-
-    def __exit__(self, *args):
-        for model, state in zip(self.models, self.prev_states):
-            model.train(state)
-        return False
-
-
-class train_mode(object):
-    def __init__(self, *models):
-        self.models = models
-
-    def __enter__(self):
-        self.prev_states = []
-        for model in self.models:
-            self.prev_states.append(model.training)
-            model.train(True)
-
-    def __exit__(self, *args):
-        for model, state in zip(self.models, self.prev_states):
-            model.train(state)
-        return False
-
-
-def make_dir(*path_parts):
-    dir_path = os.path.join(*path_parts)
-    try:
-        os.mkdir(dir_path)
-    except OSError:
-        pass
-    return dir_path
-
-
 def set_seed_everywhere(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -73,9 +32,50 @@ def calc_out_size(w, h, kernel_size, padding=0, stride=1):
     return width, height
 
 
+def transform_to_tensor(x, dtype=torch.float, grad=True, device="cuda"):
+    if isinstance(x, dict):
+        tensor = {k: torch.tensor(v, dtype=dtype, device=device, requires_grad=grad) for k, v in x.items()}
+    else:
+        tensor = torch.tensor(x, dtype=dtype, device=device, requires_grad=grad)  # B, S_D
+    return tensor
+
+
 def torch_tensor_cam_obs(cam_obs):
     cam_obs = PreprocessImage()(cam_obs).squeeze(1)
     return cam_obs
+
+
+def get_state_from_observation(hd_input_encoder, obs, detach_encoder):
+    if isinstance(obs, dict):
+        # Robot obs
+        if "pos" in obs:
+            fc_input = obs["pos"].float()
+        elif "pos_ori" in obs:
+            fc_input = obs["pos_ori"].float()
+        elif "joint" in obs:
+            fc_input = obs["joint"].float()
+
+        # Added for Residual action
+        if "gmm_action" in obs:
+            fc_input = torch.cat((fc_input, obs["gmm_action"]), dim=-1)
+
+        # Camera obs (High dimensional inputs)
+        hd_input_keys = [
+            "rgb_gripper",
+            "depth_gripper",
+            "rgb_static",
+            "depth_static",
+        ]
+        for key in hd_input_keys:
+            if key in obs:
+                if type(obs[key]) is list:
+                    obs[key] = torch.stack(obs[key], dim=1)
+                compact_repr = hd_input_encoder(obs[key].float(), detach_encoder)
+                fc_input = torch.cat((fc_input, compact_repr), dim=-1)
+
+        return fc_input.float()
+
+    return obs.float()
 
 
 def preprocess_agent_in(trainer, obs):

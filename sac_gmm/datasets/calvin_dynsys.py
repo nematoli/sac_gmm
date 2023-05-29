@@ -103,6 +103,14 @@ class CALVINDynSysDataset(Dataset):
             self.norm_range[-1] - self.norm_range[0]
         ) + self.X_mins
 
+    def sample_start(self, size=1, sigma=0.15):
+        start = self.start
+        sampled = sample_gaussian_norm_ball(start, sigma, size)
+        if size == 1:
+            return sampled[0]
+        else:
+            return sampled
+
     def get_valid_columns(self, state_type):
         if "joint" in state_type:
             start, end = 8, 15
@@ -148,3 +156,23 @@ def plot_3d_trajectories(demos, repro=None, goal=None, figsize=(4, 4)):
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+
+def sample_gaussian_norm_ball(reference_point, sigma, num_samples):
+    samples = []
+    for _ in range(num_samples):
+        # Step 1: Sample from standard Gaussian distribution
+        offset = np.random.randn(3)
+
+        # Step 2: Normalize the offset
+        normalized_offset = offset / np.linalg.norm(offset)
+
+        # Step 3: Scale the normalized offset
+        scaled_offset = normalized_offset * np.random.normal(0, sigma)
+
+        # Step 4: Translate the offset
+        sampled_point = reference_point + scaled_offset
+
+        samples.append(sampled_point)
+
+    return samples

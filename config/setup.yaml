@@ -8,8 +8,17 @@ defaults:
 
 seed: 42
 slurm: false
+device: cuda
 
-root: ~/sac_gmm
+root: /home/${developer}/sac_gmm
 log_dir: ${root}/logs
 demos_dir: ${root}/demonstrations
 exp_dir: null
+
+developer: "lagandua"
+comment: ""
+wandb:
+  entity: in-ac
+  project: sacgmm
+  developer: ${developer}
+  comment: ${comment}

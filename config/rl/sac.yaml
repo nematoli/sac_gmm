@@ -1,0 +1,27 @@
+defaults:
+  - actor: densenet
+  - critic: densenet
+  # - autoencoder: default
+_target_: sac_gmm.algo.sac.SAC
+_recursive_: false
+input_dim: 0 # to be specified later
+action_dim: 0 # to be specified later
+device: ${device}
+discount: 0.99
+init_alpha: 0.2
+optimize_alpha: true
+alpha_lr: 3e-4
+alpha_betas: [0.9, 0.999]
+actor_lr: 3e-4
+actor_betas: [0.9, 0.999]
+critic_lr: 3e-4
+critic_betas: [0.9, 0.999]
+critic_tau: 0.005
+ae_lr: 3e-4
+batch_size: 256
+replay_buffer_capacity: ${replay_buffer_capacity}
+compact_rep_size: 8
+late_fusion: true
+shared_encoder: true
+fixed_encoder: false
+autoencoder: null
