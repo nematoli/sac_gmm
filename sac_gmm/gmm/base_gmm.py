@@ -1,7 +1,9 @@
 import os
 import sys
 from pathlib import Path
+import gym
 from sac_gmm.gmm.utils.plot_utils import visualize_3d_gmm
+from sac_gmm.utils.posdef import isPD, nearestPD
 
 cwd_path = Path(__file__).absolute().parents[0]
 sac_gmm_path = cwd_path.parents[0]
@@ -33,7 +35,9 @@ class BaseGMM(object):
 
     """
 
-    def __init__(self, n_components=3, priors=None, means=None, covariances=None, plot=None, model_dir=None):
+    def __init__(
+        self, n_components=3, priors=None, means=None, covariances=None, plot=None, model_dir=None, state_size=None
+    ):
         # GMM
         self.n_components = n_components
         self.priors = priors
@@ -41,6 +45,7 @@ class BaseGMM(object):
         self.covariances = covariances
         self.plot = plot
         self.model_dir = model_dir
+        self.state_size = state_size
 
         self.name = "GMM"
 
@@ -58,19 +63,30 @@ class BaseGMM(object):
             self.covariances = np.asarray(self.covariances)
 
     def preprocess_data(self, dataset, obj_type=True, normalize=False):
-        # Stack position and velocity data
-        demos_xdx = [np.hstack([dataset.X[i], dataset.dX[i]]) for i in range(dataset.X.shape[0])]
+        if self.state_type == "pos_ori":
+            # Stack position, velocity and quaternion data
+            demos_xdx = [np.hstack([dataset.X[i], dataset.dX[i], dataset.Ori[i]]) for i in range(dataset.X.shape[0])]
+        else:
+            # Stack position and velocity data
+            demos_xdx = [np.hstack([dataset.X[i], dataset.dX[i]]) for i in range(dataset.X.shape[0])]
+
         # Stack demos
         demos = demos_xdx[0]
         for i in range(1, dataset.X.shape[0]):
             demos = np.vstack([demos, demos_xdx[i]])
 
         X = demos[:, : self.dim]
-        Y = demos[:, self.dim :]
+        Y = demos[:, self.dim : self.dim + self.dim]
 
-        data = np.hstack((X, Y))
+        if self.state_type == "pos_ori":
+            Y_Ori = demos[:, self.dim + self.dim :]
+            data = np.empty((X.shape[0], 3), dtype=object)
+            for n in range(X.shape[0]):
+                data[n] = [X[n], Y[n], Y_Ori[n]]
+        else:
+            data = np.hstack((X, Y))
 
-        if obj_type:
+        if obj_type and (data.dtype != "O"):
             data = self.float_to_object(data)
 
         return data
@@ -87,11 +103,12 @@ class BaseGMM(object):
         self.dim = self.dataset.X.numpy().shape[-1]
         self.data = self.preprocess_data(dataset, obj_type=obj_type, normalize=False)
 
-    def fit(self, dataset):
+    def fit(self, dataset, wandb_flag=False):
         """
         fits a GMM on demonstrations
         Args:
             dataset: skill demonstrations
+            wandb_flag: weights and biases logging flag
         """
         raise NotImplementedError
 
@@ -129,6 +146,96 @@ class BaseGMM(object):
         self.means = np.array(gmm["mu"])
         self.covariances = np.array(gmm["sigma"])
 
+    def copy_model(self, dynsys):
+        """Copies GMM params to self from the input GMM class object
+
+        Args:
+            dynsys (BaseGMM|ManifoldGMM|BayesianGMM): GMM class object
+
+        Returns:
+            None
+        """
+        self.priors = np.copy(dynsys.priors)
+        self.means = np.copy(dynsys.means)
+        self.covariances = np.copy(dynsys.covariances)
+
+    def update_model(self, delta):
+        """Updates GMM parameters by given delta changes (i.e. SAC's output)
+
+        Args:
+            delta (dict): Changes given by the SAC agent to be made to the GMM parameters
+
+        Returns:
+            None
+        """
+        # Priors
+        if "priors" in delta:
+            delta_priors = delta["priors"].reshape(self.priors.shape)
+            self.priors += delta_priors
+            self.priors[self.priors < 0] = 0
+            self.priors /= self.priors.sum()
+
+        # Means
+        if "mu" in delta:
+            delta_means = delta["mu"].reshape(self.means.shape)
+            self.means += delta_means
+
+        # Covariances
+        if "sigma" in delta:
+            d_sigma = delta["sigma"]
+            dim = self.means.shape[2] // 2
+            num_gaussians = self.means.shape[0]
+
+            # Create sigma_state symmetric matrix
+            half_mat_size = int(dim * (dim + 1) / 2)
+            for i in range(num_gaussians):
+                d_sigma_state = d_sigma[half_mat_size * i : half_mat_size * (i + 1)]
+                mat_d_sigma_state = np.zeros((dim, dim))
+                mat_d_sigma_state[np.triu_indices(dim)] = d_sigma_state
+                mat_d_sigma_state = mat_d_sigma_state + mat_d_sigma_state.T
+                mat_d_sigma_state[np.diag_indices(dim)] = mat_d_sigma_state[np.diag_indices(dim)] / 2
+                self.sigma[:dim, :dim, i] += mat_d_sigma_state
+                if not isPD(self.sigma[:dim, :dim, i]):
+                    self.sigma[:dim, :dim, i] = nearestPD(self.sigma[:dim, :dim, i])
+
+            # Create sigma cross correlation matrix
+            d_sigma_cc = np.array(d_sigma[half_mat_size * num_gaussians :])
+            d_sigma_cc = d_sigma_cc.reshape((dim, dim, num_gaussians))
+            self.covariances[dim : 2 * dim, 0:dim] += d_sigma_cc
+
+    def model_params(self, cov=False):
+        """Returns GMM priors and means as a flattened vector
+
+        Args:
+            None
+
+        Returns:
+            params (np.array): GMM params flattened
+        """
+        priors = self.priors
+        means = self.means.flatten()
+        params = np.concatenate((priors, means), axis=-1)
+
+        return params
+
+    def get_update_range_parameter_space(self):
+        """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
+
+        Returns:
+            param_space : gym.spaces.Dict
+                Range of GMM parameters parameters
+        """
+        param_space = {}
+        param_space["priors"] = gym.spaces.Box(low=-0.1, high=0.1, shape=(self.priors.size,))
+        param_space["mu"] = gym.spaces.Box(low=-0.01, high=0.01, shape=(self.means.size,))
+        param_space["sigma"] = gym.spaces.Box(low=-1e-6, high=1e-6, shape=(self.covariances.size,))
+
+        dim = self.means.shape[2] // 2
+        num_gaussians = self.means.shape[0]
+        sigma_change_size = int(num_gaussians * dim * (dim + 1) / 2 + dim * dim * num_gaussians)
+        param_space["sigma"] = gym.spaces.Box(low=-1e-6, high=1e-6, shape=(sigma_change_size,))
+        return gym.spaces.Dict(param_space)
+
     def plot_gmm(self, obj_type=True):
         if not obj_type:
             means = self.float_to_object(self.means)
@@ -136,28 +243,16 @@ class BaseGMM(object):
             means = self.means
 
         # Pick 15 random datapoints from X to plot
-        rand_idx = np.random.choice(np.arange(1, len(self.dataset.X)), size=15, replace=False, p=None)
-        plot_data = self.dataset.X[rand_idx[0]].numpy()
-        for i in rand_idx[1:]:
-            plot_data = np.vstack([plot_data, self.dataset.X[i].numpy()])
-
-        plot_means = np.empty((self.n_components, 3))
-        for i in range(plot_means.shape[0]):
-            for j in range(plot_means.shape[1]):
-                plot_means[i, j] = means[i, 0][j]
-
-        temp = self.covariances[:, : self.dim, : self.dim]
-        plot_covariances = np.empty((self.n_components, 3))
-        for i in range(plot_covariances.shape[0]):
-            for j in range(plot_covariances.shape[1]):
-                plot_covariances[i, j] = temp[i][j, j]
+        points = self.dataset.X.numpy()[:, :, :3]
+        rand_idx = np.random.choice(np.arange(0, len(points)), size=15)
+        points = np.vstack(points[rand_idx, :, :])
+        means = np.vstack(self.means[:, 0])
+        covariances = self.covariances[:, :3, :3]
 
         return visualize_3d_gmm(
-            points=plot_data,
-            w=self.priors,
-            mu=plot_means.T,
-            stdev=plot_covariances.T,
-            skill=self.dataset.skill,
-            export_dir=self.model_dir,
-            export_type="gif",
+            points=points,
+            priors=self.priors,
+            means=means,
+            covariances=covariances,
+            save_dir=self.model_dir,
         )

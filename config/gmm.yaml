@@ -21,6 +21,7 @@ skill: 'turn_off_lightbulb'
 gmm_type: base
 gmm_components: 3
 plot_gmr: true
+gmm_input_size: ${gmm_input_size}
 
 # Environment params
 render: false

@@ -1,5 +1,6 @@
 import os
 import sys
+import wandb
 import hydra
 import logging
 from pathlib import Path
@@ -31,11 +32,11 @@ class SkillEvaluator(object):
         self.env = env
         self.skill = self.cfg.skill
         self.logger = logging.getLogger("SkillEvaluator")
+        self.robot_obs = self.cfg.state_type
 
     def evaluate(self, ds, dataset, max_steps, sampling_dt, render=False, record=False):
         dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
         succesful_rollouts, rollout_returns, rollout_lengths = 0, [], []
-        start_idx, end_idx = self.env.get_valid_columns()
         for idx, (xi, d_xi) in enumerate(dataloader):
             if (idx % 5 == 0) or (idx == len(dataset)):
                 self.logger.info(f"Test Trajectory {idx+1}/{len(dataset)}")
@@ -43,25 +44,22 @@ class SkillEvaluator(object):
             goal = dataset.goal
             rollout_return = 0
             observation = self.env.reset()
-            current_state = observation[start_idx:end_idx]
-            if dataset.state_type == "pos":
-                temp = np.append(x0, np.append(dataset.fixed_ori, -1))
-            else:
-                temp = np.append(x0, -1)
+            current_state = observation[self.robot_obs][:3]
+            temp = np.append(x0, np.append(dataset.fixed_ori, -1))
             action = self.env.prepare_action(temp, type="abs")
             # self.logger.info(f'Adjusting EE position to match the initial pose from the dataset')
             count = 0
             error_margin = 0.01
             while np.linalg.norm(current_state - x0) >= error_margin:
                 observation, reward, done, info = self.env.step(action)
-                current_state = observation[start_idx:end_idx]
+                current_state = observation[self.robot_obs][:3]
                 count += 1
                 if count >= 200:
                     # x0 = current_state
                     self.logger.info("CALVIN is struggling to place the EE at the right initial pose")
-                    self.logger.info(x0, current_state, np.linalg.norm(current_state - x0))
+                    self.logger.info(f"{np.linalg.norm(current_state - x0)}")
                     break
-            x = observation[start_idx:end_idx]
+            x = observation[self.robot_obs][:3]
             # self.logger.info(f'Simulating with DS')
             if record:
                 self.logger.info("Recording Robot Camera Obs")
@@ -74,15 +72,15 @@ class SkillEvaluator(object):
                     new_x = x + delta_x
                 else:
                     d_x = ds.predict(x - goal)
-                    delta_x = sampling_dt * d_x
+                    delta_x = sampling_dt * d_x[:3]
                     new_x = x + delta_x
                 if dataset.state_type == "pos":
                     temp = np.append(new_x, np.append(dataset.fixed_ori, -1))
-                else:
-                    temp = np.append(new_x, -1)
+                elif dataset.state_type == "pos_ori":
+                    temp = np.append(new_x, np.append(d_x[3:], -1))
                 action = self.env.prepare_action(temp, type="abs")
                 observation, reward, done, info = self.env.step(action)
-                x = observation[start_idx:end_idx]
+                x = observation[self.robot_obs][:3]
                 rollout_return += reward
                 if record:
                     self.env.record_frame()
@@ -102,13 +100,43 @@ class SkillEvaluator(object):
                 video_path = self.env.save_recorded_frames()
                 self.env.reset_recorded_frames()
                 status = None
+                if self.cfg.wandb:
+                    wandb.log(
+                        {
+                            f"{self.env.skill_name} {status} {self.env.record_count}": wandb.Video(
+                                video_path, fps=30, format="gif"
+                            )
+                        }
+                    )
             rollout_returns.append(rollout_return)
             rollout_lengths.append(step)
         acc = succesful_rollouts / len(dataset.X)
+        if self.cfg.wandb:
+            wandb.config.update({"val dataset size": len(dataset.X)})
+            wandb.log(
+                {
+                    "skill": self.env.skill_name,
+                    "accuracy": acc * 100,
+                    "average_return": np.mean(rollout_returns),
+                    "average_traj_len": np.mean(rollout_lengths),
+                }
+            )
         return acc, np.mean(rollout_returns), np.mean(rollout_lengths)
 
     def run(self):
         skill_accs = {}
+        if self.cfg.wandb:
+            config = {
+                "state_type": self.cfg.state_type,
+                "sampling_dt": self.cfg.sampling_dt,
+                "max steps": self.cfg.max_steps,
+            }
+            wandb.init(
+                project="ds-evaluation",
+                entity="in-ac",
+                config=config,
+                name=f"{self.cfg.skill}_{self.cfg.state_type}",
+            )
         self.env.set_skill(self.skill)
 
         # Get validation dataset
@@ -145,6 +173,9 @@ class SkillEvaluator(object):
         )
         skill_accs[self.skill] = [str(acc), str(avg_return), str(avg_len)]
         self.env.count = 0
+
+        if self.cfg.wandb:
+            wandb.finish()
 
         # Log evaluation output
         self.logger.info(f"{self.skill} Skill Accuracy: {round(acc, 2)}")

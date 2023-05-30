@@ -10,6 +10,9 @@ goal_centered: true # this must be false during evaluation
 render: false
 record: false
 
+# Logger
+wandb: true
+
 hydra:
   run:
     dir: ${log_dir}/train-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}

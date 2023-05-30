@@ -56,18 +56,23 @@ class CALVINDynSysDataset(Dataset):
             oris = np.apply_along_axis(p.getQuaternionFromEuler, -1, self.X[:, :, 3:])
             self.X = np.concatenate([self.X[:, :, :3], oris], axis=-1)
 
-        self.start = np.mean(self.X[:, 0, :], axis=0)
-        self.goal = np.mean(self.X[:, -1, :], axis=0)
+        self.start = np.mean(self.X[:, 0, :3], axis=0)
+        self.goal = np.mean(self.X[:, -1, :3], axis=0)
         if self.goal_centered:
             # Make X goal centered i.e., subtract each trajectory with its goal
-            self.X = self.X - np.expand_dims(self.X[:, -1, :], axis=1)
+            self.X[:, :, :3] = self.X[:, :, :3] - np.expand_dims(self.X[:, -1, :3], axis=1)
 
         if self.normalized:
             self.set_mins_and_maxs(self.X)
             self.X = self.normalize(self.X)
 
-        self.dX = (self.X[:, 2:, :] - self.X[:, :-2, :]) / self.dt
+        self.dX = (self.X[:, 2:, :3] - self.X[:, :-2, :3]) / self.dt
         self.X = self.X[:, 1:-1, :]
+
+        if self.state_type == "pos_ori":
+            self.Ori = self.X[:, :, 3:]
+            self.Ori = torch.from_numpy(self.Ori).type(torch.FloatTensor)
+            self.X = self.X[:, :, :3]
 
         self.X = torch.from_numpy(self.X).type(torch.FloatTensor)
         self.dX = torch.from_numpy(self.dX).type(torch.FloatTensor)
@@ -97,6 +102,14 @@ class CALVINDynSysDataset(Dataset):
         return (x - self.norm_range[0]) * (self.X_maxs - self.X_mins) / (
             self.norm_range[-1] - self.norm_range[0]
         ) + self.X_mins
+
+    def sample_start(self, size=1, sigma=0.15):
+        start = self.start
+        sampled = sample_gaussian_norm_ball(start, sigma, size)
+        if size == 1:
+            return sampled[0]
+        else:
+            return sampled
 
     def get_valid_columns(self, state_type):
         if "joint" in state_type:
@@ -143,3 +156,23 @@ def plot_3d_trajectories(demos, repro=None, goal=None, figsize=(4, 4)):
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+
+def sample_gaussian_norm_ball(reference_point, sigma, num_samples):
+    samples = []
+    for _ in range(num_samples):
+        # Step 1: Sample from standard Gaussian distribution
+        offset = np.random.randn(3)
+
+        # Step 2: Normalize the offset
+        normalized_offset = offset / np.linalg.norm(offset)
+
+        # Step 3: Scale the normalized offset
+        scaled_offset = normalized_offset * np.random.normal(0, sigma)
+
+        # Step 4: Translate the offset
+        sampled_point = reference_point + scaled_offset
+
+        samples.append(sampled_point)
+
+    return samples

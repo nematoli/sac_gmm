@@ -11,7 +11,8 @@ sys.path.insert(0, sac_gmm_path.as_posix())  # sac_gmm
 sys.path.insert(0, os.path.join(root, "calvin_env"))  # root/calvin_env
 sys.path.insert(0, root.as_posix())  # Root
 
-from gym import spaces
+import gym
+from sac_gmm.utils.misc import resize_cam_obs
 from calvin_env.envs.play_table_env import PlayTableSimEnv
 import hydra
 import imageio
@@ -24,13 +25,16 @@ class SkillSpecificEnv(PlayTableSimEnv):
         super(SkillSpecificEnv, self).__init__(**kwargs)
         # For this example we will modify the observation to
         # only retrieve the end effector pose
-        self.action_space = spaces.Box(low=-1, high=1, shape=(7,))
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(15,))
+        self.action_space = gym.spaces.Box(low=-1, high=1, shape=(7,))
+        self.obs_allowed = ["pos", None]  # robot obs, cam obs (order is important)
+        self.observation_space = None
         # We can use the task utility to know if the task was executed correctly
         self.tasks = hydra.utils.instantiate(tasks)
         self.skill_name = None
         self.state_type = None
         self.max_episode_steps = 1000
+        # Make robot provide Quaternion orientation
+        self.robot.euler_obs = False
 
         self.frames = []
         self.outdir = None
@@ -44,15 +48,45 @@ class SkillSpecificEnv(PlayTableSimEnv):
         """Set env input type - joint, pos, pos_ori"""
         self.state_type = type
 
+    def set_obs_allowed(self, obs_allowed):
+        """Set what observations env should return"""
+        assert len(obs_allowed) == 2, "Input must be a list of size 2"
+        self.obs_allowed = obs_allowed
+
+    def set_outdir(self, outdir):
+        """Set output directory where recordings can/will be saved"""
+        self.outdir = outdir
+
     def reset(self):
         obs = super().reset()
         self.start_info = self.get_info()
+        self.reset_recorded_frames()
         return obs
 
     def get_obs(self):
         """Overwrite robot obs to only retrieve end effector position"""
+        obs = {}
+        robot_obs_allowed, cam_obs_allowed = self.obs_allowed
         robot_obs, robot_info = self.robot.get_observation()
-        return robot_obs
+
+        if robot_obs_allowed == "pos":
+            obs[robot_obs_allowed] = robot_obs[:3]
+        elif robot_obs_allowed == "pos_ori":
+            obs[robot_obs_allowed] = robot_obs[:7]
+        elif robot_obs_allowed == "joint":
+            obs[robot_obs_allowed] = robot_obs[8:15]
+        else:
+            raise ValueError("Invalid value (robot obs) inside obs_allowed list")
+
+        if cam_obs_allowed is not None:
+            rgb_obs, depth_obs = self.get_camera_obs()
+            if "rgb" in cam_obs_allowed:
+                obs[cam_obs_allowed] = rgb_obs[cam_obs_allowed]
+            elif "depth" in cam_obs_allowed:
+                obs[cam_obs_allowed] = depth_obs[cam_obs_allowed]
+            else:
+                raise ValueError("Invalid value (camera obs) inside obs_allowed list")
+        return obs
 
     def get_camera_obs(self):
         """Collect camera, robot and scene observations."""
@@ -61,13 +95,9 @@ class SkillSpecificEnv(PlayTableSimEnv):
         depth_obs = {}
         for cam in self.cameras:
             rgb, depth = cam.render()
-            rgb_obs[f"rgb_{cam.name}"] = rgb
-            depth_obs[f"depth_{cam.name}"] = depth
+            rgb_obs[f"rgb_{cam.name}"] = resize_cam_obs(rgb)
+            depth_obs[f"depth_{cam.name}"] = resize_cam_obs(np.expand_dims(depth, -1))
         return rgb_obs, depth_obs
-
-    def set_outdir(self, outdir):
-        """Set output directory where recordings can/will be saved"""
-        self.outdir = outdir
 
     def record_frame(self, obs_type="rgb", cam_type="static", size=208):
         """Record RGB obsservation"""
@@ -83,18 +113,12 @@ class SkillSpecificEnv(PlayTableSimEnv):
         """Reset recorded frames"""
         self.frames = []
 
-    def save_recorded_frames(self, path=None):
+    def save_recorded_frames(self, outdir, fname):
         """Save recorded frames as a video"""
-        if path is None:
-            imageio.mimsave(
-                os.path.join(self.outdir, f"{self.skill_name}_{self.state_type}_{self.record_count}.mp4"),
-                self.frames,
-                fps=30,
-            )
-            self.record_count += 1
-        else:
-            imageio.mimsave(path, self.frames, fps=30)
-        return os.path.join(self.outdir, f"{self.skill_name}_{self.state_type}_{self.record_count-1}.mp4")
+        fname = f"{fname}.mp4"
+        fpath = os.path.join(outdir, fname)
+        imageio.mimsave(fpath, self.frames, fps=30)
+        return fpath
 
     def _success(self):
         """Returns a boolean indicating if the task was performed correctly"""
@@ -136,8 +160,8 @@ class SkillSpecificEnv(PlayTableSimEnv):
             action = {"type": f"joint_{type}", "action": None}
         elif "pos" in self.state_type:
             action = {"type": f"cartesian_{type}", "action": None}
-            action["action"] = input
 
+        action["action"] = input
         return action
 
     def step(self, action):
@@ -164,3 +188,26 @@ class SkillSpecificEnv(PlayTableSimEnv):
         info.update(r_info)
         info.update(d_info)
         return obs, reward, done, info
+
+    def get_obs_space(self):
+        obs_space = {}
+        robot_obs, cam_obs = self.obs_allowed
+
+        # Robot EE position
+        if robot_obs == "pos":
+            obs_space[robot_obs] = gym.spaces.Box(low=-np.ones(3), high=np.ones(3))
+        elif robot_obs == "pos_ori":
+            obs_space[robot_obs] = gym.spaces.Box(low=-np.ones(7), high=np.ones(7))
+        elif robot_obs == "joint":
+            obs_space[robot_obs] = gym.spaces.Box(low=-np.ones(7), high=np.ones(7))
+
+        # Camera
+        if cam_obs is not None:
+            rgb, depth = self.get_camera_obs()
+            high = None
+            if "rgb" in cam_obs:
+                high = np.ones((rgb[cam_obs].shape[0], rgb[cam_obs].shape[1], rgb[cam_obs].shape[2]))
+            else:
+                high = np.ones((depth[cam_obs].shape[0], depth[cam_obs].shape[1]))
+            obs_space[cam_obs] = gym.spaces.Box(low=-high, high=high)
+        return gym.spaces.Dict(obs_space)

@@ -1,7 +1,8 @@
 # Skill params
 skills_dir: ${root}/skills_ds
 state_type: 'pos'
-dim: none
+dim: 3
+
 
 # Dataset params:
 skill: null
@@ -18,3 +19,4 @@ max_steps: 240
 # GMM params
 gmm_components: 6
 plot: true
+gmm_input_size: ${dim}

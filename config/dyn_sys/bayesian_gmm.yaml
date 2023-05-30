@@ -3,3 +3,4 @@ n_components: ${gmm_components}
 max_iter: 100
 plot: ${plot}
 model_dir: ${skills_dir}
+state_size: ${gmm_input_size}

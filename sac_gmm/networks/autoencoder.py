@@ -5,7 +5,7 @@ from gym.spaces import Tuple
 from collections import OrderedDict
 
 import numpy as np
-import utils
+from sac_gmm.utils.misc import calc_out_size
 import pdb
 
 
@@ -22,7 +22,8 @@ class AutoEncoder(nn.Module):
         return x
 
     def get_image_rep(self, x):
-        return self.encoder.forward(x).detach()
+        self.encoder.eval()
+        return self.encoder.forward(x, detach_encoder=True).detach()
 
 
 class Encoder(nn.Module):
@@ -32,8 +33,8 @@ class Encoder(nn.Module):
         self.device = device
         self.in_channels = in_channels
         h, w = obs_space
-        h, w = utils.misc.calc_out_size(h, w, 8, stride=4)
-        h, w = utils.misc.calc_out_size(h, w, 4, stride=2)
+        h, w = calc_out_size(h, w, 8, stride=4)
+        h, w = calc_out_size(h, w, 4, stride=2)
         if late_fusion:
             num_channels = 1
         else:
@@ -85,8 +86,8 @@ class Decoder(nn.Module):
         self.late_fusion = late_fusion
         self.i_h, self.i_w = obs_space
         h, w = self.i_h, self.i_w
-        h, w = utils.misc.calc_out_size(h, w, 8, stride=4)
-        self.h, self.w = utils.misc.calc_out_size(h, w, 4, stride=2)
+        h, w = calc_out_size(h, w, 8, stride=4)
+        self.h, self.w = calc_out_size(h, w, 4, stride=2)
 
         if self.late_fusion:
             self.fc = nn.Linear(input_dim, 64 * out_channels).to(self.device)

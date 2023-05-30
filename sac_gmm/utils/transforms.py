@@ -40,5 +40,21 @@ class PreprocessImage(object):
         tensor = transforms.Normalize(mean, std)(tensor)
         tensor = transforms.Resize(64)(tensor)
         tensor = transforms.Grayscale(1)(tensor)
-        tensor = tensor.unsqueeze(0)
+        return tensor
+
+
+class ResizeImage(object):
+    """Reszies numpy image with torch transforms."""
+
+    def __call__(self, array: np.ndarray) -> torch.Tensor:
+        assert isinstance(array, np.ndarray)
+        array = np.transpose(array, (2, 0, 1))
+        tensor = torch.from_numpy(array).type(torch.FloatTensor)
+        tensor = transforms.Resize(64)(tensor)
+        return tensor
+
+
+class GrayscaleImage(object):
+    def __call__(self, tensor) -> torch.Tensor:
+        tensor = transforms.Grayscale(1)(tensor)
         return tensor
