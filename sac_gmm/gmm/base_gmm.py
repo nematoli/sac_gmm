@@ -155,9 +155,9 @@ class BaseGMM(object):
         Returns:
             None
         """
-        self.priors = dynsys.priors
-        self.means = dynsys.means
-        self.covariances = dynsys.covariances
+        self.priors = np.copy(dynsys.priors)
+        self.means = np.copy(dynsys.means)
+        self.covariances = np.copy(dynsys.covariances)
 
     def update_model(self, delta):
         """Updates GMM parameters by given delta changes (i.e. SAC's output)

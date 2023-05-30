@@ -62,8 +62,8 @@ class SAC(pl.LightningModule):
 
         # Agent
         self.agent = hydra.utils.instantiate(agent)
-        self.action_space = self.agent.get_action_space()
-        self.env_obs_space = self.agent.env.observation_space
+        self.agent.action_space = self.agent.get_action_space()
+        self.action_space = self.agent.action_space
 
         # All networks
         self.build_networks(actor, critic, autoencoder, compact_rep_size, device)

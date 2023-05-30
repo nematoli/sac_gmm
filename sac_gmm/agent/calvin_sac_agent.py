@@ -24,7 +24,6 @@ class CALVINSACAgent(object):
         num_seed_steps,
         eval_frequency,
         num_eval_episodes,
-        gmm_window_size,
         max_episode_steps,
         record,
         render,
@@ -42,7 +41,6 @@ class CALVINSACAgent(object):
                 "num_seed_steps": num_seed_steps,
                 "eval_frequency": eval_frequency,
                 "num_eval_episodes": num_eval_episodes,
-                "gmm_window_size": gmm_window_size,
                 "max_episode_steps": max_episode_steps,
                 "record": record,
                 "render": render,
@@ -57,7 +55,6 @@ class CALVINSACAgent(object):
         # Environment
         self.calvin_env_cfg = calvin_env
         self.env = self.make_env()
-        self.action_space = self.get_action_space()
         self.robot_obs, self.cam_obs = self.env.obs_allowed
 
         # Dataset (helps with EE start positions)
@@ -79,7 +76,7 @@ class CALVINSACAgent(object):
         self.reset()
 
         # Logging
-        self.cons_logger = logging.getLogger("CALVINSeqblendRLAgent")
+        self.cons_logger = logging.getLogger("CALVINSACAgent")
         if self.cfg.record:
             self.video_dir = os.path.join(self.cfg.exp_dir, "videos")
             os.makedirs(self.video_dir, exist_ok=True)
