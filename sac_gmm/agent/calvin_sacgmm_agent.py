@@ -194,6 +194,7 @@ class CALVINSACGMMAgent(CALVINSACAgent):
                     x = next_observation[self.robot_obs]
                     if done:
                         break
+                self.observation = next_observation
                 episode_steps += 1
                 episode_return += dyn_sys_reward
                 if self.cfg.record and (episode == rand_idx):
