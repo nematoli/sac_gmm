@@ -7,6 +7,7 @@ import pytorch_lightning as pl
 from sac_gmm.utils.replay_buffer import ReplayBuffer
 from sac_gmm.datasets.rl_dataset import RLDataset
 from sac_gmm.networks.autoencoder import Encoder as Hd_Input_Encoder, Decoder
+from sac_gmm.utils.misc import grayscale_cam_obs
 
 import hydra
 import wandb
@@ -86,12 +87,13 @@ class SAC(pl.LightningModule):
         ) = self.configure_optimizers()
 
         # Replay Buffer
-        self.replay_buffer = ReplayBuffer(
-            self.agent.get_state_dim(compact_rep_size),
-            action_dim,
-            int(replay_buffer_capacity),
-            self.device,
-        )
+        # self.replay_buffer = ReplayBuffer(
+        #     self.agent.get_state_dim(compact_rep_size),
+        #     self.action_space.shape[0],
+        #     int(replay_buffer_capacity),
+        #     self.device,
+        # )
+        self.replay_buffer = ReplayBuffer(int(replay_buffer_capacity))
         self.replay_buffer.save_dir = os.path.join(self.agent.cfg.exp_dir, "replay_buffer/")
         os.makedirs(self.replay_buffer.save_dir, exist_ok=True)
 
@@ -278,14 +280,15 @@ class SAC(pl.LightningModule):
         self.log("alpha_loss", alpha_loss, on_step=True)
 
     def update_autoencoder(self, batch):
-        hd_key = self.env.obs_allowed[1]
+        hd_key = self.agent.env.obs_allowed[1]
         batch_hd_input = batch[0][hd_key].float()
-        with torch.no_grad():
-            h = self.critic.hd_input_encoder(batch_hd_input, detach_encoder=True)
-            pred_obs = self.decoder(h)
-            rec_loss = F.mse_loss(pred_obs, batch_hd_input.detach())
-            latent_loss = (0.5 * h.pow(2).sum(1)).mean()
-            autoencoder_loss = rec_loss + self.decoder_latent_lambda * latent_loss
+        h = self.critic.hd_input_encoder(batch_hd_input, detach_encoder=False)
+        pred_obs = self.decoder(h)
+        # batch_hd_input is a Bx3xHxW tensor. Must change it to grayscale for the loss
+        gray_batch_hd_input = grayscale_cam_obs(batch_hd_input)
+        rec_loss = F.mse_loss(pred_obs, gray_batch_hd_input.detach())
+        latent_loss = (0.5 * h.pow(2).sum(1)).mean()
+        autoencoder_loss = rec_loss + self.decoder_latent_lambda * latent_loss
 
         # Log image
         wandb_obj = self.logger.experiment
@@ -293,6 +296,7 @@ class SAC(pl.LightningModule):
         img_array = np.clip((img_array.detach().cpu().numpy() + 1) * 0.5, 0, 1)
         images = wandb.Image(img_array, mode="L", caption="High dimensional input reconstruction")
         wandb_obj.log({"reconstructed input": images})
+
         self.log("ae_loss", autoencoder_loss, on_step=True)
         self.ae_optimizer.zero_grad()
         self.manual_backward(autoencoder_loss)
@@ -301,9 +305,7 @@ class SAC(pl.LightningModule):
     def compute_actor_and_alpha_loss(self, batch, alpha_optimizer):
         batch_observations = batch[0]
         policy_actions, curr_log_pi = self.actor.get_actions(
-            batch_observations,
-            deterministic=False,
-            reparameterize=True,
+            batch_observations, deterministic=False, reparameterize=True, detach_encoder=self.shared_encoder
         )
         alpha_loss = -(self.log_alpha * (curr_log_pi + self.target_entropy).detach()).mean()
 
@@ -315,7 +317,7 @@ class SAC(pl.LightningModule):
         alpha = self.log_alpha.exp()
         self.log("alpha", alpha, on_step=True)
 
-        q1, q2 = self.critic(batch_observations, policy_actions)
+        q1, q2 = self.critic(batch_observations, policy_actions, detach_encoder=self.shared_encoder)
         Q_value = torch.min(q1, q2)
         actor_loss = (alpha * curr_log_pi - Q_value).mean()
         return actor_loss, alpha_loss

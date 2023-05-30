@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(root, "calvin_env"))  # root/calvin_env
 sys.path.insert(0, root.as_posix())  # Root
 
 import gym
+from sac_gmm.utils.misc import resize_cam_obs
 from calvin_env.envs.play_table_env import PlayTableSimEnv
 import hydra
 import imageio
@@ -94,8 +95,8 @@ class SkillSpecificEnv(PlayTableSimEnv):
         depth_obs = {}
         for cam in self.cameras:
             rgb, depth = cam.render()
-            rgb_obs[f"rgb_{cam.name}"] = rgb
-            depth_obs[f"depth_{cam.name}"] = depth
+            rgb_obs[f"rgb_{cam.name}"] = resize_cam_obs(rgb)
+            depth_obs[f"depth_{cam.name}"] = resize_cam_obs(np.expand_dims(depth, -1))
         return rgb_obs, depth_obs
 
     def record_frame(self, obs_type="rgb", cam_type="static", size=208):

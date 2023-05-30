@@ -8,7 +8,7 @@ import logging
 import hydra
 import copy
 from sac_gmm.envs.skill_env import SkillSpecificEnv
-from sac_gmm.utils.misc import transform_to_tensor, get_state_from_observation
+from sac_gmm.utils.misc import transform_to_tensor
 
 
 class CALVINSACAgent(object):
@@ -141,10 +141,10 @@ class CALVINSACAgent(object):
         next_observation, reward, done, info = self.env.step(action_with_gripper)
 
         replay_buffer.add(
-            self.observation[self.robot_obs],
+            self.observation,
             action,
             reward,
-            next_observation[self.robot_obs],
+            next_observation,
             done,
         )
         self.observation = next_observation

@@ -6,7 +6,7 @@ import os
 from collections import deque
 import random
 import math
-from utils.transforms import PreprocessImage
+from utils.transforms import PreprocessImage, ResizeImage, GrayscaleImage
 
 
 def set_seed_everywhere(seed):
@@ -33,15 +33,39 @@ def calc_out_size(w, h, kernel_size, padding=0, stride=1):
 
 
 def transform_to_tensor(x, dtype=torch.float, grad=True, device="cuda"):
+    hd_input_keys = [
+        "rgb_gripper",
+        "depth_gripper",
+        "rgb_static",
+        "depth_static",
+    ]
     if isinstance(x, dict):
-        tensor = {k: torch.tensor(v, dtype=dtype, device=device, requires_grad=grad) for k, v in x.items()}
+        tensor = {}
+        for k, v in x.items():
+            if k in hd_input_keys:
+                tensor[k] = v.clone().detach().requires_grad_(grad).to(dtype).to(device)
+            else:
+                tensor[k] = torch.tensor(v, dtype=dtype, device=device, requires_grad=grad)
     else:
         tensor = torch.tensor(x, dtype=dtype, device=device, requires_grad=grad)  # B, S_D
     return tensor
 
 
-def torch_tensor_cam_obs(cam_obs):
-    cam_obs = PreprocessImage()(cam_obs).squeeze(1)
+def preprocess_cam_obs(cam_obs):
+    """Converts RGB or Depth images to 1x64x64 (grayscale) images"""
+    cam_obs = PreprocessImage()(cam_obs)
+    return cam_obs
+
+
+def resize_cam_obs(cam_obs):
+    """Resizes camera obs"""
+    cam_obs = ResizeImage()(cam_obs)
+    return cam_obs
+
+
+def grayscale_cam_obs(cam_obs):
+    """Grayscales camera obs"""
+    cam_obs = GrayscaleImage()(cam_obs)
     return cam_obs
 
 
@@ -70,7 +94,7 @@ def get_state_from_observation(hd_input_encoder, obs, detach_encoder):
             if key in obs:
                 if type(obs[key]) is list:
                     obs[key] = torch.stack(obs[key], dim=1)
-                compact_repr = hd_input_encoder(obs[key].float(), detach_encoder)
+                compact_repr = hd_input_encoder(grayscale_cam_obs(obs[key].float()), detach_encoder)
                 fc_input = torch.cat((fc_input, compact_repr), dim=-1)
 
         return fc_input.float()
@@ -89,7 +113,7 @@ def preprocess_agent_in(trainer, obs):
         agent_in (torch.tensor): gmm_params, robot obs and cam obs latents flattened as a torch.tensor
     """
     robot_obs = torch.from_numpy(obs[trainer.robot_obs]).to(trainer.device)
-    cam_obs = torch_tensor_cam_obs(obs[trainer.cam_obs]).to(trainer.device)
+    cam_obs = preprocess_cam_obs(obs[trainer.cam_obs]).to(trainer.device)
     cam_obs_rep = trainer.agent.ae.get_image_rep(cam_obs.to(trainer.device))
     gmm_params = trainer.dyn_sys.model_params(trainer.cfg.adapt_cov)
     gmm_params = torch.from_numpy(gmm_params).to(trainer.device)

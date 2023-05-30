@@ -55,8 +55,9 @@ class Actor(nn.Module):
         state,
         deterministic=False,
         reparameterize=False,
+        detach_encoder=False,
     ):
-        mean, std = self.forward(state)
+        mean, std = self.forward(state, detach_encoder)
         if deterministic:
             actions = torch.tanh(mean)
             log_pi = torch.zeros_like(actions)
