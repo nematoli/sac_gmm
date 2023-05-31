@@ -13,3 +13,4 @@ imageio[ffmpeg]
 termcolor
 pymanopt
 mayavi
+wandb
