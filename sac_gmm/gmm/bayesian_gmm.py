@@ -42,7 +42,7 @@ class BayesianGMM(BaseGMM):
             outfile = self.plot_gmm(obj_type=False)
 
         if wandb_flag:
-            config = {"n_comp": self.n_comp}
+            config = {"n_components": self.n_components}
             wandb.init(
                 project="ds-training",
                 entity="in-ac",
