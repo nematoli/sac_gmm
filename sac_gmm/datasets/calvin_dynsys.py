@@ -113,15 +113,15 @@ class CALVINDynSysDataset(Dataset):
 
     def get_valid_columns(self, state_type):
         if "joint" in state_type:
-            start, end = 8, 15
+            start, end = 7, 14
         elif "pos_ori" in state_type:
-            start, end = 1, 7
+            start, end = 0, 6
         elif "pos" in state_type:
-            start, end = 1, 4
+            start, end = 0, 3
         elif "ori" in state_type:
-            start, end = 4, 7
+            start, end = 3, 6
         elif "grip" in state_type:
-            start, end = 7, 8
+            start, end = 6, 7
         return start, end
 
     def plot_random(self):
