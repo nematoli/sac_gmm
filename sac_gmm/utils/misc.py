@@ -115,7 +115,7 @@ def preprocess_agent_in(trainer, obs):
     robot_obs = torch.from_numpy(obs[trainer.robot_obs]).to(trainer.device)
     cam_obs = preprocess_cam_obs(obs[trainer.cam_obs]).to(trainer.device)
     cam_obs_rep = trainer.agent.ae.get_image_rep(cam_obs.to(trainer.device))
-    gmm_params = trainer.dyn_sys.model_params(trainer.cfg.adapt_cov)
+    gmm_params = trainer.gmm.model_params(trainer.cfg.adapt_cov)
     gmm_params = torch.from_numpy(gmm_params).to(trainer.device)
 
     agent_in = torch.concat((gmm_params, robot_obs, cam_obs_rep), axis=-1).to(trainer.device)
@@ -134,7 +134,7 @@ def postprocess_agent_out(trainer, gmm_change, priors_scale=0.1, means_scale=0.1
         dict (dict): Dictionary format of the processed output
     """
     dict = {}
-    param_space = trainer.dyn_sys.get_update_range_parameter_space()
+    param_space = trainer.gmm.get_update_range_parameter_space()
     priors_size = param_space["priors"].shape[0]
     means_size = param_space["mu"].shape[0]
     priors = gmm_change[:priors_size] * param_space["priors"].high

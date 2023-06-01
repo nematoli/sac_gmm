@@ -16,7 +16,7 @@ sys.path.insert(0, root.as_posix())  # root
 
 
 class SkillTrainer(object):
-    """Python wrapper that allows you to train DS skills on a given dataset"""
+    """Python wrapper that allows you to train gmm skills on a given dataset"""
 
     def __init__(self, cfg):
         self.cfg = cfg
@@ -27,7 +27,7 @@ class SkillTrainer(object):
         os.makedirs(self.cfg.skills_dir, exist_ok=True)
 
     def run(self):
-        self.logger.info(f"Training DS for skill {self.skill} with {self.state_type} as the input")
+        self.logger.info(f"Training gmm for skill {self.skill} with {self.state_type} as the input")
 
         # Load dataset
         self.cfg.dataset.skill = self.skill
@@ -39,17 +39,17 @@ class SkillTrainer(object):
             f"Skill: {self.skill}, Train Data: {train_dataset.X.size()}, Val. Data: {val_dataset.X.size()}"
         )
         self.cfg.dim = train_dataset.X.shape[-1]
-        ds = hydra.utils.instantiate(self.cfg.dyn_sys)
+        gmm = hydra.utils.instantiate(self.cfg.gmm)
         # Make output dir where trained models will be saved
-        ds.model_dir = os.path.join(self.cfg.skills_dir, self.state_type, self.skill, ds.name)
-        os.makedirs(ds.model_dir, exist_ok=True)
-        ds.fit(dataset=train_dataset, wandb_flag=self.cfg.wandb)
+        gmm.model_dir = os.path.join(self.cfg.skills_dir, self.state_type, self.skill, gmm.name)
+        os.makedirs(gmm.model_dir, exist_ok=True)
+        gmm.fit(dataset=train_dataset, wandb_flag=self.cfg.wandb)
         self.logger.info(
-            f"Training complete. Trained DS params are saved in the {os.path.join(ds.model_dir)} directory"
+            f"Training complete. Trained gmm params are saved in the {os.path.join(gmm.model_dir)} directory"
         )
 
 
-@hydra.main(version_base="1.1", config_path="../../config", config_name="train_ds")
+@hydra.main(version_base="1.1", config_path="../../config", config_name="gmm_train")
 def main(cfg: DictConfig) -> None:
     cfg.skills_dir = Path(cfg.skills_dir).expanduser()
 

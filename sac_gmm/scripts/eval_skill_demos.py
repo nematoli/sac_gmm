@@ -21,7 +21,7 @@ from sac_gmm.envs.skill_env import SkillSpecificEnv
 
 
 class SkillEvaluatorDemos(object):
-    """Python wrapper that allows you to evaluate learned DS skills
+    """Python wrapper that allows you to evaluate learned gmm skills
     in the CALVIN environment.
     """
 
@@ -123,13 +123,13 @@ class SkillEvaluatorDemos(object):
         self.logger.info(f"{self.skill} Demos Accuracy: {round(acc, 2)}")
 
         # Write accuracies to a file
-        with open(os.path.join(self.env.outdir, f"skill_ds_acc_{self.cfg.state_type}.txt"), "w") as f:
+        with open(os.path.join(self.env.outdir, f"skill_gmm_acc_{self.cfg.state_type}.txt"), "w") as f:
             writer = csv.writer(f)
             for row in skill_accs.items():
                 writer.writerow(row)
 
 
-@hydra.main(version_base="1.1", config_path="../../config", config_name="eval_ds")
+@hydra.main(version_base="1.1", config_path="../../config", config_name="eval_skill")
 def main(cfg: DictConfig) -> None:
     cfg.log_dir = Path(cfg.log_dir).expanduser()
     cfg.demos_dir = Path(cfg.demos_dir).expanduser()

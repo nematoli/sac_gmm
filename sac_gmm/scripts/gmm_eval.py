@@ -23,7 +23,7 @@ from sac_gmm.envs.skill_env import SkillSpecificEnv
 
 
 class SkillEvaluator(object):
-    """Python wrapper that allows you to evaluate learned DS skills
+    """Python wrapper that allows you to evaluate learned gmm skills
     in the CALVIN environment.
     """
 
@@ -34,7 +34,7 @@ class SkillEvaluator(object):
         self.logger = logging.getLogger("SkillEvaluator")
         self.robot_obs = self.cfg.state_type
 
-    def evaluate(self, ds, dataset, max_steps, sampling_dt, render=False, record=False):
+    def evaluate(self, gmm, dataset, max_steps, sampling_dt, render=False, record=False):
         dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
         succesful_rollouts, rollout_returns, rollout_lengths = 0, [], []
         for idx, (xi, d_xi) in enumerate(dataloader):
@@ -60,20 +60,14 @@ class SkillEvaluator(object):
                     self.logger.info(f"{np.linalg.norm(current_state - x0)}")
                     break
             x = observation[self.robot_obs][:3]
-            # self.logger.info(f'Simulating with DS')
+            # self.logger.info(f'Simulating with gmm')
             if record:
                 self.logger.info("Recording Robot Camera Obs")
                 self.env.record_frame()
             for step in range(max_steps):
-                if ds.name == "clfds":
-                    d_x = ds.reg_model.forward(torch.from_numpy(x - goal).float().unsqueeze(dim=0).unsqueeze(dim=0))
-                    d_x = d_x.detach().cpu().numpy().squeeze()
-                    delta_x = sampling_dt * d_x
-                    new_x = x + delta_x
-                else:
-                    d_x = ds.predict(x - goal)
-                    delta_x = sampling_dt * d_x[:3]
-                    new_x = x + delta_x
+                d_x = gmm.predict(x - goal)
+                delta_x = sampling_dt * d_x[:3]
+                new_x = x + delta_x
                 if dataset.state_type == "pos":
                     temp = np.append(new_x, np.append(dataset.fixed_ori, -1))
                 elif dataset.state_type == "pos_ori":
@@ -125,18 +119,6 @@ class SkillEvaluator(object):
 
     def run(self):
         skill_accs = {}
-        if self.cfg.wandb:
-            config = {
-                "state_type": self.cfg.state_type,
-                "sampling_dt": self.cfg.sampling_dt,
-                "max steps": self.cfg.max_steps,
-            }
-            wandb.init(
-                project="ds-evaluation",
-                entity="in-ac",
-                config=config,
-                name=f"{self.cfg.skill}_{self.cfg.state_type}",
-            )
         self.env.set_skill(self.skill)
 
         # Get validation dataset
@@ -145,26 +127,39 @@ class SkillEvaluator(object):
 
         # Create and load models to evaluate
         self.cfg.dim = val_dataset.X.shape[-1]
-        ds = hydra.utils.instantiate(self.cfg.dyn_sys)
-        ds.model_dir = os.path.join(self.cfg.skills_dir, self.cfg.state_type, self.skill, ds.name)
+        gmm = hydra.utils.instantiate(self.cfg.gmm)
+        gmm.model_dir = os.path.join(self.cfg.skills_dir, self.cfg.state_type, self.skill, gmm.name)
 
         # Obtain X_mins and X_maxs from training data to normalize in real-time
         self.cfg.dataset.train = True
         train_dataset = hydra.utils.instantiate(self.cfg.dataset)
         val_dataset.goal = train_dataset.goal
 
-        ds.skills_dir = ds.model_dir
-        ds.load_model()
-        ds.state_type = self.cfg.state_type
-        if ds.name == "ManifoldGMM":
-            ds.manifold = ds.make_manifold(self.cfg.dim)
+        gmm.skills_dir = gmm.model_dir
+        gmm.load_model()
+        gmm.state_type = self.cfg.state_type
+        if gmm.name == "ManifoldGMM":
+            gmm.manifold = gmm.make_manifold(self.cfg.dim)
 
         self.logger.info(f"Evaluating {self.skill} skill with {self.cfg.state_type} input on CALVIN environment")
         self.logger.info(f"Test/Val Data: {val_dataset.X.size()}")
 
+        if self.cfg.wandb:
+            config = {
+                "state_type": self.cfg.state_type,
+                "sampling_dt": self.cfg.sampling_dt,
+                "max steps": self.cfg.max_steps,
+            }
+            wandb.init(
+                project="gmm-evaluation",
+                entity="in-ac",
+                config=config,
+                name=f"{self.cfg.skill}_{gmm.state_type}_{gmm.name}_{gmm.n_components}",
+            )
+
         # Evaluate by simulating in the CALVIN environment
         acc, avg_return, avg_len = self.evaluate(
-            ds,
+            gmm,
             val_dataset,
             max_steps=self.cfg.max_steps,
             render=self.cfg.render,
@@ -181,13 +176,13 @@ class SkillEvaluator(object):
         self.logger.info(f"{self.skill} Skill Accuracy: {round(acc, 2)}")
 
         # Write accuracies to a file
-        with open(os.path.join(self.env.outdir, f"skill_ds_acc_{self.cfg.state_type}.txt"), "w") as f:
+        with open(os.path.join(self.env.outdir, f"skill_gmm_acc_{self.cfg.state_type}.txt"), "w") as f:
             writer = csv.writer(f)
             for row in skill_accs.items():
                 writer.writerow(row)
 
 
-@hydra.main(version_base="1.1", config_path="../../config", config_name="eval_ds")
+@hydra.main(version_base="1.1", config_path="../../config", config_name="gmm_eval")
 def main(cfg: DictConfig) -> None:
     cfg.log_dir = Path(cfg.log_dir).expanduser()
     cfg.demos_dir = Path(cfg.demos_dir).expanduser()

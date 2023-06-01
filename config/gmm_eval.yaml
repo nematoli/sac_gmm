@@ -1,7 +1,7 @@
 defaults:
   - setup
   - skills_setup
-  - calvin_env: default_close
+  - calvin_env: open_drawer
 
 # Dataset params:
 train: false # false to load validation dataset

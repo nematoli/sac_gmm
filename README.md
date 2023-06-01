@@ -40,14 +40,14 @@ Configure [config/demos.yaml](./config/demos.yaml).
 ```
 
 ### Step 2: Train and evaluate skill libraries (Dynamical Systems) with ManifoldGMM 
-Configure [config/train_ds.yaml](./config/train_ds.yaml).
+Configure [config/gmm_train.yaml](./config/gmm_train.yaml).
 ```
-> python sac_gmm/dynsys/train_skills.py skill='open_drawer'
+> python sac_gmm/scripts/gmm_train.py skill='open_drawer'
 ```
 
-Configure [config/eval_ds.yaml](./config/eval_ds.yaml).
+Configure [config/gmm_eval.yaml](./config/gmm_eval.yaml).
 ```
-> python sac_gmm/dynsys/eval_skills.py skill='open_drawer'
+> python sac_gmm/scripts/gmm_eval.py skill='open_drawer'
 ```
 
 ### Pre-trained Models

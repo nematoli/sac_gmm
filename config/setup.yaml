@@ -1,6 +1,6 @@
 defaults:
   - dataset: calvin_ds
-  - dyn_sys: manifold_gmm # clfds or manifold_gmm or bayesian_gmm
+  - gmm: bayesian_gmm #manifold_gmm or bayesian_gmm
   - _self_
 
   - override hydra/job_logging: colorlog
@@ -15,7 +15,7 @@ log_dir: ${root}/logs
 demos_dir: ${root}/demonstrations
 exp_dir: null
 
-developer: "lagandua"
+developer: "nematoli"
 comment: ""
 wandb:
   entity: in-ac
