@@ -1,6 +1,7 @@
 defaults:
   - setup
   - skills_setup
+  - logger: wandb
 
 # Dataset params:
 train: true # false to load validation dataset
@@ -10,14 +11,11 @@ goal_centered: true # this must be false during evaluation
 render: false
 record: false
 
-# Logger
-wandb: true
-
 hydra:
   run:
-    dir: ${log_dir}/train-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${log_dir}/gmm-train-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweep:
-    dir: ${log_dir}/train-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${log_dir}/gmm-train-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.override_dirname}
   job:
     config:

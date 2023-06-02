@@ -3,7 +3,10 @@ import sys
 import hydra
 import logging
 from pathlib import Path
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
+from pytorch_lightning.utilities import rank_zero_only
+from pytorch_lightning import seed_everything
+from sac_gmm.utils.utils import print_system_env_info, setup_logger
 
 cwd_path = Path(__file__).absolute().parents[0]
 sac_gmm_path = cwd_path.parents[0]
@@ -15,47 +18,41 @@ sys.path.insert(0, os.path.join(root, "calvin_env"))  # root/calvin_env
 sys.path.insert(0, root.as_posix())  # root
 
 
-class SkillTrainer(object):
-    """Python wrapper that allows you to train gmm skills on a given dataset"""
+logger = logging.getLogger(__name__)
 
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.skill = self.cfg.skill
-        self.state_type = self.cfg.state_type
-        self.logger = logging.getLogger("SkillTrainer")
-        # Make skills directory if doesn't exist
-        os.makedirs(self.cfg.skills_dir, exist_ok=True)
 
-    def run(self):
-        self.logger.info(f"Training gmm for skill {self.skill} with {self.state_type} as the input")
-
-        # Load dataset
-        self.cfg.dataset.skill = self.skill
-        self.cfg.dataset.train = True
-        train_dataset = hydra.utils.instantiate(self.cfg.dataset)
-        self.cfg.dataset.train = False
-        val_dataset = hydra.utils.instantiate(self.cfg.dataset)
-        self.logger.info(
-            f"Skill: {self.skill}, Train Data: {train_dataset.X.size()}, Val. Data: {val_dataset.X.size()}"
-        )
-        self.cfg.dim = train_dataset.X.shape[-1]
-        gmm = hydra.utils.instantiate(self.cfg.gmm)
-        # Make output dir where trained models will be saved
-        gmm.model_dir = os.path.join(self.cfg.skills_dir, self.state_type, self.skill, gmm.name)
-        os.makedirs(gmm.model_dir, exist_ok=True)
-        gmm.fit(dataset=train_dataset, wandb_flag=self.cfg.wandb)
-        self.logger.info(
-            f"Training complete. Trained gmm params are saved in the {os.path.join(gmm.model_dir)} directory"
-        )
+@rank_zero_only
+def log_rank_0(*args, **kwargs):
+    # when using ddp, only log with rank 0 process
+    logger.info(*args, **kwargs)
 
 
 @hydra.main(version_base="1.1", config_path="../../config", config_name="gmm_train")
-def main(cfg: DictConfig) -> None:
-    cfg.skills_dir = Path(cfg.skills_dir).expanduser()
+def train_gmm(cfg: DictConfig) -> None:
+    cfg.exp_dir = hydra.core.hydra_config.HydraConfig.get()["runtime"]["output_dir"]
 
-    eval = SkillTrainer(cfg)
-    eval.run()
+    seed_everything(cfg.seed, workers=True)
+    log_rank_0(f"Training a GMM skill with the following config:\n{OmegaConf.to_yaml(cfg)}")
+    log_rank_0(print_system_env_info())
+    log_rank_0(f"Training gmm for skill {cfg.skill} with {cfg.state_type} as the input")
+
+    # Load dataset
+    cfg.dataset.skill = cfg.skill
+    train_dataset = hydra.utils.instantiate(cfg.dataset)
+    log_rank_0(f"Skill: {cfg.skill}, Train Data: {train_dataset.X.size()}")
+
+    # Model
+    gmm = hydra.utils.instantiate(cfg.model.gmm)
+    gmm.model_dir = os.path.join(Path(cfg.skills_dir).expanduser(), cfg.state_type, cfg.skill, gmm.name)
+    os.makedirs(gmm.model_dir, exist_ok=True)
+
+    # Setup logger
+    logger_name = f"{cfg.skill}_{cfg.state_type}_{gmm.name}_{gmm.n_components}"
+    gmm.logger = setup_logger(cfg, name=logger_name)
+
+    gmm.fit(dataset=train_dataset)
+    log_rank_0(f"Training Finished. Trained gmm params are saved in the {gmm.model_dir} directory")
 
 
 if __name__ == "__main__":
-    main()
+    train_gmm()

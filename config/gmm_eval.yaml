@@ -1,7 +1,8 @@
 defaults:
   - setup
   - skills_setup
-  - calvin_env: open_drawer
+  - calvin_env: null
+  - logger: wandb
 
 # Dataset params:
 train: false # false to load validation dataset
@@ -11,14 +12,11 @@ goal_centered: false # this must be false during evaluation
 render: false
 record: false
 
-# Logger
-wandb: true
-
 hydra:
   run:
-    dir: ${log_dir}/eval-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${log_dir}/gmm-eval-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweep:
-    dir: ${log_dir}/eval-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${log_dir}/gmm-eval-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.override_dirname}
   job:
     config:

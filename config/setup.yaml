@@ -1,6 +1,6 @@
 defaults:
   - dataset: calvin_ds
-  - gmm: bayesian_gmm #manifold_gmm or bayesian_gmm
+  - model/gmm: bayesian_gmm #manifold_gmm or bayesian_gmm
   - _self_
 
   - override hydra/job_logging: colorlog
@@ -17,8 +17,3 @@ exp_dir: null
 
 developer: "nematoli"
 comment: ""
-wandb:
-  entity: in-ac
-  project: sacgmm
-  developer: ${developer}
-  comment: ${comment}

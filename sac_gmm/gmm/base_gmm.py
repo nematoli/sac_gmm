@@ -1,9 +1,11 @@
+import logging
 import os
 import sys
 from pathlib import Path
 import gym
 from sac_gmm.gmm.utils.plot_utils import visualize_3d_gmm
 from sac_gmm.utils.posdef import isPD, nearestPD
+from pytorch_lightning.utilities import rank_zero_only
 
 cwd_path = Path(__file__).absolute().parents[0]
 sac_gmm_path = cwd_path.parents[0]
@@ -14,6 +16,15 @@ sys.path.insert(0, sac_gmm_path.as_posix())  # sac_gmm
 sys.path.insert(0, root.as_posix())  # Root
 
 import numpy as np
+
+
+logger = logging.getLogger(__name__)
+
+
+@rank_zero_only
+def log_rank_0(*args, **kwargs):
+    # when using ddp, only log with rank 0 process
+    logger.info(*args, **kwargs)
 
 
 class BaseGMM(object):
@@ -103,12 +114,11 @@ class BaseGMM(object):
         self.dim = self.dataset.X.numpy().shape[-1]
         self.data = self.preprocess_data(dataset, obj_type=obj_type, normalize=False)
 
-    def fit(self, dataset, wandb_flag=False):
+    def fit(self, dataset):
         """
         fits a GMM on demonstrations
         Args:
             dataset: skill demonstrations
-            wandb_flag: weights and biases logging flag
         """
         raise NotImplementedError
 
@@ -134,11 +144,11 @@ class BaseGMM(object):
                 "sigma": self.covariances,
             },
         )
-        self.logger.info(f"Saved GMM params at {filename}")
+        log_rank_0(f"Saved GMM params at {filename}")
 
     def load_model(self):
         filename = self.model_dir + "/gmm_params.npy"
-        self.logger.info(f"Loading GMM params from {filename}")
+        log_rank_0(f"Loading GMM params from {filename}")
 
         gmm = np.load(filename, allow_pickle=True).item()
 

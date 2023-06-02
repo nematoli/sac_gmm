@@ -12,7 +12,10 @@ sys.path.insert(0, os.path.join(root, "calvin_env"))  # root/calvin_env
 sys.path.insert(0, root.as_posix())  # Root
 
 import gym
-from sac_gmm.utils.misc import resize_cam_obs
+from typing import Dict
+
+# from sac_gmm.utils.misc import resize_cam_obs
+from sac_gmm.datasets.utils.load_utils import get_transforms
 from calvin_env.envs.play_table_env import PlayTableSimEnv
 import hydra
 import imageio
@@ -40,6 +43,8 @@ class SkillSpecificEnv(PlayTableSimEnv):
         self.outdir = None
         self.record_count = 1
 
+        self.transform_rgb, self.transform_dpt = None, None
+
     def set_skill(self, skill):
         """Set skill name"""
         self.skill_name = skill
@@ -56,6 +61,12 @@ class SkillSpecificEnv(PlayTableSimEnv):
     def set_outdir(self, outdir):
         """Set output directory where recordings can/will be saved"""
         self.outdir = outdir
+
+    def set_obs_transforms(self, transforms: Dict):
+        """Set the transformation on observations for the RL agent"""
+        self.transform_rgb = get_transforms(transforms.rgb)
+        self.transform_dpt = get_transforms(transforms.depth)
+        return
 
     def reset(self):
         obs = super().reset()
@@ -79,7 +90,7 @@ class SkillSpecificEnv(PlayTableSimEnv):
             raise ValueError("Invalid value (robot obs) inside obs_allowed list")
 
         if cam_obs_allowed is not None:
-            rgb_obs, depth_obs = self.get_camera_obs()
+            rgb_obs, depth_obs = self.get_camera_obs(transform=True)
             if "rgb" in cam_obs_allowed:
                 obs[cam_obs_allowed] = rgb_obs[cam_obs_allowed]
             elif "depth" in cam_obs_allowed:
@@ -88,15 +99,20 @@ class SkillSpecificEnv(PlayTableSimEnv):
                 raise ValueError("Invalid value (camera obs) inside obs_allowed list")
         return obs
 
-    def get_camera_obs(self):
+    def get_camera_obs(self, transform=False):
         """Collect camera, robot and scene observations."""
         assert self.cameras is not None
         rgb_obs = {}
         depth_obs = {}
         for cam in self.cameras:
             rgb, depth = cam.render()
-            rgb_obs[f"rgb_{cam.name}"] = resize_cam_obs(rgb)
-            depth_obs[f"depth_{cam.name}"] = resize_cam_obs(np.expand_dims(depth, -1))
+            if transform:
+                rgb_obs[f"rgb_{cam.name}"] = self.transform_rgb(rgb)
+                # TODO: make sure transformed depth obs is what you want
+                depth_obs[f"depth_{cam.name}"] = self.transform_dpt(depth)
+            else:
+                rgb_obs[f"rgb_{cam.name}"] = rgb
+                depth_obs[f"depth_{cam.name}"] = depth
         return rgb_obs, depth_obs
 
     def record_frame(self, obs_type="rgb", cam_type="static", size=208):
@@ -203,7 +219,7 @@ class SkillSpecificEnv(PlayTableSimEnv):
 
         # Camera
         if cam_obs is not None:
-            rgb, depth = self.get_camera_obs()
+            rgb, depth = self.get_camera_obs(transform=True)
             high = None
             if "rgb" in cam_obs:
                 high = np.ones((rgb[cam_obs].shape[0], rgb[cam_obs].shape[1], rgb[cam_obs].shape[2]))

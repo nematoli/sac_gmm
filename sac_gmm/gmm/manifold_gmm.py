@@ -1,7 +1,9 @@
+import logging
 import os
 import sys
 import wandb
 from pathlib import Path
+from pytorch_lightning.utilities import rank_zero_only
 
 cwd_path = Path(__file__).absolute().parents[0]
 sac_gmm_path = cwd_path.parents[0]
@@ -18,7 +20,13 @@ from sac_gmm.gmm.base_gmm import BaseGMM
 from sac_gmm.gmm.utils.manifold_clustering import manifold_k_means, manifold_gmm_em
 from sac_gmm.gmm.utils.manifold_gmr import manifold_gmr
 
-import logging
+logger = logging.getLogger(__name__)
+
+
+@rank_zero_only
+def log_rank_0(*args, **kwargs):
+    # when using ddp, only log with rank 0 process
+    logger.info(*args, **kwargs)
 
 
 class ManifoldGMM(BaseGMM):
@@ -30,8 +38,7 @@ class ManifoldGMM(BaseGMM):
         self.name = "ManifoldGMM"
 
         self.manifold = None
-
-        self.logger = logging.getLogger(f"{self.name}")
+        self.logger = None
 
     def make_manifold(self, dim):
         if self.state_type in ["pos", "joint"]:
@@ -52,7 +59,7 @@ class ManifoldGMM(BaseGMM):
         manifold = Product([in_manifold, out_manifold])
         return manifold
 
-    def fit(self, dataset, wandb_flag=False):
+    def fit(self, dataset):
         # Dataset
         self.set_data_params(dataset)
         self.manifold = self.make_manifold(self.dim)
@@ -63,7 +70,7 @@ class ManifoldGMM(BaseGMM):
         total_dim = self.dim + self.dim
         if self.state_type == "pos_ori":
             total_dim += 4
-        self.logger.info("Manifold GMM with K-Means priors")
+        log_rank_0("Manifold GMM with K-Means priors")
         init_covariances = np.concatenate(self.n_components * [np.eye(total_dim)[None]], 0)
         init_priors = np.zeros(self.n_components)
         for k in range(self.n_components):
@@ -75,7 +82,7 @@ class ManifoldGMM(BaseGMM):
             initial_means=km_means,
             initial_covariances=init_covariances,
             initial_priors=init_priors,
-            logger=self.logger,
+            logger=logger,
         )
         # Reshape means from (n_components, 2) to (n_components, 2, state_size)
         self.means = self.get_reshaped_means()
@@ -89,16 +96,7 @@ class ManifoldGMM(BaseGMM):
         if self.plot:
             outfile = self.plot_gmm()
 
-        if wandb_flag:
-            config = {"n_comp": self.n_components}
-            wandb.init(
-                project="ds-training",
-                entity="in-ac",
-                name=f"{dataset.skill}_{dataset.state_type}_gmm",
-                config=config,
-            )
-            wandb.log({"GMM-Viz": wandb.Video(outfile)})
-            wandb.finish()
+        self.logger.log_table(key="fit", columns=["GMM"], data=[[wandb.Video(outfile)]])
 
     def predict(self, x):
         if self.state_type == "pos_ori":

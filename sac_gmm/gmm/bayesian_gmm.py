@@ -2,7 +2,6 @@ from sklearn.mixture import BayesianGaussianMixture
 from gmr import GMM
 from sac_gmm.gmm.base_gmm import BaseGMM
 import numpy as np
-import logging
 import wandb
 
 
@@ -18,10 +17,9 @@ class BayesianGMM(BaseGMM):
         self.max_iter = max_iter
         self.bgmm = BayesianGaussianMixture(n_components=self.n_components, max_iter=self.max_iter)
         self.gmm = None
+        self.logger = None
 
-        self.logger = logging.getLogger(f"{self.name}")
-
-    def fit(self, dataset, wandb_flag=False):
+    def fit(self, dataset):
         self.set_data_params(dataset, obj_type=False)
         self.bgmm = self.bgmm.fit(self.data)
         self.means, self.covariances, self.priors = self.bgmm.means_, self.bgmm.covariances_, self.bgmm.weights_
@@ -41,16 +39,7 @@ class BayesianGMM(BaseGMM):
         if self.plot:
             outfile = self.plot_gmm(obj_type=False)
 
-        if wandb_flag:
-            config = {"n_components": self.n_components}
-            wandb.init(
-                project="ds-training",
-                entity="in-ac",
-                name=f"{dataset.skill}_{dataset.state_type}_gmm",
-                config=config,
-            )
-            wandb.log({"GMM-Viz": wandb.Video(outfile)})
-            wandb.finish()
+        self.logger.log_table(key="fit", columns=["GMM"], data=[[wandb.Video(outfile)]])
 
     def predict(self, x):
         cgmm = self.gmm.condition([0, 1, 2], x.reshape(1, -1))
