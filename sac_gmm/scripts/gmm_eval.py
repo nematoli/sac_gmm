@@ -8,12 +8,11 @@ import torch
 import numpy as np
 from pathlib import Path
 from torch.utils.data import DataLoader
-from sac_gmm.envs.skill_env import SkillSpecificEnv
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.utilities import rank_zero_only
 from pytorch_lightning import seed_everything
 from sac_gmm.utils.utils import print_system_env_info, setup_logger
-
+from sac_gmm.utils.env_maker import make_env
 
 cwd_path = Path(__file__).absolute().parents[0]
 sac_gmm_path = cwd_path.parents[0]
@@ -32,24 +31,6 @@ logger = logging.getLogger(__name__)
 def log_rank_0(*args, **kwargs):
     # when using ddp, only log with rank 0 process
     logger.info(*args, **kwargs)
-
-
-def make_eval_env(cfg: DictConfig):
-    # Create the evaluation env
-    new_env_cfg = {**cfg.calvin_env.env}
-    new_env_cfg["use_egl"] = False
-    new_env_cfg["show_gui"] = False
-    new_env_cfg["use_vr"] = False
-    new_env_cfg["use_scene_info"] = True
-    new_env_cfg["tasks"] = cfg.calvin_env.tasks
-    new_env_cfg.pop("_target_", None)
-    new_env_cfg.pop("_recursive_", None)
-    env = SkillSpecificEnv(**new_env_cfg)
-    env.set_state_type(cfg.state_type)
-    env.set_outdir(cfg.exp_dir)
-    env.set_skill(cfg.skill)
-
-    return env
 
 
 def evaluate(env, gmm, dataset, max_steps, sampling_dt, render=False, record=False):
@@ -81,7 +62,7 @@ def evaluate(env, gmm, dataset, max_steps, sampling_dt, render=False, record=Fal
         # log_rank_0(f'Simulating with gmm')
         if record:
             log_rank_0("Recording Robot Camera Obs")
-            env.record_frame()
+            env.record_frame(size=64)
         for step in range(max_steps):
             d_x = gmm.predict(x - goal)
             delta_x = sampling_dt * d_x[:3]
@@ -95,7 +76,7 @@ def evaluate(env, gmm, dataset, max_steps, sampling_dt, render=False, record=Fal
             x = observation[gmm.state_type][:3]
             rollout_return += reward
             if record:
-                env.record_frame()
+                env.record_frame(size=64)
             if render:
                 env.render()
             if done:
@@ -137,12 +118,12 @@ def eval_gmm(cfg: DictConfig) -> None:
     log_rank_0(f"Evaluating gmm for {cfg.skill} skill with {cfg.state_type} as the input")
 
     # Load dataset
-    cfg.dataset.skill = cfg.skill
-    val_dataset = hydra.utils.instantiate(cfg.dataset)
+    cfg.datamodule.dataset.skill = cfg.skill
+    val_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
     log_rank_0(f"Skill: {cfg.skill}, Validation Data: {val_dataset.X.size()}")
     # Obtain X_mins and X_maxs from training data to normalize in real-time
-    cfg.dataset.train = True
-    train_dataset = hydra.utils.instantiate(cfg.dataset)
+    cfg.datamodule.dataset.train = True
+    train_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
     val_dataset.goal = train_dataset.goal
 
     # Create and load models to evaluate
@@ -160,7 +141,7 @@ def eval_gmm(cfg: DictConfig) -> None:
     gmm.logger = setup_logger(cfg, name=logger_name)
 
     # Evaluate by simulating in the CALVIN environment
-    env = make_eval_env(cfg)
+    env = make_env(cfg)
     acc, avg_return, avg_len = evaluate(
         env,
         gmm,

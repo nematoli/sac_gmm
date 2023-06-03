@@ -1,3 +1,9 @@
+seed: 0
+use_vr: true
+data_path: data
+save_dir: /tmp
+record: true
+
 cameras:
   static:
     _target_: calvin_env.camera.static_camera.StaticCamera
@@ -401,8 +407,4 @@ recorder:
   record_fps: 30.0
   show_fps: false
   enable_tts: true
-seed: 0
-use_vr: true
-data_path: data
-save_dir: /tmp
-record: true
+

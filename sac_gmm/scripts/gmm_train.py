@@ -37,8 +37,8 @@ def train_gmm(cfg: DictConfig) -> None:
     log_rank_0(f"Training gmm for skill {cfg.skill} with {cfg.state_type} as the input")
 
     # Load dataset
-    cfg.dataset.skill = cfg.skill
-    train_dataset = hydra.utils.instantiate(cfg.dataset)
+    cfg.datamodule.dataset.skill = cfg.skill
+    train_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
     log_rank_0(f"Skill: {cfg.skill}, Train Data: {train_dataset.X.size()}")
 
     # Model

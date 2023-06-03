@@ -1,0 +1,4 @@
+env_name: calvin
+
+defaults:
+  - calvin_env: close_drawer
