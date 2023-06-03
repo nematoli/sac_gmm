@@ -1,6 +1,6 @@
 from sklearn.mixture import BayesianGaussianMixture
 from gmr import GMM
-from sac_gmm.gmm.base_gmm import BaseGMM
+from sac_gmm.models.gmm.base_gmm import BaseGMM
 import numpy as np
 import wandb
 

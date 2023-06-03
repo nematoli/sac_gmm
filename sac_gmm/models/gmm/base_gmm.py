@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 import gym
-from sac_gmm.gmm.utils.plot_utils import visualize_3d_gmm
+from sac_gmm.models.gmm.utils.plot_utils import visualize_3d_gmm
 from sac_gmm.utils.posdef import isPD, nearestPD
 from pytorch_lightning.utilities import rank_zero_only
 

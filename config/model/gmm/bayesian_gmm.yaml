@@ -1,4 +1,4 @@
-_target_:  sac_gmm.gmm.bayesian_gmm.BayesianGMM
+_target_:  sac_gmm.models.gmm.bayesian_gmm.BayesianGMM
 n_components: ${gmm_components}
 max_iter: 100
 plot: ${plot}

@@ -16,9 +16,9 @@ sys.path.insert(0, root.as_posix())  # Root
 import numpy as np
 from pymanopt.manifolds import Euclidean, Sphere, Product
 
-from sac_gmm.gmm.base_gmm import BaseGMM
-from sac_gmm.gmm.utils.manifold_clustering import manifold_k_means, manifold_gmm_em
-from sac_gmm.gmm.utils.manifold_gmr import manifold_gmr
+from sac_gmm.models.gmm.base_gmm import BaseGMM
+from sac_gmm.models.gmm.utils.manifold_clustering import manifold_k_means, manifold_gmm_em
+from sac_gmm.models.gmm.utils.manifold_gmr import manifold_gmr
 
 logger = logging.getLogger(__name__)
 

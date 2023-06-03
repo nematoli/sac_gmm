@@ -1,4 +1,4 @@
-_target_:  sac_gmm.gmm.manifold_gmm.ManifoldGMM
+_target_:  sac_gmm.models.gmm.manifold_gmm.ManifoldGMM
 n_components: ${gmm_components}
 plot: ${plot}
 model_dir: ${skills_dir}
