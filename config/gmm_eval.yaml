@@ -1,6 +1,7 @@
 defaults:
   - setup
   - skills_setup
+  - dataset: calvin_ds
   - calvin_env: null
   - logger: wandb
 

@@ -1,11 +1,3 @@
-defaults:
-  - dataset: calvin_ds
-  - model/gmm: bayesian_gmm #manifold_gmm or bayesian_gmm
-  - _self_
-
-  - override hydra/job_logging: colorlog
-  - override hydra/hydra_logging: colorlog
-
 seed: 42
 slurm: false
 device: cuda

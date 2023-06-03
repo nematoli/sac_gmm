@@ -1,8 +1,14 @@
+defaults:
+  - model/gmm: bayesian_gmm #manifold_gmm or bayesian_gmm
+  - _self_
+
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
 # Skill params
 skills_dir: ${root}/skills_ds
 state_type: 'pos'
 dim: 3
-
 
 # Dataset params:
 skill: null
