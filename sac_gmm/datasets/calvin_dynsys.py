@@ -23,7 +23,6 @@ class CALVINDynSysDataset(Dataset):
         self.demos_dir = Path(demos_dir).expanduser()
         self.state_type = self.skill.state_type
         self.dt = self.skill.dt
-        self.sampling_dt = self.skill.sampling_dt
         self.normalized = self.skill.normalized
         self.norm_range = [-1, 1]
         self.X_mins = None
@@ -127,7 +126,7 @@ class CALVINDynSysDataset(Dataset):
         x = true_x[0]
         for t in range(len(true_x)):
             sampled_path.append(x)
-            delta_x = self.sampling_dt * self.dX[rand_idx, t, :].numpy()
+            delta_x = self.dt * self.dX[rand_idx, t, :].numpy()
             x = x + delta_x
         sampled_path = np.array(sampled_path)
         plot_3d_trajectories(true_x, sampled_path)

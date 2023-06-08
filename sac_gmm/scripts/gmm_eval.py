@@ -33,7 +33,7 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-def evaluate(env, gmm, dataset, max_steps, sampling_dt, render=False, record=False):
+def evaluate(env, gmm, dataset, max_steps, dt, render=False, record=False):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     succesful_rollouts, rollout_returns, rollout_lengths = 0, [], []
     for idx, (xi, d_xi) in enumerate(dataloader):
@@ -65,7 +65,7 @@ def evaluate(env, gmm, dataset, max_steps, sampling_dt, render=False, record=Fal
             env.record_frame(size=64)
         for step in range(max_steps):
             d_x = gmm.predict(x - goal)
-            delta_x = sampling_dt * d_x[:3]
+            delta_x = dt * d_x[:3]
             new_x = x + delta_x
             if gmm.state_type == "pos":
                 temp = np.append(new_x, np.append(dataset.fixed_ori, -1))
@@ -129,7 +129,7 @@ def eval_gmm(cfg: DictConfig) -> None:
     gmm = hydra.utils.instantiate(cfg.gmm)
     gmm.load_model()
 
-    if gmm.name == "ManifoldGMM":
+    if "Manifold" in gmm.name:
         # cfg.dim = val_dataset.X.shape[-1]
         gmm.manifold = gmm.make_manifold()
 
@@ -148,7 +148,7 @@ def eval_gmm(cfg: DictConfig) -> None:
         max_steps=cfg.skill.max_steps,
         render=cfg.render,
         record=cfg.record,
-        sampling_dt=cfg.skill.sampling_dt,
+        dt=cfg.skill.dt,
     )
 
     # Log evaluation output

@@ -1,6 +1,5 @@
 # Environment params
 env_name: calvin
-state_type: "pos"
 env_obs_allowed: ["pos", "rgb_static"] # Order is important = [robot_obs, camera_obs]
 
 defaults:

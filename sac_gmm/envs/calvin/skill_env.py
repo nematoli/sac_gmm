@@ -46,6 +46,10 @@ class SkillSpecificEnv(PlayTableSimEnv):
         """Set skill"""
         self.skill = skill
 
+    def set_state_type(self, state_type):
+        """Set state type"""
+        self.skill.state_type = state_type
+
     def set_obs_allowed(self, obs_allowed):
         """Set what observations env should return"""
         assert len(obs_allowed) == 2, "Input must be a list of size 2"

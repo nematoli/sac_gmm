@@ -33,7 +33,7 @@ class BayesianGMM(BaseGMM):
         os.makedirs(self.model_dir, exist_ok=True)
 
     def fit(self, dataset):
-        self.set_data_params(dataset, obj_type=False)
+        self.set_data_params(dataset)
         self.bgmm = self.bgmm.fit(self.data)
         self.means, self.covariances, self.priors = self.bgmm.means_, self.bgmm.covariances_, self.bgmm.weights_
 
@@ -50,7 +50,7 @@ class BayesianGMM(BaseGMM):
 
         # Plot GMM
         if self.plot:
-            outfile = self.plot_gmm(obj_type=False)
+            outfile = self.plot_gmm()
 
         self.logger.log_table(key="fit", columns=["GMM"], data=[[wandb.Video(outfile)]])
 

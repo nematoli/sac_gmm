@@ -77,7 +77,7 @@ class BaseGMM(object):
         if self.covariances is not None:
             self.covariances = np.asarray(self.covariances)
 
-    def preprocess_data(self, dataset, obj_type=True, normalize=False):
+    def preprocess_data(self, dataset, normalize=False):
         if self.state_type == "pos_ori":
             # Stack position, velocity and quaternion data
             demos_xdx = [np.hstack([dataset.X[i], dataset.dX[i], dataset.Ori[i]]) for i in range(dataset.X.shape[0])]
@@ -101,21 +101,12 @@ class BaseGMM(object):
         else:
             data = np.hstack((X, Y))
 
-        if obj_type and (data.dtype != "O"):
-            data = self.float_to_object(data)
-
         return data
 
-    def float_to_object(self, param):
-        data = np.empty((param.shape[0], 2), dtype=object)
-        for n in range(param.shape[0]):
-            data[n] = [param[n, : self.dim], param[n, self.dim :]]
-        return data
-
-    def set_data_params(self, dataset, obj_type=True):
+    def set_data_params(self, dataset):
         self.dataset = dataset
         self.dim = self.dataset.X.numpy().shape[-1]
-        self.data = self.preprocess_data(dataset, obj_type=obj_type, normalize=False)
+        self.data = self.preprocess_data(dataset, normalize=False)
 
     def fit(self, dataset):
         """
@@ -231,29 +222,13 @@ class BaseGMM(object):
 
         return params
 
-    def get_update_range_parameter_space(self):
-        """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
-
-        Returns:
-            param_space : gym.spaces.Dict
-                Range of GMM parameters parameters
-        """
-        param_space = {}
-        param_space["priors"] = gym.spaces.Box(low=-0.1, high=0.1, shape=(self.priors.size,))
-        param_space["mu"] = gym.spaces.Box(low=-0.01, high=0.01, shape=(self.means.size,))
-        param_space["sigma"] = gym.spaces.Box(low=-1e-6, high=1e-6, shape=(self.covariances.size,))
-
-        dim = self.means.shape[2] // 2
-        num_gaussians = self.means.shape[0]
-        sigma_change_size = int(num_gaussians * dim * (dim + 1) / 2 + dim * dim * num_gaussians)
-        param_space["sigma"] = gym.spaces.Box(low=-1e-6, high=1e-6, shape=(sigma_change_size,))
-        return gym.spaces.Dict(param_space)
-
     def plot_gmm(self, obj_type=True):
-        if not obj_type:
-            means = self.float_to_object(self.means)
-        else:
-            means = self.means
+        # if not obj_type:
+        #     means = self.float_to_object(self.means)
+        # else:
+        #     means = self.means
+
+        self.reshape_params(to="gmr-specific")
 
         # Pick 15 random datapoints from X to plot
         points = self.dataset.X.numpy()[:, :, :3]
@@ -269,3 +244,17 @@ class BaseGMM(object):
             covariances=covariances,
             save_dir=self.model_dir,
         )
+
+    def get_reshaped_means(self):
+        """Reshape means from (n_components, 2) to (n_components, 2, state_size)"""
+        new_means = np.empty((self.n_components, 2, self.dim))
+        for i in range(new_means.shape[0]):
+            for j in range(new_means.shape[1]):
+                new_means[i, j, :] = self.means[i][j]
+        return new_means
+
+    def get_reshape_data(self):
+        reshaped_data = np.empty((self.data.shape[0], 2), dtype=object)
+        for n in range(self.data.shape[0]):
+            reshaped_data[n] = [self.data[n, : self.dim], self.data[n, self.dim :]]
+        return reshaped_data
