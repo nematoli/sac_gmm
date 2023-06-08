@@ -1,0 +1,18 @@
+_target_: sac_gmm.models.sac.agent.sac_gmm_calvin.CALVINSACGMMAgent
+_recursive_: false
+
+calvin_env: ${env}
+datamodule: ${datamodule}
+
+num_init_steps: 2
+num_eval_episodes: 5
+
+skill: ${skill}
+gmm: ${gmm}
+adapt_cov: false
+mean_shift: false
+adapt_per_episode: 4
+
+exp_dir: ${exp_dir}
+render: ${render}
+record: ${record}

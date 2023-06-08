@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sac_gmm.networks.base_critic import Critic
+from sac_gmm.models.sac.networks.critic.base_critic import Critic
 from sac_gmm.utils.misc import get_state_from_observation
 
 

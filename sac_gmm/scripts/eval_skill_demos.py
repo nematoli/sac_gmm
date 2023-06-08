@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(root, "calvin_env"))  # root/calvin_env
 sys.path.insert(0, root.as_posix())  # root
 
 from torch.utils.data import DataLoader
-from sac_gmm.envs.skill_env import SkillSpecificEnv
+from sac_gmm.envs.calvin.skill_env import SkillSpecificEnv
 
 
 class SkillEvaluatorDemos(object):

@@ -1,0 +1,4 @@
+_target_: sac_gmm.models.sac.networks.critic.critic_densenet.DenseNetCritic
+input_dim: ???
+hidden_depth: 2
+hidden_dim: 256

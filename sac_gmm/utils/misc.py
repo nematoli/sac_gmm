@@ -6,6 +6,7 @@ import os
 from collections import deque
 import random
 import math
+
 from utils.transforms import PreprocessImage, ResizeImage, GrayscaleImage
 
 
@@ -33,22 +34,32 @@ def calc_out_size(w, h, kernel_size, padding=0, stride=1):
 
 
 def transform_to_tensor(x, dtype=torch.float, grad=True, device="cuda"):
-    hd_input_keys = [
-        "rgb_gripper",
-        "depth_gripper",
-        "rgb_static",
-        "depth_static",
-    ]
     if isinstance(x, dict):
         tensor = {}
-        for k, v in x.items():
-            if k in hd_input_keys:
-                tensor[k] = v.clone().detach().requires_grad_(grad).to(dtype).to(device)
-            else:
-                tensor[k] = torch.tensor(v, dtype=dtype, device=device, requires_grad=grad)
+        tensor = {k: torch.tensor(v, dtype=dtype, device=device, requires_grad=grad) for k, v in x.items()}
     else:
         tensor = torch.tensor(x, dtype=dtype, device=device, requires_grad=grad)  # B, S_D
     return tensor
+
+
+# TODO: why akshay has added detach here?
+# def transform_to_tensor(x, dtype=torch.float, grad=True, device="cuda"):
+#     hd_input_keys = [
+#         "rgb_gripper",
+#         "depth_gripper",
+#         "rgb_static",
+#         "depth_static",
+#     ]
+#     if isinstance(x, dict):
+#         tensor = {}
+#         for k, v in x.items():
+#             if k in hd_input_keys:
+#                 tensor[k] = v.clone().detach().requires_grad_(grad).to(dtype).to(device)
+#             else:
+#                 tensor[k] = torch.tensor(v, dtype=dtype, device=device, requires_grad=grad)
+#     else:
+#         tensor = torch.tensor(x, dtype=dtype, device=device, requires_grad=grad)  # B, S_D
+#     return tensor
 
 
 def preprocess_cam_obs(cam_obs):

@@ -133,8 +133,8 @@ class Logger(object):
         self.save_wb = save_wb
         if self.save_wb:
             config = {
-                "num_train_steps": cfg.num_train_steps,
-                "num_seed_steps": cfg.num_seed_steps,
+                "max_steps": cfg.max_steps,
+                "num_init_steps": cfg.num_init_steps,
                 "eval_frequency": cfg.eval_frequency,
                 "num_eval_episodes": cfg.num_eval_episodes,
                 "gmm_window_size": cfg.gmm_window_size,

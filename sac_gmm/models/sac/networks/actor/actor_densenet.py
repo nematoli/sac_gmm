@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sac_gmm.networks.base_actor import Actor
+from sac_gmm.models.sac.networks.actor.base_actor import Actor
 from sac_gmm.utils.misc import get_state_from_observation
 
 LOG_SIG_MAX = 2

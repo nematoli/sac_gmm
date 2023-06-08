@@ -1,4 +1,4 @@
-from sac_gmm.utils.replay_buffer import ReplayBuffer
+from sac_gmm.datasets.replay_buffer import ReplayBuffer
 from torch.utils.data.dataset import IterableDataset
 from typing import Iterator
 

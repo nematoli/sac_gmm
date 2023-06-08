@@ -10,10 +10,10 @@ import pdb
 
 
 class AutoEncoder(nn.Module):
-    def __init__(self, hd_input_space, in_channels, hidden_dim, late_fusion, latent_lambda, device):
+    def __init__(self, img_res, in_channels, hidden_dim, late_fusion, latent_lambda, device):
         super(AutoEncoder, self).__init__()
-        self.encoder = Encoder(in_channels, hd_input_space, hidden_dim, late_fusion, device).to(device)
-        self.decoder = Decoder(hidden_dim, hd_input_space, in_channels, late_fusion, device).to(device)
+        self.encoder = Encoder(in_channels, img_res, hidden_dim, late_fusion, device).to(device)
+        self.decoder = Decoder(hidden_dim, img_res, in_channels, late_fusion, device).to(device)
         self.latent_lambda = latent_lambda
 
     def forward(self, x):
@@ -32,7 +32,7 @@ class Encoder(nn.Module):
         self.late_fusion = late_fusion
         self.device = device
         self.in_channels = in_channels
-        h, w = obs_space
+        h, w = obs_space, obs_space
         h, w = calc_out_size(h, w, 8, stride=4)
         h, w = calc_out_size(h, w, 4, stride=2)
         if late_fusion:
@@ -84,7 +84,7 @@ class Decoder(nn.Module):
         self.device = device
         self.out_channels = out_channels
         self.late_fusion = late_fusion
-        self.i_h, self.i_w = obs_space
+        self.i_h, self.i_w = obs_space, obs_space
         h, w = self.i_h, self.i_w
         h, w = calc_out_size(h, w, 8, stride=4)
         self.h, self.w = calc_out_size(h, w, 4, stride=2)
