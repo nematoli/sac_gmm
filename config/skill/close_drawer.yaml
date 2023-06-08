@@ -1,0 +1,9 @@
+defaults:
+  - setup
+
+# Dataset params:
+name: close_drawer
+state_type: 'pos'
+
+# GMM params
+n_components: 5

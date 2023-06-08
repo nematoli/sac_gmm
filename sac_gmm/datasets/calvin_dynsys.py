@@ -6,31 +6,28 @@ import torch
 import pdb
 import pybullet as p
 from pathlib import Path
+from omegaconf import DictConfig
 
 
 class CALVINDynSysDataset(Dataset):
     def __init__(
         self,
-        skill,
-        train=True,
-        state_type="pos",
-        demos_dir="",
-        goal_centered=False,
-        dt=2 / 30,
-        sampling_dt=1 / 30,
-        normalized=False,
-        is_quaternion=False,
+        skill: DictConfig,
+        train: bool,
+        goal_centered: bool,
+        demos_dir: str,
     ):
         self.skill = skill
-        self.demos_dir = Path(demos_dir).expanduser()
+        self.train = train
         self.goal_centered = goal_centered
-        self.dt = dt
-        self.sampling_dt = sampling_dt
-        self.normalized = normalized
+        self.demos_dir = Path(demos_dir).expanduser()
+        self.state_type = self.skill.state_type
+        self.dt = self.skill.dt
+        self.sampling_dt = self.skill.sampling_dt
+        self.normalized = self.skill.normalized
         self.norm_range = [-1, 1]
         self.X_mins = None
         self.X_maxs = None
-        self.train = train
         self.fixed_ori = None
         self.start = None
         self.goal = None
@@ -39,8 +36,7 @@ class CALVINDynSysDataset(Dataset):
         else:
             fname = "validation"
         assert self.demos_dir.is_dir(), "Demos directory does not exist!"
-        self.data_file = glob.glob(str(self.demos_dir / self.skill / f"{fname}.npy"))[0]
-        self.state_type = state_type
+        self.data_file = glob.glob(str(self.demos_dir / self.skill.name / f"{fname}.npy"))[0]
 
         start_idx, end_idx = self.get_valid_columns(self.state_type)
         self.X = np.load(self.data_file)[:, :, start_idx:end_idx]
@@ -50,9 +46,9 @@ class CALVINDynSysDataset(Dataset):
         temp_ori = np.load(self.data_file)[:, :, s_idx:e_idx]
         self.fixed_ori = temp_ori[0, -1, :]
 
-        if self.state_type == "ori" and is_quaternion:
+        if self.state_type == "ori" and self.is_quaternion:
             self.X = np.apply_along_axis(p.getQuaternionFromEuler, -1, self.X)
-        elif self.state_type == "pos_ori" and is_quaternion:
+        elif self.state_type == "pos_ori" and self.is_quaternion:
             oris = np.apply_along_axis(p.getQuaternionFromEuler, -1, self.X[:, :, 3:])
             self.X = np.concatenate([self.X[:, :, :3], oris], axis=-1)
 

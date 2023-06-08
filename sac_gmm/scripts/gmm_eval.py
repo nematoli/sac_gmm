@@ -102,7 +102,7 @@ def evaluate(env, gmm, dataset, max_steps, sampling_dt, render=False, record=Fal
     gmm.logger.log_table(
         key="stats",
         columns=["skill", "accuracy", "average_return", "average_traj_len"],
-        data=[[env.skill_name, acc * 100, np.mean(rollout_returns), np.mean(rollout_lengths)]],
+        data=[[env.skill.name, acc * 100, np.mean(rollout_returns), np.mean(rollout_lengths)]],
     )
 
     return acc, np.mean(rollout_returns), np.mean(rollout_lengths)
@@ -115,45 +115,44 @@ def eval_gmm(cfg: DictConfig) -> None:
     seed_everything(cfg.seed, workers=True)
     log_rank_0(f"Evaluating {cfg.skill} skill with the following config:\n{OmegaConf.to_yaml(cfg)}")
     log_rank_0(print_system_env_info())
-    log_rank_0(f"Evaluating gmm for {cfg.skill} skill with {cfg.state_type} as the input")
+    log_rank_0(f"Evaluating gmm for {cfg.skill.name} skill with {cfg.skill.state_type} as the input")
 
     # Load dataset
-    cfg.datamodule.dataset.skill = cfg.skill
     val_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
-    log_rank_0(f"Skill: {cfg.skill}, Validation Data: {val_dataset.X.size()}")
+    log_rank_0(f"Skill: {cfg.skill.name}, Validation Data: {val_dataset.X.size()}")
     # Obtain X_mins and X_maxs from training data to normalize in real-time
     cfg.datamodule.dataset.train = True
     train_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
     val_dataset.goal = train_dataset.goal
 
     # Create and load models to evaluate
-    gmm = hydra.utils.instantiate(cfg.model.gmm)
-    gmm.model_dir = os.path.join(Path(cfg.skills_dir).expanduser(), cfg.state_type, cfg.skill, gmm.name)
+    gmm = hydra.utils.instantiate(cfg.gmm)
     gmm.load_model()
-    gmm.state_type = cfg.state_type
 
     if gmm.name == "ManifoldGMM":
-        cfg.dim = val_dataset.X.shape[-1]
-        gmm.manifold = gmm.make_manifold(cfg.dim)
+        # cfg.dim = val_dataset.X.shape[-1]
+        gmm.manifold = gmm.make_manifold()
 
     # Setup logger
-    logger_name = f"{cfg.skill}_{cfg.state_type}_{gmm.name}_{gmm.n_components}"
+    logger_name = f"{cfg.skill.name}_{cfg.skill.state_type}_{gmm.name}_{gmm.n_components}"
     gmm.logger = setup_logger(cfg, name=logger_name)
 
     # Evaluate by simulating in the CALVIN environment
-    env = make_env(cfg)
+    env = make_env(cfg.env)
+    env.set_skill(cfg.skill)
+
     acc, avg_return, avg_len = evaluate(
         env,
         gmm,
         val_dataset,
-        max_steps=cfg.max_steps,
+        max_steps=cfg.skill.max_steps,
         render=cfg.render,
         record=cfg.record,
-        sampling_dt=cfg.sampling_dt,
+        sampling_dt=cfg.skill.sampling_dt,
     )
 
     # Log evaluation output
-    log_rank_0(f"{cfg.skill} Skill Accuracy: {round(acc, 2)}")
+    log_rank_0(f"{cfg.skill.name} Skill Accuracy: {round(acc, 2)}")
 
 
 if __name__ == "__main__":

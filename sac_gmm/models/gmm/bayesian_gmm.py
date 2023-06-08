@@ -1,14 +1,25 @@
+import os
+import sys
+import wandb
+from pathlib import Path
+import numpy as np
 from sklearn.mixture import BayesianGaussianMixture
 from gmr import GMM
 from sac_gmm.models.gmm.base_gmm import BaseGMM
-import numpy as np
-import wandb
+
+cwd_path = Path(__file__).absolute().parents[0]
+sac_gmm_path = cwd_path.parents[0]
+root = sac_gmm_path.parents[0]
+
+# This is to access the locally installed repo clone when using slurm
+sys.path.insert(0, sac_gmm_path.as_posix())  # sac_gmm
+sys.path.insert(0, root.as_posix())  # Root
 
 
 class BayesianGMM(BaseGMM):
-    def __init__(self, n_components, max_iter, plot, model_dir, state_size):
+    def __init__(self, skill, max_iter, plot):
         super(BayesianGMM, self).__init__(
-            n_components=n_components, plot=plot, model_dir=model_dir, state_size=state_size
+            n_components=skill.n_components, plot=plot, model_dir=skill.skills_dir, state_type=skill.state_type
         )
 
         self.name = "BayesianGMM"
@@ -18,6 +29,8 @@ class BayesianGMM(BaseGMM):
         self.bgmm = BayesianGaussianMixture(n_components=self.n_components, max_iter=self.max_iter)
         self.gmm = None
         self.logger = None
+        self.model_dir = os.path.join(Path(skill.skills_dir).expanduser(), skill.name, skill.state_type, self.name)
+        os.makedirs(self.model_dir, exist_ok=True)
 
     def fit(self, dataset):
         self.set_data_params(dataset, obj_type=False)

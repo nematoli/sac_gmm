@@ -34,20 +34,17 @@ def train_gmm(cfg: DictConfig) -> None:
     seed_everything(cfg.seed, workers=True)
     log_rank_0(f"Training a GMM skill with the following config:\n{OmegaConf.to_yaml(cfg)}")
     log_rank_0(print_system_env_info())
-    log_rank_0(f"Training gmm for skill {cfg.skill} with {cfg.state_type} as the input")
+    log_rank_0(f"Training gmm for skill {cfg.skill.name} with {cfg.skill.state_type} as the input")
 
     # Load dataset
-    cfg.datamodule.dataset.skill = cfg.skill
     train_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
-    log_rank_0(f"Skill: {cfg.skill}, Train Data: {train_dataset.X.size()}")
+    log_rank_0(f"Skill: {cfg.skill.name}, Train Data: {train_dataset.X.size()}")
 
     # Model
-    gmm = hydra.utils.instantiate(cfg.model.gmm)
-    gmm.model_dir = os.path.join(Path(cfg.skills_dir).expanduser(), cfg.state_type, cfg.skill, gmm.name)
-    os.makedirs(gmm.model_dir, exist_ok=True)
+    gmm = hydra.utils.instantiate(cfg.gmm)
 
     # Setup logger
-    logger_name = f"{cfg.skill}_{cfg.state_type}_{gmm.name}_{gmm.n_components}"
+    logger_name = f"{cfg.skill.name}_{cfg.skill.state_type}_{gmm.name}_{gmm.n_components}"
     gmm.logger = setup_logger(cfg, name=logger_name)
 
     gmm.fit(dataset=train_dataset)

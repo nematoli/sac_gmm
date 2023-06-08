@@ -47,7 +47,7 @@ class BaseGMM(object):
     """
 
     def __init__(
-        self, n_components=3, priors=None, means=None, covariances=None, plot=None, model_dir=None, state_size=None
+        self, n_components=3, priors=None, means=None, covariances=None, plot=None, model_dir=None, state_type=None
     ):
         # GMM
         self.n_components = n_components
@@ -56,15 +56,19 @@ class BaseGMM(object):
         self.covariances = covariances
         self.plot = plot
         self.model_dir = model_dir
-        self.state_size = state_size
+        self.state_type = state_type
 
         self.name = "GMM"
 
         # Data
         self.dataset = None
-        self.state_type = None
-        self.dim = None
         self.data = None
+        if self.state_type == "pos" or "ori":
+            self.dim = 3
+        elif self.state_type == "pos_ori":
+            self.dim = 6
+        else:
+            raise NotImplementedError
 
         if self.priors is not None:
             self.priors = np.asarray(self.priors)
@@ -110,7 +114,6 @@ class BaseGMM(object):
 
     def set_data_params(self, dataset, obj_type=True):
         self.dataset = dataset
-        self.state_type = self.dataset.state_type
         self.dim = self.dataset.X.numpy().shape[-1]
         self.data = self.preprocess_data(dataset, obj_type=obj_type, normalize=False)
 

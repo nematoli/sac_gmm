@@ -30,23 +30,25 @@ def log_rank_0(*args, **kwargs):
 
 
 class ManifoldGMM(BaseGMM):
-    def __init__(self, n_components, plot, model_dir, state_size):
+    def __init__(self, skill, plot):
         super(ManifoldGMM, self).__init__(
-            n_components=n_components, plot=plot, model_dir=model_dir, state_size=state_size
+            n_components=skill.n_components, plot=plot, model_dir=skill.skills_dir, state_type=skill.state_type
         )
 
         self.name = "ManifoldGMM"
 
         self.manifold = None
         self.logger = None
+        self.model_dir = os.path.join(Path(skill.skills_dir).expanduser(), skill.name, skill.state_type, self.name)
+        os.makedirs(self.model_dir, exist_ok=True)
 
-    def make_manifold(self, dim):
+    def make_manifold(self):
         if self.state_type in ["pos", "joint"]:
-            in_manifold = Euclidean(dim)
-            out_manifold = Euclidean(dim)
+            in_manifold = Euclidean(self.dim)
+            out_manifold = Euclidean(self.dim)
         elif self.state_type == "ori":
-            in_manifold = Sphere(dim)
-            out_manifold = Sphere(dim)
+            in_manifold = Sphere(self.dim)
+            out_manifold = Sphere(self.dim)
         elif self.state_type == "pos_ori":
             in_dim = 3
             out_dim_e = 3
@@ -62,7 +64,7 @@ class ManifoldGMM(BaseGMM):
     def fit(self, dataset):
         # Dataset
         self.set_data_params(dataset)
-        self.manifold = self.make_manifold(self.dim)
+        self.manifold = self.make_manifold()
 
         # K-Means
         km_means, km_assignments = manifold_k_means(self.manifold, self.data, nb_clusters=self.n_components)
@@ -120,7 +122,7 @@ class ManifoldGMM(BaseGMM):
 
     def get_reshaped_means(self):
         """Reshape means from (n_components, 2) to (n_components, 2, state_size)"""
-        new_means = np.empty((self.n_components, 2, self.state_size))
+        new_means = np.empty((self.n_components, 2, self.dim))
         for i in range(new_means.shape[0]):
             for j in range(new_means.shape[1]):
                 new_means[i, j, :] = self.means[i][j]
@@ -138,7 +140,7 @@ class ManifoldGMM(BaseGMM):
         # priors and covariances already match shape
         shape = None
         if to == "generic":
-            shape = (self.n_components, 2 * self.state_size)
+            shape = (self.n_components, 2 * self.dim)
         else:
-            shape = (self.n_components, 2, self.state_size)
+            shape = (self.n_components, 2, self.dim)
         self.means = self.means.reshape(shape)

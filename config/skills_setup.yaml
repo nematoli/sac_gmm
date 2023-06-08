@@ -1,28 +1,8 @@
 defaults:
-  - model/gmm: bayesian_gmm #manifold_gmm or bayesian_gmm
+  - gmm: manifold_gmm # manifold_gmm or bayesian_gmm
+  - skill: open_drawer # open_drawer / close_drawer /  
   - _self_
 
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 
-# Skill params
-skills_dir: ${root}/skills_ds
-state_type: 'pos'
-dim: 3
-
-# Dataset params:
-skill: null
-train: true # false to load validation dataset
-goal_centered: true # this must be false during evaluation
-dt: 0.0666
-sampling_dt: 0.0333
-normalized: false
-is_quaternion: false
-
-# Evaluation and DS params
-max_steps: 240
-
-# GMM params
-gmm_components: 6
-plot: true
-gmm_input_size: ${dim}

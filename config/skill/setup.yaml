@@ -1,0 +1,9 @@
+skills_dir: ${root}/skills_ds
+
+dt: 0.0666
+sampling_dt: 0.0333
+normalized: false
+is_quaternion: false
+
+# Evaluation and DS params
+max_steps: 240
