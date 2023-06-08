@@ -245,6 +245,23 @@ class BaseGMM(object):
             save_dir=self.model_dir,
         )
 
+    def reshape_params(self, to="generic"):
+        """Reshapes model params to/from generic/gmr-specific shapes.
+        E.g., For N GMM components, S state size, generic shapes are
+        self.priors = (N,);
+        self.means = (N, 2*S);
+        self.covariances = (N, 2*S, 2*S)
+
+        Gmr-specific: self.means = (N, 2, S)
+        """
+        # priors and covariances already match shape
+        shape = None
+        if to == "generic":
+            shape = (self.n_components, 2 * self.dim)
+        else:
+            shape = (self.n_components, 2, self.dim)
+        self.means = self.means.reshape(shape)
+
     def get_reshaped_means(self):
         """Reshape means from (n_components, 2) to (n_components, 2, state_size)"""
         new_means = np.empty((self.n_components, 2, self.dim))
