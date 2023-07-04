@@ -61,8 +61,10 @@ class CALVINDynSysDataset(Dataset):
             self.set_mins_and_maxs(self.X)
             self.X = self.normalize(self.X)
 
-        self.dX = (self.X[:, 2:, :3] - self.X[:, :-2, :3]) / self.dt
-        self.X = self.X[:, 1:-1, :]
+        self.dX = np.zeros_like(self.X)
+        self.dX[:, :-2, :3] = (self.X[:, 2:, :3] - self.X[:, :-2, :3]) / self.dt
+        self.dX[:, -2, :3] = (self.X[:, -1, :3] - self.X[:, -2, :3]) / self.dt
+        self.dX[:, -1, :3] = 0
 
         if self.state_type == "pos_ori":
             self.Ori = self.X[:, :, 3:]
@@ -130,6 +132,11 @@ class CALVINDynSysDataset(Dataset):
             x = x + delta_x
         sampled_path = np.array(sampled_path)
         plot_3d_trajectories(true_x, sampled_path)
+
+    def rm_rw_data(self, list_indicis):
+        self.X = np.load(self.data_file)
+        new_X = np.delete(self.X, list_indicis, axis=0)
+        np.save(self.data_file, new_X)
 
 
 def plot_3d_trajectories(demos, repro=None, goal=None, figsize=(4, 4)):

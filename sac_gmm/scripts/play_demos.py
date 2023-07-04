@@ -33,18 +33,16 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-def evaluate(env, gmm, dataset, max_steps, dt, render=False, record=False):
+def play(env, dataset, max_steps, dt, render=False, record=False):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
-    succesful_rollouts, rollout_returns, rollout_lengths = 0, [], []
+    succesful_rollouts, rollout_returns, rollout_lengths, failed_runs = 0, [], [], []
     for idx, (xi, d_xi) in enumerate(dataloader):
-        if (idx % 5 == 0) or (idx == len(dataset)):
-            log_rank_0(f"Test Trajectory {idx+1}/{len(dataset)}")
+        log_rank_0(f"Trajectory {idx+1}/{len(dataset)}")
+
         x0 = xi.squeeze()[0, :].numpy()
-        goal = dataset.goal
         rollout_return = 0
         observation = env.reset()
         current_state = observation["position"]
-        # log_rank_0(f'Adjusting EE position to match the initial pose from the dataset')
         count = 0
         error_margin = 0.01
         while np.linalg.norm(x0 - current_state) >= error_margin:
@@ -52,22 +50,19 @@ def evaluate(env, gmm, dataset, max_steps, dt, render=False, record=False):
             observation, reward, done, info = env.step(dx)
             current_state = observation["position"]
             count += 1
-            if count >= 300:
+            if count >= 1000:
                 # x0 = current_state
                 log_rank_0("CALVIN is struggling to place the EE at the right initial pose")
                 log_rank_0(f"{np.linalg.norm(x0 - current_state)}")
                 break
-        # log_rank_0(f'Simulating with gmm')
 
         if record:
             log_rank_0("Recording Robot Camera Obs")
             env.record_frame(size=64)
 
-        x = observation["position"]
-        for step in range(max_steps):
-            d_x = gmm.predict(x - goal)
+        for step in range(max_steps - 1):
+            d_x = d_xi.squeeze()[step, :].numpy()
             observation, reward, done, info = env.step(d_x)
-            x = observation["position"]
             rollout_return += reward
             if record:
                 env.record_frame(size=64)
@@ -81,73 +76,70 @@ def evaluate(env, gmm, dataset, max_steps, dt, render=False, record=False):
             status = "Success"
         else:
             status = "Fail"
+            failed_runs.append(idx)
+
         log_rank_0(f"{idx+1}: {status}!")
         if record:
             log_rank_0("Saving Robot Camera Obs")
             video_path = env.save_recorded_frames(outdir=env.outdir, fname=idx)
             env.reset_recorded_frames()
             status = None
-            gmm.logger.log_table(key="eval", columns=["GMM"], data=[[wandb.Video(video_path, fps=30, format="gif")]])
 
         rollout_returns.append(rollout_return)
         rollout_lengths.append(step)
     acc = succesful_rollouts / len(dataset.X)
-    # wandb.config.update({"val dataset size": len(dataset.X)})
-    gmm.logger.log_table(
-        key="stats",
-        columns=["skill", "accuracy", "average_return", "average_traj_len"],
-        data=[[env.skill.name, acc * 100, np.mean(rollout_returns), np.mean(rollout_lengths)]],
-    )
 
-    return acc, np.mean(rollout_returns), np.mean(rollout_lengths)
+    return acc, np.mean(rollout_returns), np.mean(rollout_lengths), failed_runs
 
 
-@hydra.main(version_base="1.1", config_path="../../config", config_name="gmm_eval")
-def eval_gmm(cfg: DictConfig) -> None:
+@hydra.main(version_base="1.1", config_path="../../config", config_name="play_demos")
+def play_demos(cfg: DictConfig) -> None:
     cfg.exp_dir = hydra.core.hydra_config.HydraConfig.get()["runtime"]["output_dir"]
 
     seed_everything(cfg.seed, workers=True)
-    log_rank_0(f"Evaluating {cfg.skill} skill with the following config:\n{OmegaConf.to_yaml(cfg)}")
+    log_rank_0(f"Playing {cfg.skill.name} demos with the following config:\n{OmegaConf.to_yaml(cfg)}")
     log_rank_0(print_system_env_info())
-    log_rank_0(f"Evaluating gmm for {cfg.skill.name} skill with {cfg.skill.state_type} as the input")
-
-    # Load dataset
-    val_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
-    log_rank_0(f"Skill: {cfg.skill.name}, Validation Data: {val_dataset.X.size()}")
-    # Obtain X_mins and X_maxs from training data to normalize in real-time
-    cfg.datamodule.dataset.train = True
-    train_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
-    val_dataset.goal = train_dataset.goal
-
-    # Create and load models to evaluate
-    gmm = hydra.utils.instantiate(cfg.gmm)
-    gmm.load_model()
-
-    if "Manifold" in gmm.name:
-        # cfg.dim = val_dataset.X.shape[-1]
-        gmm.manifold = gmm.make_manifold()
-
-    # Setup logger
-    logger_name = f"{cfg.skill.name}_{cfg.skill.state_type}_{gmm.name}_{gmm.n_components}"
-    gmm.logger = setup_logger(cfg, name=logger_name)
 
     # Evaluate by simulating in the CALVIN environment
     env = make_env(cfg.env)
     env.set_skill(cfg.skill)
 
-    acc, avg_return, avg_len = evaluate(
+    # Load dataset
+    train_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
+    log_rank_0(f"Skill: {cfg.skill.name}, Train Data: {train_dataset.X.size()}")
+
+    acc, avg_return, avg_len, failed = play(
         env,
-        gmm,
+        train_dataset,
+        max_steps=cfg.skill.max_steps,
+        render=cfg.render,
+        record=cfg.record,
+        dt=cfg.skill.dt,
+    )
+    # Log evaluation output
+    log_rank_0(f"{cfg.skill.name} Training Demos Accuracy: {round(acc, 2)}")
+    if cfg.remove_failures:
+        train_dataset.rm_rw_data(failed)
+        log_rank_0(f"Removed {len(failed)} failures from the Training Demos")
+
+    cfg.datamodule.dataset.train = False
+    val_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
+    log_rank_0(f"Skill: {cfg.skill.name}, Validation Data: {val_dataset.X.size()}")
+
+    acc, avg_return, avg_len, failed = play(
+        env,
         val_dataset,
         max_steps=cfg.skill.max_steps,
         render=cfg.render,
         record=cfg.record,
         dt=cfg.skill.dt,
     )
-
     # Log evaluation output
-    log_rank_0(f"{cfg.skill.name} Skill Accuracy: {round(acc, 2)}")
+    log_rank_0(f"{cfg.skill.name} Validation Demos Accuracy: {round(acc, 2)}")
+    if cfg.remove_failures:
+        val_dataset.rm_rw_data(failed)
+        log_rank_0(f"Removed {len(failed)} failures from the Validation Demos")
 
 
 if __name__ == "__main__":
-    eval_gmm()
+    play_demos()

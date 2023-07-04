@@ -1,6 +1,6 @@
 defaults:
-  - gmm: manifold_gmm # manifold_gmm or bayesian_gmm
-  - skill: open_drawer # open_drawer / close_drawer /  
+  - gmm: bayesian_gmm # manifold_gmm or bayesian_gmm
+  - skill: close_drawer # open_drawer / close_drawer /  
   - _self_
 
   - override hydra/job_logging: colorlog

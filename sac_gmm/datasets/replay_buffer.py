@@ -19,8 +19,7 @@ Transition = namedtuple("Transition", ["state", "action", "reward", "next_state"
 
 class ReplayBuffer:
     def __init__(self, save_dir, max_capacity=5e6):
-        self.unsaved_transitions = 0
-        self.curr_file_idx = 1
+        self.last_saved_idx = 0
         self.replay_buffer = deque(maxlen=int(max_capacity))
         self.save_dir = save_dir
 
@@ -33,7 +32,6 @@ class ReplayBuffer:
         """
         transition = Transition(state, action, reward, next_state, done)
         self.replay_buffer.append(transition)
-        self.unsaved_transitions += 1
 
     def sample(self, batch_size: int):
         indices = np.random.choice(
@@ -53,34 +51,43 @@ class ReplayBuffer:
     def save(self):
         if self.save_dir is None:
             return False
-        if self.unsaved_transitions > 0:
-            p = Path(self.save_dir)
-            p.mkdir(parents=True, exist_ok=True)
-            final_rb_index = len(self.replay_buffer)
-            start_rb_index = len(self.replay_buffer) - self.unsaved_transitions
-            for replay_buffer_index in range(start_rb_index, final_rb_index):
-                transition = self.replay_buffer[replay_buffer_index]
-                file_name = "%s/transition_%09d.npz" % (self.save_dir, self.curr_file_idx)
-                np.savez(
-                    file_name,
-                    state=transition.state,
-                    action=transition.action,
-                    next_state=transition.next_state,
-                    reward=transition.reward,
-                    done=transition.done,
-                )
-                self.curr_file_idx += 1
-            # Logging
-            if self.unsaved_transitions == 1:
-                log_rank_0("Saved file with index : %09d" % (self.curr_file_idx - 1))
-            else:
-                log_rank_0(
-                    "Saved files with indices : %09d - %09d"
-                    % (
-                        self.curr_file_idx - self.unsaved_transitions,
-                        self.curr_file_idx - 1,
+        p = Path(self.save_dir)
+        p.mkdir(parents=True, exist_ok=True)
+        num_entries = len(self.replay_buffer)
+        for i in range(self.last_saved_idx, num_entries):
+            transition = self.replay_buffer[i]
+            file_name = "%s/transition_%d.npz" % (self.save_dir, i)
+            np.savez(
+                file_name,
+                state=transition.state,
+                action=transition.action,
+                reward=transition.reward,
+                next_state=transition.next_state,
+                done=transition.done,
+            )
+        log_rank_0("Saved transitions with indices : %d - %d" % (self.last_saved_idx, i))
+        self.last_saved_idx = i
+
+    def load(self):
+        if self.save_dir is None:
+            return False
+        p = Path(self.save_dir)
+        if p.is_dir():
+            p = p.glob("*.npz")
+            files = [x for x in p if x.is_file()]
+            if len(files) > 0:
+                for file in files:
+                    data = np.load(file, allow_pickle=True)
+                    transition = Transition(
+                        data["state"].item(),
+                        data["action"],
+                        data["reward"].item(),
+                        data["next_state"].item(),
+                        data["done"].item(),
                     )
-                )
-            self.unsaved_transitions = 0
-            return True
-        return False
+                    self.replay_buffer.append(transition)
+                log_rank_0("Replay buffer loaded successfully")
+            else:
+                log_rank_0("No files were found in path %s" % (self.save_dir))
+        else:
+            log_rank_0("Path %s does not have an appropiate directory address" % (self.save_dir))

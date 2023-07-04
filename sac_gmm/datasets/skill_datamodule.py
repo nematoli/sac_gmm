@@ -44,7 +44,7 @@ class SkillDataModule(pl.LightningDataModule):
         self.train_dataset = hydra.utils.instantiate(
             self.dataset,
             data_dir=self.train_dir,
-            skill=self.skill,
+            skill=self.skill.name,
             step_len=self.step_len,
             train=True,
             transforms=self.transforms,
@@ -52,7 +52,7 @@ class SkillDataModule(pl.LightningDataModule):
         self.val_dataset = hydra.utils.instantiate(
             self.dataset,
             data_dir=self.val_dir,
-            skill=self.skill,
+            skill=self.skill.name,
             step_len=self.step_len,
             train=False,
             transforms=self.transforms,

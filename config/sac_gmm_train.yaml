@@ -12,12 +12,18 @@ defaults:
   - override hydra/hydra_logging: colorlog
   - _self_
 
+show_gui: true
+# evaluation frequency:
+eval_frequency: 20
+num_init_steps: 256
+num_eval_episodes: 1
+
 # Dataset params:
 train: true # false to load validation dataset
 goal_centered: true # this must be false during evaluation
 
 # Visualization
-render: false
+render: true
 record: false
 
 hydra:

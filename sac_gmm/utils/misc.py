@@ -83,30 +83,10 @@ def grayscale_cam_obs(cam_obs):
 def get_state_from_observation(hd_input_encoder, obs, detach_encoder):
     if isinstance(obs, dict):
         # Robot obs
-        if "pos" in obs:
-            fc_input = obs["pos"].float()
-        elif "pos_ori" in obs:
-            fc_input = obs["pos_ori"].float()
-        elif "joint" in obs:
-            fc_input = obs["joint"].float()
-
-        # Added for Residual action
-        if "gmm_action" in obs:
-            fc_input = torch.cat((fc_input, obs["gmm_action"]), dim=-1)
-
-        # Camera obs (High dimensional inputs)
-        hd_input_keys = [
-            "rgb_gripper",
-            "depth_gripper",
-            "rgb_static",
-            "depth_static",
-        ]
-        for key in hd_input_keys:
-            if key in obs:
-                if type(obs[key]) is list:
-                    obs[key] = torch.stack(obs[key], dim=1)
-                compact_repr = hd_input_encoder(grayscale_cam_obs(obs[key].float()), detach_encoder)
-                fc_input = torch.cat((fc_input, compact_repr), dim=-1)
+        if "position" in obs:
+            fc_input = obs["position"].float()
+        if "orientation" in obs:
+            fc_input = torch.cat((fc_input, obs["orientation"].float()), dim=-1)
 
         return fc_input.float()
 

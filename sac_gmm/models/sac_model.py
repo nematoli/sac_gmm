@@ -69,110 +69,101 @@ class SAC(SkillModel):
             batch: current mini batch of replay data
             nb_batch: batch number
         """
+        # log_rank_0(f"this is step: {batch_idx}")
+
         reward, self.episode_done = self.agent.play_step(self.actor, "stochastic", self.replay_buffer)
         self.episode_return += reward
         self.episode_length += 1
 
-        batch = self.check_batch(batch)
-        losses = self.loss(batch)
-        self.log_loss(losses, mode="train")
+        losses = self.loss(self.check_batch(batch))
+        self.log_loss(losses)
         self.soft_update(self.critic_target, self.critic, self.critic_tau)
 
         if self.episode_done:
             # When an episode ends, log episode metrics
             metrics = {
-                "metrics/episode_return": self.episode_return,
-                "metrics/episode_length": self.episode_length,
-                "metrics/episode_number": self.episode_idx.item(),
+                "train/episode_return": self.episode_return,
+                "train/episode_length": self.episode_length,
+                "train/episode_number": self.episode_idx.item(),
             }
-            self.log_metrics(metrics, mode="train", on_step=True, on_epoch=False)
+            # eval_return = float("-inf")
+            # eval_accuracy = float("-inf")
+            if self.episode_idx % self.eval_frequency == 0:
+                eval_accuracy, eval_return, eval_length, _ = self.agent.evaluate(self.actor)
+                eval_metrics = {
+                    "eval/accuracy": eval_accuracy,
+                    "eval/episode_avg_return": eval_return,
+                    "eval/episode_avg_length": eval_length,
+                    "eval/total_env_steps": self.agent.total_env_steps,
+                }
+                metrics.update(eval_metrics)
 
+            self.log_metrics(metrics, on_step=True, on_epoch=False)
             self.episode_return, self.episode_length = 0, 0
             self.episode_idx += 1
-
-    def on_train_epoch_end(self):
-        """
-        This function is called every time a training epoch ends.
-        One training epoch = replay_buffer size / batch_size iterations
-        It evaluates actor (when appropriate) by simulating
-        in the environment.
-        """
-        eval_return = float("-inf")
-        eval_accuracy = float("-inf")
-        metrics = {}
-        # Log every episode end
-        if self.episode_idx % self.eval_frequency == 0:
-            (
-                eval_accuracy,
-                eval_return,
-                eval_length,
-                eval_video_path,
-            ) = self.agent.evaluate(self.actor)
-            metrics = {
-                "metrics/accuracy": eval_accuracy,
-                "metrics/episode_avg_return": eval_return,
-                "metrics/episode_avg_length": eval_length,
-                "metrics/total_env_steps": self.agent.total_env_steps,
-            }
-
-            # TODO: Log Video
 
             # Save the replay buffer when you evaluate
             self.replay_buffer.save()
 
-        # TODO: check on_step and on_epoch here
-        self.log_metrics(metrics, mode="eval", on_step=False, on_epoch=True)
-        logger.info(f"Starting training epoch {self.current_epoch}")
+        # # Monitored metric to save model
+        # self.log("eval_episode_return", eval_return, on_epoch=True)
+        # self.log("eval_accuracy", eval_accuracy, on_epoch=True)
 
-        # TODO Monitored metric to save model
+    # def on_train_epoch_end(self):
+    #     log_rank_0("this was one epoch")
+
+    #     """
+    #     This function is called every time a training epoch ends.
+    #     One training epoch = replay_buffer size / batch_size iterations
+    #     It evaluates actor (when appropriate) by simulating
+    #     in the environment.
+    #     """
+    #     eval_return = float("-inf")
+    #     eval_accuracy = float("-inf")
+    #     if self.episode_idx % self.eval_frequency == 0:
+    #         eval_accuracy, eval_return, eval_length, _ = self.agent.evaluate(self.actor)
+    #         metrics = {
+    #             "eval/accuracy": eval_accuracy,
+    #             "eval/episode_avg_return": eval_return,
+    #             "eval/episode_avg_length": eval_length,
+    #             "eval/total_env_steps": self.agent.total_env_steps,
+    #         }
+
+    #         self.log_metrics(metrics, on_step=False, on_epoch=True)
+    #         self.episode_return, self.episode_length = 0, 0
+    #         self.episode_idx += 1
+
+    #     # Save the replay buffer when you evaluate
+    #     self.replay_buffer.save()
+    #     # Monitored metric to save model
+    #     self.log("eval_episode_return", eval_return, on_epoch=True)
+    #     self.log("eval_accuracy", eval_accuracy, on_epoch=True)
 
     def loss(self, batch):
-        actor_optimizer, critic_optimizer, alpha_optimizer = self.optimizers()
-        actor_loss, alpha_loss, alpha = self.compute_actor_and_alpha_loss(batch, actor_optimizer, alpha_optimizer)
+        critic_optimizer, actor_optimizer, alpha_optimizer = self.optimizers()
         critic_loss = self.compute_critic_loss(batch, critic_optimizer)
+        actor_loss, alpha_loss = self.compute_actor_and_alpha_loss(batch, actor_optimizer, alpha_optimizer)
 
         losses = {
             "loss/critic": critic_loss,
             "loss/actor": actor_loss,
             "loss/alpha": alpha_loss,
-            "alpha/value": alpha,
+            "alpha/value": self.alpha,
         }
         return losses
-
-    def compute_actor_and_alpha_loss(self, batch, actor_optimizer, alpha_optimizer):
-        batch_obs = batch[0]
-        policy_actions, curr_log_pi = self.actor.get_actions(batch_obs, deterministic=False, reparameterize=True)
-        alpha_loss = -(self.log_alpha * (curr_log_pi + self.target_entropy).detach()).mean()
-
-        if self.optimize_alpha:
-            alpha_optimizer.zero_grad()
-            self.manual_backward(alpha_loss)
-            alpha_optimizer.step()
-        alpha = self.log_alpha.exp()
-
-        q1, q2 = self.critic(batch_obs, policy_actions)
-        Q_value = torch.min(q1, q2)
-        actor_loss = (alpha * curr_log_pi - Q_value).mean()
-
-        actor_optimizer.zero_grad()
-        self.manual_backward(actor_loss)
-        actor_optimizer.step()
-
-        return actor_loss, alpha_loss, alpha
 
     def compute_critic_loss(self, batch, critic_optimizer):
         batch_obs, batch_actions, batch_rewards, batch_next_obs, batch_dones = batch
 
         with torch.no_grad():
-            next_actions, next_log_pi = self.actor.get_actions(
+            policy_actions, log_pi = self.actor.get_actions(
                 batch_next_obs,
                 deterministic=False,
                 reparameterize=False,
             )
-            q1_next_target, q2_next_target = self.critic_target(batch_next_obs, next_actions)
+            q1_next_target, q2_next_target = self.critic_target(batch_next_obs, policy_actions)
             q_next_target = torch.min(q1_next_target, q2_next_target)
-            alpha = self.log_alpha.exp()
-            q_target = batch_rewards + (1 - batch_dones) * self.discount * (q_next_target - alpha * next_log_pi)
+            q_target = batch_rewards + (1 - batch_dones) * self.discount * (q_next_target - self.alpha * log_pi)
 
         # Bellman loss
         q1_pred, q2_pred = self.critic(batch_obs, batch_actions.float())
@@ -183,3 +174,25 @@ class SAC(SkillModel):
         critic_optimizer.step()
 
         return bellman_loss
+
+    def compute_actor_and_alpha_loss(self, batch, actor_optimizer, alpha_optimizer):
+        batch_obs = batch[0]
+        policy_actions, log_pi = self.actor.get_actions(batch_obs, deterministic=False, reparameterize=True)
+        q1, q2 = self.critic(batch_obs, policy_actions)
+        Q_value = torch.min(q1, q2)
+        actor_loss = (self.alpha * log_pi - Q_value).mean()
+
+        actor_optimizer.zero_grad()
+        self.manual_backward(actor_loss)
+        actor_optimizer.step()
+
+        self.log_alpha = self.log_alpha.to(log_pi.device)
+        alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
+        if self.optimize_alpha:
+            alpha_optimizer.zero_grad()
+            self.manual_backward(alpha_loss)
+            alpha_optimizer.step()
+
+        self.alpha = self.log_alpha.exp()
+
+        return actor_loss, alpha_loss

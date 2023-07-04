@@ -7,6 +7,6 @@ use_vr: ${env.calvin_env.use_vr}
 show_gui: false
 robot_cfg: ${env.calvin_env.robot}
 scene_cfg: ${env.calvin_env.scene}
-use_scene_info: false
+use_scene_info: true
 use_egl: true
 control_freq: 30

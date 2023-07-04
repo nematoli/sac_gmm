@@ -44,9 +44,11 @@ class Actor(nn.Module):
         for i in range(1, num_layers):
             state = F.silu(self.fc_layers[i](state))
         mean = self.fc_mean(state)
-        mean = torch.clamp(mean, MEAN_MIN, MEAN_MAX)
+        # mean = torch.clamp(mean, MEAN_MIN, MEAN_MAX)
         log_std = self.fc_log_std(state)
         log_std = torch.clamp(log_std, LOG_SIG_MIN, LOG_SIG_MAX)
+        # log_std = torch.clamp(log_std, min=-20, max=2)  # Avoid -inf when std -> 0
+
         std = log_std.exp()
         return mean, std
 

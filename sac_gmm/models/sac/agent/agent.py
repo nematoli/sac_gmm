@@ -53,9 +53,18 @@ class Agent(object):
         self.episode_play_steps = 0
         self.episode_env_steps = 0
 
-    def get_state_dim(self):
+    def get_state_dim(self, comp_repr_size=0):
         """Returns the size of the state based on env's observation space"""
-        raise NotImplementedError
+        state_dim = 0
+        observation_space = self.env.get_observation_space()
+        keys = list(observation_space.keys())
+        if "position" in keys:
+            state_dim += 3
+        if "orientation" in keys:
+            state_dim += 3
+        # if self.high_dim_key() in keys:
+        #     state_dim += comp_repr_size
+        return state_dim
 
     def get_action_space(self):
         raise NotImplementedError
@@ -76,7 +85,7 @@ class Agent(object):
     def get_action(self, actor, observation, strategy="stochastic"):
         """Interface to get action from SAC Actor,
         ready to be used in the environment"""
-
+        actor.eval()
         if strategy == "random":
             return self.get_action_space().sample()
         elif strategy == "zeros":
@@ -90,7 +99,7 @@ class Agent(object):
         # observation = transform_to_tensor(observation, device=self.device)
         observation = transform_to_tensor(observation)
         action, _ = actor.get_actions(observation, deterministic=deterministic, reparameterize=False)
-
+        actor.train()
         return action.detach().cpu().numpy()
 
     def play_step(self, actor, strategy="stochastic", replay_buffer=None):

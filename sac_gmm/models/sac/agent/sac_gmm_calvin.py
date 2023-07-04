@@ -45,7 +45,9 @@ class CALVINSACGMMAgent(Agent):
 
         # Environment
         self.env.set_skill(self.skill)
-        self.robot_obs, self.cam_obs = self.env.obs_allowed
+
+        # self.robot_obs, self.cam_obs = self.env.obs_allowed
+
         # # TODO: find the transforms for this
         # env.set_obs_transforms(cfg.datamodule.transforms)
 
@@ -61,10 +63,10 @@ class CALVINSACGMMAgent(Agent):
         self.adapt_per_episode = adapt_per_episode
         self.gmm_window = self.skill.max_steps // self.adapt_per_episode
 
-        # record setup
-        self.video_dir = os.path.join(exp_dir, "videos")
-        os.makedirs(self.video_dir, exist_ok=True)
-        self.env.set_outdir(self.video_dir)
+        # # record setup
+        # self.video_dir = os.path.join(exp_dir, "videos")
+        # os.makedirs(self.video_dir, exist_ok=True)
+        # self.env.set_outdir(self.video_dir)
         self.render = render
         self.record = record
 
@@ -75,20 +77,7 @@ class CALVINSACGMMAgent(Agent):
     def reset(self) -> None:
         """Resets the environment, moves the EE to a good start state and updates the agent state"""
         super().reset()
-        self.obs = self.env.sample_start_position(self.datamodule.dataset)
-
-    def get_state_dim(self):
-        """Returns the size of the state based on env's observation space"""
-        state_dim = 0
-        robot_obs, cam_obs = self.env.obs_allowed
-        if "pos" in robot_obs:
-            state_dim += 3
-        if "ori" in robot_obs:
-            state_dim += 4
-        if "joint" in robot_obs:
-            state_dim = 7
-
-        return state_dim
+        # self.obs = self.env.sample_start_position(self.datamodule.dataset)
 
     def get_action_space(self):
         parameter_space = self.get_update_range_parameter_space()
@@ -106,6 +95,7 @@ class CALVINSACGMMAgent(Agent):
         self.action_space = gym.spaces.Box(action_low, action_high)
         return self.action_space
 
+    @torch.no_grad()
     def play_step(self, actor, strategy="stochastic", replay_buffer=None):
         """Perform a step in the environment and add the transition
         tuple to the replay buffer"""
@@ -116,29 +106,31 @@ class CALVINSACGMMAgent(Agent):
 
         # Act with the dynamical system in the environment
         gmm_reward = 0
-        x = self.obs[self.robot_obs]
+        curr_obs = self.obs
         for _ in range(self.gmm_window):
-            dx = self.gmm.predict(x - self.datamodule.dataset.goal)
-            new_x = x + self.dt * dx
-            env_action = np.append(new_x, np.append(self.datamodule.dataset.fixed_ori, -1))
-            env_action = self.env.prepare_action(env_action, type="abs")
-            next_obs, reward, done, info = self.env.step(env_action)
+            conn = self.env.isConnected()
+            if not conn:
+                done = False
+                break
+            dx = self.gmm.predict(curr_obs["position"] - self.datamodule.dataset.goal)
+            curr_obs, reward, done, info = self.env.step(dx)
             gmm_reward += reward
-            x = next_obs[self.robot_obs]
             self.episode_env_steps += 1
             self.total_env_steps += 1
             if done:
                 break
 
-        replay_buffer.add(self.obs, gmm_change, gmm_reward, next_obs, done)
-        self.obs = next_obs
+        replay_buffer.add(self.obs, gmm_change, gmm_reward, curr_obs, done)
+        self.obs = curr_obs
 
         self.episode_play_steps += 1
         self.total_play_steps += 1
 
-        if done or (self.episode_env_steps >= self.skill.max_steps):
-            self.reset()
+        if self.episode_env_steps >= self.skill.max_steps:
             done = True
+
+        if done or not conn:
+            self.reset()
         return reward, done
 
     @torch.no_grad()
@@ -148,17 +140,19 @@ class CALVINSACGMMAgent(Agent):
         succesful_episodes, episodes_returns, episodes_lengths = 0, [], []
         saved_video_path = None
         # Choose a random episode to record
-        rand_idx = np.random.randint(0, self.num_eval_episodes)
-        for episode in tqdm(range(0, self.num_eval_episodes)):
-            episode_env_steps = 0
-            episode_return = 0
+        rand_idx = np.random.randint(1, self.num_eval_episodes + 1)
+        for episode in tqdm(range(1, self.num_eval_episodes + 1)):
+            episode_return, episode_env_steps = 0, 0
+
             self.obs = self.env.reset()
             # Start from a known starting point
-            self.obs = self.env.sample_start_position(self.datamodule.dataset)
+            # self.obs = self.env.sample_start_position(self.datamodule.dataset)
+
             # Recording setup
             if self.record and (episode == rand_idx):
                 self.env.reset_recorded_frames()
                 self.env.record_frame(size=64)
+
             while episode_env_steps < self.skill.max_steps:
                 # Change dynamical system
                 self.gmm.copy_model(self.initial_gmm)
@@ -166,16 +160,12 @@ class CALVINSACGMMAgent(Agent):
                 self.update_gaussians(gmm_change)
 
                 # Act with the dynamical system in the environment
-                gmm_reward = 0
-                x = self.obs[self.robot_obs]
+                # x = self.obs["position"]
+
                 for _ in range(self.gmm_window):
-                    dx = self.gmm.predict(x - self.datamodule.dataset.goal)
-                    new_x = x + self.dt * dx
-                    env_action = np.append(new_x, np.append(self.datamodule.dataset.fixed_ori, -1))
-                    env_action = self.env.prepare_action(env_action, type="abs")
-                    next_obs, reward, done, info = self.env.step(env_action)
-                    gmm_reward += reward
-                    x = next_obs[self.robot_obs]
+                    dx = self.gmm.predict(self.obs["position"] - self.datamodule.dataset.goal)
+                    self.obs, reward, done, info = self.env.step(dx)
+                    episode_return += reward
                     episode_env_steps += 1
 
                     if self.record and (episode == rand_idx):
@@ -185,8 +175,6 @@ class CALVINSACGMMAgent(Agent):
                     if done:
                         break
 
-                episode_return += gmm_reward
-                self.obs = next_obs
                 if done:
                     self.reset()
                     break
@@ -223,7 +211,7 @@ class CALVINSACGMMAgent(Agent):
         # TODO: make low and high config variables
         param_space = {}
         param_space["priors"] = gym.spaces.Box(low=-0.1, high=0.1, shape=(self.gmm.priors.size,))
-        param_space["mu"] = gym.spaces.Box(low=-0.01, high=0.01, shape=(self.gmm.means.size,))
+        param_space["mu"] = gym.spaces.Box(low=-0.05, high=0.05, shape=(self.gmm.means.size,))
 
         dim = self.gmm.means.shape[1] // 2
         num_gaussians = self.gmm.means.shape[0]
@@ -247,6 +235,7 @@ class CALVINSACGMMAgent(Agent):
             mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
 
             change_dict = {"mu": mu, "priors": priors}
+            # print("change: ", change_dict)
             if self.adapt_cov:
                 change_dict["sigma"] = gmm_change[size_priors + size_mu :] * parameter_space["sigma"].high
             self.gmm.update_model(change_dict)

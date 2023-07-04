@@ -1,5 +1,6 @@
 seed: 0
-use_vr: true
+use_vr: false
+show_gui: false
 data_path: data
 save_dir: /tmp
 record: true

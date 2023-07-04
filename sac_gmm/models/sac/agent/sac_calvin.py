@@ -85,6 +85,7 @@ class CALVINSACAgent(Agent):
 
         return self.action_space
 
+    @torch.no_grad()
     def play_step(self, actor, strategy="stochastic", replay_buffer=None):
         """Perform a step in the environment and add the transition
         tuple to the replay buffer"""
@@ -93,6 +94,7 @@ class CALVINSACAgent(Agent):
         action_with_gripper = np.append(action_with_fixori, -1)
         action_with_gripper = self.env.prepare_action(action_with_gripper, type="rel")
         next_obs, reward, done, info = self.env.step(action_with_gripper)
+
         replay_buffer.add(self.obs, action, reward, next_obs, done)
         self.obs = next_obs
 
@@ -102,9 +104,11 @@ class CALVINSACAgent(Agent):
         self.episode_play_steps += 1
         self.total_play_steps += 1
 
-        if done or (self.episode_env_steps >= self.skill.max_steps):
-            self.reset()
+        if self.episode_env_steps >= self.skill.max_steps:
             done = True
+
+        if done:
+            self.reset()
         return reward, done
 
     @torch.no_grad()
@@ -114,8 +118,8 @@ class CALVINSACAgent(Agent):
         succesful_episodes, episodes_returns, episodes_lengths = 0, [], []
         saved_video_path = None
         # Choose a random episode to record
-        rand_idx = np.random.randint(0, self.num_eval_episodes)
-        for episode in tqdm(range(0, self.num_eval_episodes)):
+        rand_idx = np.random.randint(1, self.num_eval_episodes + 1)
+        for episode in tqdm(range(1, self.num_eval_episodes + 1)):
             episode_env_steps = 0
             episode_return = 0
             self.obs = self.env.reset()

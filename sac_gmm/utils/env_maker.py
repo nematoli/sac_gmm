@@ -3,20 +3,23 @@ import hydra
 from hydra import initialize, compose
 from omegaconf import DictConfig
 from sac_gmm.envs.calvin.skill_env import SkillSpecificEnv
+from sac_gmm.envs.calvin.skill_env_v1 import CalvinSkillEnv
 
 
 def make_env(cfg_env: DictConfig):
     if cfg_env.env_name == "calvin":
-        env_cfg = {**cfg_env.calvin_env.env}
-        env_cfg["use_egl"] = False
-        env_cfg["show_gui"] = False
-        env_cfg["use_vr"] = False
-        env_cfg["use_scene_info"] = True
-        env_cfg["tasks"] = cfg_env.calvin_env.tasks
-        env_cfg.pop("_target_", None)
-        env_cfg.pop("_recursive_", None)
+        env = CalvinSkillEnv(cfg_env)
 
-        env = SkillSpecificEnv(**env_cfg)
+        # env_cfg = {**cfg_env.calvin_env.env}
+        # env_cfg["use_egl"] = False
+        # env_cfg["show_gui"] = False
+        # env_cfg["use_vr"] = False
+        # env_cfg["use_scene_info"] = True
+        # env_cfg["tasks"] = cfg_env.calvin_env.tasks
+        # env_cfg.pop("_target_", None)
+        # env_cfg.pop("_recursive_", None)
+
+        # env = SkillSpecificEnv(**env_cfg)
         # env.set_skill(cfg.skill)
         # env.set_state_type(cfg.state_type)
         # # TODO: find the transforms for this

@@ -4,6 +4,7 @@ from omegaconf import DictConfig
 from typing import Dict, Union, Any, List
 import numpy as np
 import torch
+import torch.nn as nn
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only
 from sac_gmm.datasets.rl_dataset import RLDataset
@@ -70,22 +71,26 @@ class SkillModel(pl.LightningModule):
         self.critic_tau = critic_tau
 
         # Entropy: Set target entropy to -|A|
+        # TODO: what would be a good init_alpha
+        self.alpha = init_alpha
+        self.log_alpha = nn.Parameter(torch.Tensor([np.log(init_alpha)]), requires_grad=True)
+
         self.target_entropy = -self.action_dim
-        self.log_alpha = torch.tensor(np.log(init_alpha))  # .to(device)
-        self.log_alpha.requires_grad = True
+
+        # self.log_alpha.requires_grad = True
         self.optimize_alpha = optimize_alpha
 
         # Optimizers
-        self.actor_lr, self.actor_betas = actor_lr, actor_betas
         self.critic_lr, self.critic_betas = critic_lr, critic_betas
+        self.actor_lr, self.actor_betas = actor_lr, actor_betas
         self.alpha_lr, self.alpha_betas = alpha_lr, alpha_betas
-        self.actor_optimizer, self.critic_optimizer, self.log_alpha_optimizer = self.configure_optimizers()
+        # self.configure_optimizers()
 
         # Populate Replay Buffer with Random Actions
         self.agent.populate_replay_buffer(self.actor, self.replay_buffer)
 
         # Logic values
-        self.episode_idx = torch.zeros(1, requires_grad=False)
+        self.episode_idx = nn.Parameter(torch.zeros(1), requires_grad=False)
         self.episode_return = 0
         self.episode_length = 0
         self.eval_frequency = eval_frequency
@@ -93,8 +98,15 @@ class SkillModel(pl.LightningModule):
         # PyTorch Lightning
         self.automatic_optimization = False
 
+        self.save_hyperparameters()
+
     def configure_optimizers(self):
         """Initialize optimizers"""
+        critic_optimizer = torch.optim.Adam(
+            filter(lambda p: p.requires_grad, self.critic.parameters()),
+            lr=self.critic_lr,
+            betas=self.critic_betas,
+        )
 
         actor_optimizer = torch.optim.Adam(
             filter(lambda p: p.requires_grad, self.actor.parameters()),
@@ -102,18 +114,14 @@ class SkillModel(pl.LightningModule):
             betas=self.actor_betas,
         )
 
-        critic_optimizer = torch.optim.Adam(
-            filter(lambda p: p.requires_grad, self.critic.parameters()),
-            lr=self.critic_lr,
-            betas=self.critic_betas,
-        )
-
         if self.optimize_alpha:
             log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.alpha_lr, betas=self.alpha_betas)
         else:
             log_alpha_optimizer = None
 
-        return (actor_optimizer, critic_optimizer, log_alpha_optimizer)
+        optimizers = [critic_optimizer, actor_optimizer, log_alpha_optimizer]
+
+        return optimizers
 
     def train_dataloader(self):
         """Initialize the Replay Buffer dataset used for retrieving experiences"""
@@ -138,7 +146,7 @@ class SkillModel(pl.LightningModule):
 
     @rank_zero_only
     def on_train_epoch_start(self) -> None:
-        logger.info(f"Starting training epoch {self.current_epoch}")
+        log_rank_0(f"Starting training epoch {self.current_epoch}")
 
     def training_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> Dict[str, Union[torch.Tensor, Any]]:
         """
@@ -149,23 +157,23 @@ class SkillModel(pl.LightningModule):
 
         raise NotImplementedError
 
-    def on_train_epoch_end(self):
-        raise NotImplementedError
+    # def on_train_epoch_end(self):
+    #     raise NotImplementedError
 
     def loss(self, batch) -> Dict[str, torch.Tensor]:
         raise NotImplementedError
 
-    def log_loss(self, loss: Dict[str, torch.Tensor], mode: str):
+    def log_loss(self, loss: Dict[str, torch.Tensor]):
         for key, val in loss.items():
             if loss[key] != 0:
                 info = key.split("/")
-                self.log(info[0] + "/{}_".format(mode) + info[1], loss[key], on_step=False, on_epoch=True)
+                self.log(info[0] + "/" + info[1], loss[key], on_step=True, on_epoch=False)
 
-    def log_metrics(self, metrics: Dict[str, torch.Tensor], mode: str, on_step: bool, on_epoch: bool):
+    def log_metrics(self, metrics: Dict[str, torch.Tensor], on_step: bool, on_epoch: bool):
         for key, val in metrics.items():
             if metrics[key] != 0:
                 info = key.split("/")
-                self.log(info[0] + "/{}-".format(mode) + info[1], metrics[key], on_step=on_step, on_epoch=on_epoch)
+                self.log(info[0] + "/" + info[1], metrics[key], on_step=on_step, on_epoch=on_epoch)
 
     def check_batch(self, batch):
         """Verifies if everything is as expected inside a batch"""

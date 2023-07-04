@@ -4,8 +4,8 @@ _recursive_: false
 calvin_env: ${env}
 datamodule: ${datamodule}
 
-num_init_steps: 2
-num_eval_episodes: 5
+num_init_steps: ${num_init_steps}
+num_eval_episodes: ${num_eval_episodes}
 
 skill: ${skill}
 

@@ -16,7 +16,9 @@ gripper_cam_link: 12
 use_nullspace: true
 max_velocity: 2
 use_ik_fast: false
+max_rel_pos: 1
+max_rel_orn: 1
 magic_scaling_factor_pos: 1 # 1.6
 magic_scaling_factor_orn: 1 # 2.2
-use_target_pose: true
+use_target_pose: false
 euler_obs: true
