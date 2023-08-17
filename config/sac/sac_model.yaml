@@ -1,8 +1,7 @@
 defaults:
   - default
-  - actor: densenet
-  - critic: densenet
-  - agent: sac_calvin
+  - actor: default
+  - critic: default
   - replay_buffer: default
 
 _target_: sac_gmm.models.sac_model.SAC

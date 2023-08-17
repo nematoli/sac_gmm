@@ -1,13 +1,9 @@
 import logging
-import hydra
 from omegaconf import DictConfig
-import os
-import gym
 import torch
 import numpy as np
 from tqdm import tqdm
 from pytorch_lightning.utilities import rank_zero_only
-from sac_gmm.utils.misc import transform_to_tensor
 from sac_gmm.utils.env_maker import make_env
 
 logger = logging.getLogger(__name__)
@@ -53,7 +49,7 @@ class Agent(object):
         self.episode_play_steps = 0
         self.episode_env_steps = 0
 
-    def get_state_dim(self, comp_repr_size=0):
+    def get_state_dim(self, feature_size=0):
         """Returns the size of the state based on env's observation space"""
         state_dim = 0
         observation_space = self.env.get_observation_space()
@@ -62,8 +58,8 @@ class Agent(object):
             state_dim += 3
         if "orientation" in keys:
             state_dim += 3
-        # if self.high_dim_key() in keys:
-        #     state_dim += comp_repr_size
+        if "rgb_gripper" in keys:
+            state_dim += feature_size
         return state_dim
 
     def get_action_space(self):
@@ -82,7 +78,7 @@ class Agent(object):
             self.play_step(actor=actor, strategy="random", replay_buffer=replay_buffer)
         replay_buffer.save()
 
-    def get_action(self, actor, observation, strategy="stochastic"):
+    def get_action(self, actor, observation, strategy="stochastic", device="cuda"):
         """Interface to get action from SAC Actor,
         ready to be used in the environment"""
         actor.eval()
@@ -96,9 +92,8 @@ class Agent(object):
             deterministic = True
         else:
             raise Exception("Strategy not implemented")
-        # observation = transform_to_tensor(observation, device=self.device)
-        observation = transform_to_tensor(observation)
-        action, _ = actor.get_actions(observation, deterministic=deterministic, reparameterize=False)
+        state = self.get_state_from_observation(actor.encoder, observation, device)
+        action, _ = actor.get_actions(state, deterministic=deterministic, reparameterize=False)
         actor.train()
         return action.detach().cpu().numpy()
 
@@ -114,4 +109,8 @@ class Agent(object):
 
     def sample_start_position(self, error_margin=0.01, max_checks=15):
         """Samples a random starting point and moves the end effector to that point"""
+        raise NotImplementedError
+
+    def get_state_from_observation(self, encoder, obs, device="cuda"):
+        """get state from observation"""
         raise NotImplementedError

@@ -6,4 +6,4 @@ name: close_drawer
 state_type: 'pos'
 
 # GMM params
-n_components: 5
+n_components: 3

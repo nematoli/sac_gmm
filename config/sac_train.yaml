@@ -1,10 +1,10 @@
 defaults:
   - setup
-  - skills_setup
+  - skill_setup
   - callbacks: default
   - datamodule: calvin_ds
-  - env: open_drawer # env
   - sac: sac_model
+  - agent: sac_gmm_calvin
   - logger: wandb
   - trainer: default
 

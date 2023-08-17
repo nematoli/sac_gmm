@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from sac_gmm.utils.distributions import TanhNormal
-from sac_gmm.utils.misc import get_state_from_observation
+from torch.distributions.normal import Normal
+from collections import OrderedDict
 
 
 LOG_SIG_MAX = 2
@@ -12,65 +13,68 @@ MEAN_MAX = 9.0
 
 
 class Actor(nn.Module):
-    def __init__(
-        self,
-        input_dim: int,
-        action_dim: int,
-        hidden_depth: int = 2,
-        hidden_dim: int = 256,
-        init_w: float = 1e-3,
-    ):
+    def __init__(self, input_dim, action_dim, hidden_dim=256):
         super(Actor, self).__init__()
         # Action parameters
         self.action_space = None
+        action_dim = action_dim
 
-        self.fc_layers = [nn.Linear(input_dim, hidden_dim)]
-        for i in range(hidden_depth - 1):
-            self.fc_layers.append(nn.Linear(hidden_dim, hidden_dim))
-        self.fc_layers = nn.ModuleList(self.fc_layers)
+        # TODO: replace ELU with SiLU
+        # TODO: Batchnorm?
+        self.fc_layers = nn.Sequential(
+            OrderedDict(
+                [
+                    ("fc_1", nn.Linear(input_dim, hidden_dim)),
+                    ("bn_1", nn.BatchNorm1d(hidden_dim)),
+                    ("elu_1", nn.ELU()),
+                    ("fc_2", nn.Linear(hidden_dim, hidden_dim)),
+                    ("bn_2", nn.BatchNorm1d(hidden_dim)),
+                    ("elu_2", nn.ELU()),
+                ]
+            )
+        )
         self.fc_mean = nn.Linear(hidden_dim, action_dim)
         self.fc_log_std = nn.Linear(hidden_dim, action_dim)
-        # https://arxiv.org/pdf/2006.05990.pdf
-        # recommends initializing the policy MLP with smaller weights in the last layer
-        self.fc_log_std.weight.data.uniform_(-init_w, init_w)
-        self.fc_log_std.bias.data.uniform_(-init_w, init_w)
-        self.fc_mean.weight.data.uniform_(-init_w, init_w)
-        self.fc_mean.bias.data.uniform_(-init_w, init_w)
 
-    def forward(self, observation, detach_encoder=False):
-        state = get_state_from_observation(self.hd_input_encoder, observation, detach_encoder)
-        num_layers = len(self.fc_layers)
-        state = F.silu(self.fc_layers[0](state))
-        for i in range(1, num_layers):
-            state = F.silu(self.fc_layers[i](state))
+    def forward(self, state):
+        single_dim = len(state.shape) == 1
+        if single_dim:
+            state = state.unsqueeze(0)
+
+        state = self.fc_layers(state)
         mean = self.fc_mean(state)
-        # mean = torch.clamp(mean, MEAN_MIN, MEAN_MAX)
         log_std = self.fc_log_std(state)
-        log_std = torch.clamp(log_std, LOG_SIG_MIN, LOG_SIG_MAX)
-        # log_std = torch.clamp(log_std, min=-20, max=2)  # Avoid -inf when std -> 0
+        # log_std = torch.clamp(log_std, LOG_SIG_MIN, LOG_SIG_MAX)
+        log_std = torch.clamp(log_std, min=-20, max=2)  # Avoid -inf when std -> 0
+        if single_dim:
+            mean = mean.squeeze()
+            log_std = log_std.squeeze()
 
-        std = log_std.exp()
-        return mean, std
+        return mean, log_std
 
-    def get_actions(
-        self,
-        state,
-        deterministic=False,
-        reparameterize=False,
-        detach_encoder=False,
-    ):
-        mean, std = self.forward(state, detach_encoder)
+    def get_actions(self, obs, deterministic=False, reparameterize=False, epsilon=1e-6):
+        mean, log_std = self.forward(obs)
         if deterministic:
             actions = torch.tanh(mean)
             log_pi = torch.zeros_like(actions)
         else:
-            tanh_normal = TanhNormal(mean, std)
-            if reparameterize:
-                actions, log_pi = tanh_normal.rsample_and_logprob()
-            else:
-                actions, log_pi = tanh_normal.sample_and_logprob()
-            return actions, log_pi
+            actions, log_pi = self.sample_actions(mean, log_std, reparameterize, epsilon=epsilon)
         return self.scale_actions(actions), log_pi
+
+    def sample_actions(self, means, log_stds, reparameterize, epsilon=1e-6):
+        stds = log_stds.exp()
+        normal = Normal(means, stds)
+        if reparameterize:
+            z = normal.rsample()
+        else:
+            z = normal.sample()
+        actions = torch.tanh(z)
+        log_pi = normal.log_prob(z) - torch.log(1 - actions.square() + epsilon)
+        log_pi = log_pi.sum(-1, keepdim=True)
+        return actions, log_pi
+
+    def set_action_space(self, action_space):
+        self.action_space = action_space
 
     def scale_actions(self, action):
         action_high = torch.tensor(self.action_space.high, dtype=torch.float, device=action.device)
@@ -78,3 +82,6 @@ class Actor(nn.Module):
         slope = (action_high - action_low) / 2
         action = action_low + slope * (action + 1)
         return action
+
+    def set_encoder(self, encoder):
+        self.encoder = encoder

@@ -33,63 +33,38 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-def play(env, dataset, max_steps, dt, render=False, record=False):
+def play(env, dataset, max_steps, render=False):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
-    succesful_rollouts, rollout_returns, rollout_lengths, failed_runs = 0, [], [], []
+    succesful_rollouts, failed_runs = 0, []
     for idx, (xi, d_xi) in enumerate(dataloader):
         log_rank_0(f"Trajectory {idx+1}/{len(dataset)}")
 
         x0 = xi.squeeze()[0, :].numpy()
-        rollout_return = 0
-        observation = env.reset()
-        current_state = observation["position"]
-        count = 0
-        error_margin = 0.01
-        while np.linalg.norm(x0 - current_state) >= error_margin:
-            dx = (x0 - current_state) / dt
-            observation, reward, done, info = env.step(dx)
-            current_state = observation["position"]
-            count += 1
-            if count >= 1000:
-                # x0 = current_state
-                log_rank_0("CALVIN is struggling to place the EE at the right initial pose")
-                log_rank_0(f"{np.linalg.norm(x0 - current_state)}")
-                break
-
-        if record:
-            log_rank_0("Recording Robot Camera Obs")
-            env.record_frame(size=64)
-
-        for step in range(max_steps - 1):
-            d_x = d_xi.squeeze()[step, :].numpy()
-            observation, reward, done, info = env.step(d_x)
-            rollout_return += reward
-            if record:
-                env.record_frame(size=64)
-            if render:
-                env.render()
-            if done:
-                break
-        status = None
-        if info["success"]:
-            succesful_rollouts += 1
-            status = "Success"
+        env.reset()
+        reached_target = env.calibrate_EE_start_state(desired_pos=x0)
+        if reached_target:
+            for step in range(max_steps):
+                d_x = d_xi.squeeze()[step, :].numpy()
+                observation, reward, done, info = env.step(d_x)
+                if render:
+                    env.render()
+                if done:
+                    break
+            if info["success"]:
+                succesful_rollouts += 1
+                status = "Success"
+            else:
+                status = "Fail"
+                failed_runs.append(idx)
         else:
             status = "Fail"
             failed_runs.append(idx)
 
         log_rank_0(f"{idx+1}: {status}!")
-        if record:
-            log_rank_0("Saving Robot Camera Obs")
-            video_path = env.save_recorded_frames(outdir=env.outdir, fname=idx)
-            env.reset_recorded_frames()
-            status = None
 
-        rollout_returns.append(rollout_return)
-        rollout_lengths.append(step)
     acc = succesful_rollouts / len(dataset.X)
 
-    return acc, np.mean(rollout_returns), np.mean(rollout_lengths), failed_runs
+    return acc, failed_runs
 
 
 @hydra.main(version_base="1.1", config_path="../../config", config_name="play_demos")
@@ -108,14 +83,7 @@ def play_demos(cfg: DictConfig) -> None:
     train_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
     log_rank_0(f"Skill: {cfg.skill.name}, Train Data: {train_dataset.X.size()}")
 
-    acc, avg_return, avg_len, failed = play(
-        env,
-        train_dataset,
-        max_steps=cfg.skill.max_steps,
-        render=cfg.render,
-        record=cfg.record,
-        dt=cfg.skill.dt,
-    )
+    acc, failed = play(env, train_dataset, max_steps=cfg.skill.max_steps, render=cfg.render)
     # Log evaluation output
     log_rank_0(f"{cfg.skill.name} Training Demos Accuracy: {round(acc, 2)}")
     if cfg.remove_failures:
@@ -126,13 +94,11 @@ def play_demos(cfg: DictConfig) -> None:
     val_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
     log_rank_0(f"Skill: {cfg.skill.name}, Validation Data: {val_dataset.X.size()}")
 
-    acc, avg_return, avg_len, failed = play(
+    acc, failed = play(
         env,
         val_dataset,
         max_steps=cfg.skill.max_steps,
         render=cfg.render,
-        record=cfg.record,
-        dt=cfg.skill.dt,
     )
     # Log evaluation output
     log_rank_0(f"{cfg.skill.name} Validation Demos Accuracy: {round(acc, 2)}")

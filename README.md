@@ -23,10 +23,18 @@ export SACGMM_ROOT=$(pwd)/sac_gmm
 Install requirements:
 ```bash
 cd SACGMM_ROOT
-conda create -n sacgmm_venv python=3.7
+conda create -n sacgmm_venv python=3.8
 conda activate sacgmm_venv
 sh install.sh
 ```
+
+
+For Development:
+```bash
+pip install -r requirements-dev.txt
+pre-commit install
+```
+
 
 ## Download
 Download the [CALVIN dataset](https://github.com/mees/calvin) and place it inside [dataset/](./dataset/). 

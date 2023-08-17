@@ -1,1 +1,1 @@
-from sac_gmm.envs.calvin.calvin_env_v0 import CalvinEnv as CalvinEnvV0
+from sac_gmm.envs.calvin.skill_env import CalvinSkillEnv

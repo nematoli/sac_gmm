@@ -150,18 +150,18 @@ class BaseGMM(object):
         self.means = np.array(gmm["mu"])
         self.covariances = np.array(gmm["sigma"])
 
-    def copy_model(self, dynsys):
+    def copy_model(self, gmm):
         """Copies GMM params to self from the input GMM class object
 
         Args:
-            dynsys (BaseGMM|ManifoldGMM|BayesianGMM): GMM class object
+            gmm (BaseGMM|ManifoldGMM|BayesianGMM): GMM class object
 
         Returns:
             None
         """
-        self.priors = np.copy(dynsys.priors)
-        self.means = np.copy(dynsys.means)
-        self.covariances = np.copy(dynsys.covariances)
+        self.priors = np.copy(gmm.priors)
+        self.means = np.copy(gmm.means)
+        self.covariances = np.copy(gmm.covariances)
 
     def update_model(self, delta):
         """Updates GMM parameters by given delta changes (i.e. SAC's output)
@@ -184,28 +184,29 @@ class BaseGMM(object):
             delta_means = delta["mu"].reshape(self.means.shape)
             self.means += delta_means
 
-        # Covariances
-        if "sigma" in delta:
-            d_sigma = delta["sigma"]
-            dim = self.means.shape[2] // 2
-            num_gaussians = self.means.shape[0]
+        pass
+        # # Covariances
+        # if "sigma" in delta:
+        #     d_sigma = delta["sigma"]
+        #     dim = self.means.shape[2] // 2
+        #     num_gaussians = self.means.shape[0]
 
-            # Create sigma_state symmetric matrix
-            half_mat_size = int(dim * (dim + 1) / 2)
-            for i in range(num_gaussians):
-                d_sigma_state = d_sigma[half_mat_size * i : half_mat_size * (i + 1)]
-                mat_d_sigma_state = np.zeros((dim, dim))
-                mat_d_sigma_state[np.triu_indices(dim)] = d_sigma_state
-                mat_d_sigma_state = mat_d_sigma_state + mat_d_sigma_state.T
-                mat_d_sigma_state[np.diag_indices(dim)] = mat_d_sigma_state[np.diag_indices(dim)] / 2
-                self.sigma[:dim, :dim, i] += mat_d_sigma_state
-                if not isPD(self.sigma[:dim, :dim, i]):
-                    self.sigma[:dim, :dim, i] = nearestPD(self.sigma[:dim, :dim, i])
+        #     # Create sigma_state symmetric matrix
+        #     half_mat_size = int(dim * (dim + 1) / 2)
+        #     for i in range(num_gaussians):
+        #         d_sigma_state = d_sigma[half_mat_size * i : half_mat_size * (i + 1)]
+        #         mat_d_sigma_state = np.zeros((dim, dim))
+        #         mat_d_sigma_state[np.triu_indices(dim)] = d_sigma_state
+        #         mat_d_sigma_state = mat_d_sigma_state + mat_d_sigma_state.T
+        #         mat_d_sigma_state[np.diag_indices(dim)] = mat_d_sigma_state[np.diag_indices(dim)] / 2
+        #         self.sigma[:dim, :dim, i] += mat_d_sigma_state
+        #         if not isPD(self.sigma[:dim, :dim, i]):
+        #             self.sigma[:dim, :dim, i] = nearestPD(self.sigma[:dim, :dim, i])
 
-            # Create sigma cross correlation matrix
-            d_sigma_cc = np.array(d_sigma[half_mat_size * num_gaussians :])
-            d_sigma_cc = d_sigma_cc.reshape((dim, dim, num_gaussians))
-            self.covariances[dim : 2 * dim, 0:dim] += d_sigma_cc
+        #     # Create sigma cross correlation matrix
+        #     d_sigma_cc = np.array(d_sigma[half_mat_size * num_gaussians :])
+        #     d_sigma_cc = d_sigma_cc.reshape((dim, dim, num_gaussians))
+        #     self.covariances[dim : 2 * dim, 0:dim] += d_sigma_cc
 
     def model_params(self, cov=False):
         """Returns GMM priors and means as a flattened vector

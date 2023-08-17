@@ -1,0 +1,3 @@
+_target_: sac_gmm.models.sac.networks.critic.base_critic.Critic
+input_dim: ???
+hidden_dim: 1024

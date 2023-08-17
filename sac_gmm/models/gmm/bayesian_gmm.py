@@ -68,3 +68,13 @@ class BayesianGMM(BaseGMM):
             covariances=self.covariances,
             random_state=self.random_state,
         )
+
+    def update_model(self, delta):
+        super().update_model(delta)
+        self.gmm.means = self.means
+        self.gmm.priors = self.priors
+
+    def copy_model(self, gmm):
+        super().copy_model(gmm)
+        self.gmm.means = self.means
+        self.gmm.priors = self.priors

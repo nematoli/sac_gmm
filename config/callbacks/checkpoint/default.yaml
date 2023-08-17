@@ -1,8 +1,9 @@
 _target_: pytorch_lightning.callbacks.ModelCheckpoint
-save_last: True
-save_top_k: 10
-monitor: 'eval_episode_return' 
-mode: 'max'
+_recursive_: false
+dirpath: ??
+filename: '{train_episode-number}-{eval_episode-avg-return}'
+monitor: 'eval_episode-avg-return' 
 verbose: True
-dirpath: ${model_dir}
-filename: '%s_{step:06d}_{val_episode_return:.3f}''
+save_last: True
+save_top_k: 5
+mode: 'max'

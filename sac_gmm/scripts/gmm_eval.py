@@ -33,35 +33,36 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-def evaluate(env, gmm, dataset, max_steps, dt, render=False, record=False):
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+def evaluate(env, gmm, target, max_steps, render=False, record=False):
     succesful_rollouts, rollout_returns, rollout_lengths = 0, [], []
-    for idx, (xi, d_xi) in enumerate(dataloader):
-        if (idx % 5 == 0) or (idx == len(dataset)):
-            log_rank_0(f"Test Trajectory {idx+1}/{len(dataset)}")
-        x0 = xi.squeeze()[0, :].numpy()
-        goal = dataset.goal
+    # for idx, (xi, d_xi) in enumerate(dataloader):
+    val_rollouts = 100
+    for idx in range(val_rollouts):
+        if (idx % 5 == 0) or (idx == val_rollouts):
+            log_rank_0(f"Test Trajectory {idx+1}/{val_rollouts}")
+        # x0 = xi.squeeze()[0, :].numpy()
+        goal = target
         rollout_return = 0
         observation = env.reset()
-        current_state = observation["position"]
-        # log_rank_0(f'Adjusting EE position to match the initial pose from the dataset')
-        count = 0
-        error_margin = 0.01
-        while np.linalg.norm(x0 - current_state) >= error_margin:
-            dx = (x0 - current_state) / dt
-            observation, reward, done, info = env.step(dx)
-            current_state = observation["position"]
-            count += 1
-            if count >= 300:
-                # x0 = current_state
-                log_rank_0("CALVIN is struggling to place the EE at the right initial pose")
-                log_rank_0(f"{np.linalg.norm(x0 - current_state)}")
-                break
-        # log_rank_0(f'Simulating with gmm')
-
-        if record:
-            log_rank_0("Recording Robot Camera Obs")
-            env.record_frame(size=64)
+        # current_state = observation["position"]
+        # # log_rank_0(f'Adjusting EE position to match the initial pose from the dataset')
+        # count = 0
+        # error_margin = 0.01
+        # while np.linalg.norm(x0 - current_state) >= error_margin:
+        #     dx = (x0 - current_state) / dt
+        #     observation, reward, done, info = env.step(dx)
+        #     current_state = observation["position"]
+        #     count += 1
+        #     if count >= 300:
+        #         # x0 = current_state
+        #         log_rank_0("CALVIN is struggling to place the EE at the right initial pose")
+        #         log_rank_0(f"{np.linalg.norm(x0 - current_state)}")
+        #         break
+        # # log_rank_0(f'Simulating with gmm')
+        # print("count from here")
+        # if record:
+        #     log_rank_0("Recording Robot Camera Obs")
+        #     env.record_frame(size=64)
 
         x = observation["position"]
         for step in range(max_steps):
@@ -91,8 +92,7 @@ def evaluate(env, gmm, dataset, max_steps, dt, render=False, record=False):
 
         rollout_returns.append(rollout_return)
         rollout_lengths.append(step)
-    acc = succesful_rollouts / len(dataset.X)
-    # wandb.config.update({"val dataset size": len(dataset.X)})
+    acc = succesful_rollouts / val_rollouts
     gmm.logger.log_table(
         key="stats",
         columns=["skill", "accuracy", "average_return", "average_traj_len"],
@@ -112,19 +112,15 @@ def eval_gmm(cfg: DictConfig) -> None:
     log_rank_0(f"Evaluating gmm for {cfg.skill.name} skill with {cfg.skill.state_type} as the input")
 
     # Load dataset
-    val_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
-    log_rank_0(f"Skill: {cfg.skill.name}, Validation Data: {val_dataset.X.size()}")
     # Obtain X_mins and X_maxs from training data to normalize in real-time
     cfg.datamodule.dataset.train = True
     train_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
-    val_dataset.goal = train_dataset.goal
 
     # Create and load models to evaluate
     gmm = hydra.utils.instantiate(cfg.gmm)
     gmm.load_model()
 
     if "Manifold" in gmm.name:
-        # cfg.dim = val_dataset.X.shape[-1]
         gmm.manifold = gmm.make_manifold()
 
     # Setup logger
@@ -134,15 +130,15 @@ def eval_gmm(cfg: DictConfig) -> None:
     # Evaluate by simulating in the CALVIN environment
     env = make_env(cfg.env)
     env.set_skill(cfg.skill)
+    env.set_init_pos(train_dataset.start)
 
     acc, avg_return, avg_len = evaluate(
         env,
         gmm,
-        val_dataset,
+        target=train_dataset.goal,
         max_steps=cfg.skill.max_steps,
         render=cfg.render,
         record=cfg.record,
-        dt=cfg.skill.dt,
     )
 
     # Log evaluation output

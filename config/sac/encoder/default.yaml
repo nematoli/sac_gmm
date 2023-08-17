@@ -1,0 +1,3 @@
+_target_: sac_gmm.models.sac.networks.vision.autoencoder.PTEncoder
+_recursive_: false
+model_name: cifar10-resnet18  # cifar10-resnet18, imagenet-resnet18, imagenet-resnet50, none

@@ -62,8 +62,7 @@ class CALVINDynSysDataset(Dataset):
             self.X = self.normalize(self.X)
 
         self.dX = np.zeros_like(self.X)
-        self.dX[:, :-2, :3] = (self.X[:, 2:, :3] - self.X[:, :-2, :3]) / self.dt
-        self.dX[:, -2, :3] = (self.X[:, -1, :3] - self.X[:, -2, :3]) / self.dt
+        self.dX[:, :-1, :3] = (self.X[:, 1:, :3] - self.X[:, :-1, :3]) / self.dt
         self.dX[:, -1, :3] = 0
 
         if self.state_type == "pos_ori":

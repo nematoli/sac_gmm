@@ -7,7 +7,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from pytorch_lightning.utilities import rank_zero_only
-from sac_gmm.models.sac.agent.agent import Agent
+from sac_gmm.models.agent.agent import Agent
 
 logger = logging.getLogger(__name__)
 

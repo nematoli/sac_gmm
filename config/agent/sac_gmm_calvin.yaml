@@ -1,4 +1,4 @@
-_target_: sac_gmm.models.sac.agent.sac_gmm_calvin.CALVINSACGMMAgent
+_target_: sac_gmm.models.agent.calvin.sac_gmm_calvin.CALVINSACGMMAgent
 _recursive_: false
 
 calvin_env: ${env}
@@ -6,6 +6,9 @@ datamodule: ${datamodule}
 
 num_init_steps: ${num_init_steps}
 num_eval_episodes: ${num_eval_episodes}
+
+priors_change_range: 0.0
+mu_change_range: 0.05
 
 skill: ${skill}
 gmm: ${gmm}

@@ -10,7 +10,7 @@ from pytorch_lightning import seed_everything, Trainer
 from pytorch_lightning.utilities import rank_zero_only
 from sac_gmm.utils.utils import print_system_env_info, setup_logger, setup_callbacks, get_last_checkpoint
 
-import sac_gmm.models.sac_model as models_m
+import sac_gmm.models.sac_gmm_model as models_m
 
 cwd_path = Path(__file__).absolute().parents[0]  # scripts
 sac_gmm_path = cwd_path.parents[0]

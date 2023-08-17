@@ -8,6 +8,8 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only
 from sac_gmm.datasets.rl_dataset import RLDataset
+from torch.utils.data import DataLoader
+
 
 logger = logging.getLogger(__name__)
 
@@ -29,68 +31,62 @@ class SkillModel(pl.LightningModule):
         discount: float,
         batch_size: int,
         replay_buffer: DictConfig,
-        agent: DictConfig,
+        encoder: DictConfig,
+        agent,
         actor: DictConfig,
         critic: DictConfig,
         actor_lr: float,
-        actor_betas: List[float],
         critic_lr: float,
         critic_tau: float,
-        critic_betas: List[float],
-        optimize_alpha: bool,
         alpha_lr: float,
         init_alpha: float,
-        alpha_betas: List[float],
         eval_frequency: int,
     ):
         super(SkillModel, self).__init__()
 
-        # self.device = device
         self.discount = discount
 
         self.batch_size = batch_size
         self.replay_buffer = hydra.utils.instantiate(replay_buffer)
 
+        # Encoder
+        self.encoder = hydra.utils.instantiate(encoder)
+
         # Agent
-        self.agent = hydra.utils.instantiate(agent)
+        self.agent = agent
         self.action_space = self.agent.get_action_space()
         self.action_dim = self.action_space.shape[0]
-        self.state_dim = self.agent.get_state_dim()
+        self.state_dim = self.agent.get_state_dim(feature_size=self.encoder.feature_size)
 
         # Actor
         actor.input_dim = self.state_dim
         actor.action_dim = self.action_dim
         self.actor = hydra.utils.instantiate(actor)  # .to(self.device)
-        self.actor.action_space = self.action_space
+        self.actor.set_action_space(self.action_space)
+        self.actor.set_encoder(self.encoder)
 
         # Critic
+        self.critic_tau = critic_tau
         critic.input_dim = self.state_dim + self.action_dim
+
         self.critic = hydra.utils.instantiate(critic)  # .to(device)
+
         self.critic_target = hydra.utils.instantiate(critic)  # .to(device)
         self.critic_target.load_state_dict(self.critic.state_dict())
-        self.critic_tau = critic_tau
 
         # Entropy: Set target entropy to -|A|
-        # TODO: what would be a good init_alpha
         self.alpha = init_alpha
         self.log_alpha = nn.Parameter(torch.Tensor([np.log(init_alpha)]), requires_grad=True)
-
         self.target_entropy = -self.action_dim
 
-        # self.log_alpha.requires_grad = True
-        self.optimize_alpha = optimize_alpha
-
         # Optimizers
-        self.critic_lr, self.critic_betas = critic_lr, critic_betas
-        self.actor_lr, self.actor_betas = actor_lr, actor_betas
-        self.alpha_lr, self.alpha_betas = alpha_lr, alpha_betas
-        # self.configure_optimizers()
+        self.critic_lr, self.actor_lr, self.alpha_lr = critic_lr, actor_lr, alpha_lr
 
         # Populate Replay Buffer with Random Actions
         self.agent.populate_replay_buffer(self.actor, self.replay_buffer)
 
         # Logic values
-        self.episode_idx = nn.Parameter(torch.zeros(1), requires_grad=False)
+        self.episode_idx = 0
         self.episode_return = 0
         self.episode_length = 0
         self.eval_frequency = eval_frequency
@@ -102,23 +98,9 @@ class SkillModel(pl.LightningModule):
 
     def configure_optimizers(self):
         """Initialize optimizers"""
-        critic_optimizer = torch.optim.Adam(
-            filter(lambda p: p.requires_grad, self.critic.parameters()),
-            lr=self.critic_lr,
-            betas=self.critic_betas,
-        )
-
-        actor_optimizer = torch.optim.Adam(
-            filter(lambda p: p.requires_grad, self.actor.parameters()),
-            lr=self.actor_lr,
-            betas=self.actor_betas,
-        )
-
-        if self.optimize_alpha:
-            log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.alpha_lr, betas=self.alpha_betas)
-        else:
-            log_alpha_optimizer = None
-
+        critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.critic_lr)
+        actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.actor_lr)
+        log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.alpha_lr)
         optimizers = [critic_optimizer, actor_optimizer, log_alpha_optimizer]
 
         return optimizers
@@ -126,9 +108,7 @@ class SkillModel(pl.LightningModule):
     def train_dataloader(self):
         """Initialize the Replay Buffer dataset used for retrieving experiences"""
         dataset = RLDataset(self.replay_buffer, self.batch_size)
-        dataloader = torch.utils.data.DataLoader(
-            dataset=dataset, batch_size=self.batch_size, num_workers=8, pin_memory=True
-        )
+        dataloader = DataLoader(dataset=dataset, batch_size=self.batch_size, num_workers=0, pin_memory=True)
         return dataloader
 
     @staticmethod
@@ -144,10 +124,6 @@ class SkillModel(pl.LightningModule):
         """
         raise NotImplementedError
 
-    @rank_zero_only
-    def on_train_epoch_start(self) -> None:
-        log_rank_0(f"Starting training epoch {self.current_epoch}")
-
     def training_step(self, batch: Dict[str, torch.Tensor], batch_idx: int) -> Dict[str, Union[torch.Tensor, Any]]:
         """
         Compute and return the training loss.
@@ -157,23 +133,19 @@ class SkillModel(pl.LightningModule):
 
         raise NotImplementedError
 
-    # def on_train_epoch_end(self):
-    #     raise NotImplementedError
-
     def loss(self, batch) -> Dict[str, torch.Tensor]:
         raise NotImplementedError
 
     def log_loss(self, loss: Dict[str, torch.Tensor]):
         for key, val in loss.items():
             if loss[key] != 0:
-                info = key.split("/")
-                self.log(info[0] + "/" + info[1], loss[key], on_step=True, on_epoch=False)
+                info = key.split("_")
+                self.log(info[0] + "_" + info[1], loss[key], on_step=True, on_epoch=False)
 
     def log_metrics(self, metrics: Dict[str, torch.Tensor], on_step: bool, on_epoch: bool):
         for key, val in metrics.items():
-            if metrics[key] != 0:
-                info = key.split("/")
-                self.log(info[0] + "/" + info[1], metrics[key], on_step=on_step, on_epoch=on_epoch)
+            info = key.split("_")
+            self.log(info[0] + "_" + info[1], metrics[key], on_step=on_step, on_epoch=on_epoch)
 
     def check_batch(self, batch):
         """Verifies if everything is as expected inside a batch"""
@@ -201,3 +173,9 @@ class SkillModel(pl.LightningModule):
             dones = dones.to(self.device)
         batch = obs, actions, reward, next_obs, dones
         return batch
+
+    def on_save_checkpoint(self, checkpoint_dict):
+        checkpoint_dict["episode_idx"] = self.episode_idx
+
+    def on_load_checkpoint(self, checkpoint_dict):
+        self.episode_idx = checkpoint_dict["episode_idx"]

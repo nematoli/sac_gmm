@@ -8,7 +8,7 @@ import numpy as np
 from tqdm import tqdm
 import copy
 from pytorch_lightning.utilities import rank_zero_only
-from sac_gmm.models.sac.agent.agent import Agent
+from sac_gmm.models.agent.agent import Agent
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,8 @@ class CALVINSACGMMAgent(Agent):
         num_eval_episodes: int,
         skill: DictConfig,
         gmm: DictConfig,
+        priors_change_range: float,
+        mu_change_range: float,
         adapt_cov: bool,
         mean_shift: bool,
         adapt_per_episode: int,
@@ -46,18 +48,14 @@ class CALVINSACGMMAgent(Agent):
         # Environment
         self.env.set_skill(self.skill)
 
-        # self.robot_obs, self.cam_obs = self.env.obs_allowed
-
-        # # TODO: find the transforms for this
-        # env.set_obs_transforms(cfg.datamodule.transforms)
-
         # GMM refine setup
         self.gmm = hydra.utils.instantiate(gmm)
         self.gmm.load_model()
         if "Manifold" in self.gmm.name:
             self.gmm.manifold = self.gmm.make_manifold()
         self.initial_gmm = copy.deepcopy(self.gmm)
-        self.dt = self.skill.dt
+        self.priors_change_range = priors_change_range
+        self.mu_change_range = mu_change_range
         self.adapt_cov = adapt_cov
         self.mean_shift = mean_shift
         self.adapt_per_episode = adapt_per_episode
@@ -72,12 +70,9 @@ class CALVINSACGMMAgent(Agent):
 
         # Dataset (helps with EE start positions)
         self.datamodule = hydra.utils.instantiate(datamodule)
+        self.target = self.datamodule.dataset.goal
+        self.env.set_init_pos(self.datamodule.dataset.start)
         self.reset()
-
-    def reset(self) -> None:
-        """Resets the environment, moves the EE to a good start state and updates the agent state"""
-        super().reset()
-        # self.obs = self.env.sample_start_position(self.datamodule.dataset)
 
     def get_action_space(self):
         parameter_space = self.get_update_range_parameter_space()
@@ -96,12 +91,12 @@ class CALVINSACGMMAgent(Agent):
         return self.action_space
 
     @torch.no_grad()
-    def play_step(self, actor, strategy="stochastic", replay_buffer=None):
+    def play_step(self, actor, strategy="stochastic", replay_buffer=None, device="cuda"):
         """Perform a step in the environment and add the transition
         tuple to the replay buffer"""
         # Change dynamical system
         self.gmm.copy_model(self.initial_gmm)
-        gmm_change = self.get_action(actor, self.obs, strategy)
+        gmm_change = self.get_action(actor, self.obs, strategy, device)
         self.update_gaussians(gmm_change)
 
         # Act with the dynamical system in the environment
@@ -112,7 +107,7 @@ class CALVINSACGMMAgent(Agent):
             if not conn:
                 done = False
                 break
-            dx = self.gmm.predict(curr_obs["position"] - self.datamodule.dataset.goal)
+            dx = self.gmm.predict(curr_obs["position"] - self.target)
             curr_obs, reward, done, info = self.env.step(dx)
             gmm_reward += reward
             self.episode_env_steps += 1
@@ -120,21 +115,21 @@ class CALVINSACGMMAgent(Agent):
             if done:
                 break
 
+        if self.episode_env_steps >= self.skill.max_steps:
+            done = True
+
         replay_buffer.add(self.obs, gmm_change, gmm_reward, curr_obs, done)
         self.obs = curr_obs
 
         self.episode_play_steps += 1
         self.total_play_steps += 1
 
-        if self.episode_env_steps >= self.skill.max_steps:
-            done = True
-
         if done or not conn:
             self.reset()
-        return reward, done
+        return gmm_reward, done
 
     @torch.no_grad()
-    def evaluate(self, actor):
+    def evaluate(self, actor, device="cuda"):
         """Evaluates the actor in the environment"""
         log_rank_0("Evaluation episodes in process")
         succesful_episodes, episodes_returns, episodes_lengths = 0, [], []
@@ -145,9 +140,6 @@ class CALVINSACGMMAgent(Agent):
             episode_return, episode_env_steps = 0, 0
 
             self.obs = self.env.reset()
-            # Start from a known starting point
-            # self.obs = self.env.sample_start_position(self.datamodule.dataset)
-
             # Recording setup
             if self.record and (episode == rand_idx):
                 self.env.reset_recorded_frames()
@@ -156,14 +148,14 @@ class CALVINSACGMMAgent(Agent):
             while episode_env_steps < self.skill.max_steps:
                 # Change dynamical system
                 self.gmm.copy_model(self.initial_gmm)
-                gmm_change = self.get_action(actor, self.obs, "deterministic")
+                gmm_change = self.get_action(actor, self.obs, "deterministic", device)
                 self.update_gaussians(gmm_change)
 
                 # Act with the dynamical system in the environment
                 # x = self.obs["position"]
 
                 for _ in range(self.gmm_window):
-                    dx = self.gmm.predict(self.obs["position"] - self.datamodule.dataset.goal)
+                    dx = self.gmm.predict(self.obs["position"] - self.target)
                     self.obs, reward, done, info = self.env.step(dx)
                     episode_return += reward
                     episode_env_steps += 1
@@ -210,32 +202,56 @@ class CALVINSACGMMAgent(Agent):
         """
         # TODO: make low and high config variables
         param_space = {}
-        param_space["priors"] = gym.spaces.Box(low=-0.1, high=0.1, shape=(self.gmm.priors.size,))
-        param_space["mu"] = gym.spaces.Box(low=-0.05, high=0.05, shape=(self.gmm.means.size,))
+        param_space["priors"] = gym.spaces.Box(
+            low=-self.priors_change_range, high=self.priors_change_range, shape=(self.gmm.priors.size,)
+        )
+        param_space["mu"] = gym.spaces.Box(
+            low=-self.mu_change_range, high=self.mu_change_range, shape=(self.gmm.means.size,)
+        )
 
-        dim = self.gmm.means.shape[1] // 2
-        num_gaussians = self.gmm.means.shape[0]
-        sigma_change_size = int(num_gaussians * dim * (dim + 1) / 2 + dim * dim * num_gaussians)
-        param_space["sigma"] = gym.spaces.Box(low=-1e-6, high=1e-6, shape=(sigma_change_size,))
+        # dim = self.gmm.means.shape[1] // 2
+        # num_gaussians = self.gmm.means.shape[0]
+        # sigma_change_size = int(num_gaussians * dim * (dim + 1) / 2 + dim * dim * num_gaussians)
+        # param_space["sigma"] = gym.spaces.Box(low=-1e-6, high=1e-6, shape=(sigma_change_size,))
         return gym.spaces.Dict(param_space)
 
     def update_gaussians(self, gmm_change):
         parameter_space = self.get_update_range_parameter_space()
+        size_priors = parameter_space["priors"].shape[0]
         size_mu = parameter_space["mu"].shape[0]
-        if self.mean_shift:
-            # TODO: check low and high here
-            mu = np.hstack([gmm_change.reshape((size_mu, 1)) * parameter_space["mu"].high] * self.gmm.means.shape[1])
 
-            change_dict = {"mu": mu}
-            self.gmm.update_model(change_dict)
-        else:
-            size_priors = parameter_space["priors"].shape[0]
+        priors = gmm_change[:size_priors] * parameter_space["priors"].high
+        mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
 
-            priors = gmm_change[:size_priors] * parameter_space["priors"].high
-            mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
+        change_dict = {"mu": mu, "priors": priors}
+        # if self.adapt_cov:
+        #     change_dict["sigma"] = gmm_change[size_priors + size_mu :] * parameter_space["sigma"].high
+        self.gmm.update_model(change_dict)
 
-            change_dict = {"mu": mu, "priors": priors}
-            # print("change: ", change_dict)
-            if self.adapt_cov:
-                change_dict["sigma"] = gmm_change[size_priors + size_mu :] * parameter_space["sigma"].high
-            self.gmm.update_model(change_dict)
+        # if self.mean_shift:
+        #     # TODO: check low and high here
+        #     mu = np.hstack([gmm_change.reshape((size_mu, 1)) * parameter_space["mu"].high] * self.gmm.means.shape[1])
+
+        #     change_dict = {"mu": mu}
+        #     self.gmm.update_model(change_dict)
+        # else:
+
+    def get_state_from_observation(self, encoder, obs, device="cuda"):
+        if isinstance(obs, dict):
+            # Robot obs
+            if "position" in obs:
+                fc_input = torch.tensor(obs["position"]).to(device)
+            if "orientation" in obs:
+                fc_input = torch.cat((fc_input, obs["orientation"].float()), dim=-1).to(device)
+            if "rgb_gripper" in obs:
+                x = obs["rgb_gripper"]
+                if not torch.is_tensor(x):
+                    x = torch.tensor(x).to(device)
+                if len(x.shape) < 4:
+                    x = x.unsqueeze(0)
+                features = encoder(x)
+                if features is not None:
+                    fc_input = torch.cat((fc_input, features.squeeze()), dim=-1)
+            return fc_input.float()
+
+        return obs.float()

@@ -22,6 +22,7 @@ class ReplayBuffer:
         self.last_saved_idx = 0
         self.replay_buffer = deque(maxlen=int(max_capacity))
         self.save_dir = save_dir
+        self.load()
 
     def __len__(self) -> int:
         return len(self.replay_buffer)
