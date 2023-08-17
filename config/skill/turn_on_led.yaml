@@ -1,0 +1,9 @@
+defaults:
+  - setup
+
+# Dataset params:
+name: turn_on_led
+state_type: 'pos'
+
+# GMM params
+n_components: 3

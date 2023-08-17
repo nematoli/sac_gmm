@@ -1,7 +1,7 @@
 defaults:
   - gmm: bayesian_gmm # manifold_gmm or bayesian_gmm
-  - skill: close_drawer # open_drawer / close_drawer /  
-  - env: close_drawer # open_drawer / close_drawer / ?
+  - skill: open_drawer # open_drawer / close_drawer /  
+  - env: new_default # open_drawer / close_drawer / ?
 
   - _self_
 

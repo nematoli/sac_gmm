@@ -7,5 +7,5 @@ log_dir: ${root}/logs
 demos_dir: ${root}/demonstrations
 exp_dir: null
 
-developer: "nematoli"
+developer: "lagandua"
 comment: ""
