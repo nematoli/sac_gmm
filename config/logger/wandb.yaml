@@ -3,6 +3,6 @@ save_dir: .
 name: sacgmm
 group: sacgmm
 log_model: false
-project: sacgmm
+project: sacgmm2
 entity: in-ac
 id: ???

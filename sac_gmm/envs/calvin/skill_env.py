@@ -227,7 +227,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
         observation_space = {}
         observation_space["position"] = gym.spaces.Box(low=-1, high=1, shape=[3])
         observation_space["rgb_gripper"] = gym.spaces.Box(low=-1, high=1, shape=(3, 84, 84))
-
+        observation_space["obs"] = gym.spaces.Box(low=-1, high=1, shape=[21])
         return gym.spaces.Dict(observation_space)
 
     def get_obs(self):
@@ -235,8 +235,9 @@ class CalvinSkillEnv(PlayTableSimEnv):
         nobs = {}
         robs = np.array(obs["robot_obs"])
         nobs["position"] = robs[GYM_POSITION_INDICES]
-        gr_rgb = obs["rgb_obs"]["rgb_gripper"]
-        nobs["rgb_gripper"] = np.moveaxis(gr_rgb, 2, 0)
+        # gr_rgb = obs["rgb_obs"]["rgb_gripper"]
+        # nobs["rgb_gripper"] = np.moveaxis(gr_rgb, 2, 0)
+        nobs["obs"] = np.concatenate([obs["robot_obs"], obs["scene_obs"]])[:21]
         return nobs
 
     def _success(self):

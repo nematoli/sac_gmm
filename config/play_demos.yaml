@@ -10,7 +10,7 @@ train: true # false to load validation dataset
 goal_centered: false # this must be false during evaluation
 
 # Environment params
-render: true
+render: false
 record: false
 
 hydra:

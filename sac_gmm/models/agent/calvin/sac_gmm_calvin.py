@@ -252,6 +252,8 @@ class CALVINSACGMMAgent(Agent):
                 features = encoder(x)
                 if features is not None:
                     fc_input = torch.cat((fc_input, features.squeeze()), dim=-1)
+            if "obs" in obs:
+                fc_input = torch.tensor(obs["obs"]).to(device)
             return fc_input.float()
 
         return obs.float()
