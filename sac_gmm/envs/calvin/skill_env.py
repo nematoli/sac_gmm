@@ -8,16 +8,17 @@ import gym
 import pybullet as p
 import pybullet_utils.bullet_client as bc
 import numpy as np
-
+import math
 from calvin_env.envs.play_table_env import PlayTableSimEnv
 
 logger = logging.getLogger(__name__)
 
 # here are the indices of data in the observation vector
 # here [0,1,2] - gripper position; [3,4,5] - gripper orientation, [14] - gripper action, [6] - gripper width
-GYM_POSITION_INDICES = np.array([0, 1, 2])
-GYM_ORIENTATION_INDICES = np.array([3, 4, 5])
-GYM_6D_INDICES = np.concatenate([GYM_POSITION_INDICES, GYM_ORIENTATION_INDICES])
+CALVIN_POSITION_INDICES = np.array([0, 1, 2])
+CALVIN_ORIENTATION_INDICES = np.array([3, 4, 5])
+CALVIN_JOINTS_INDICES = np.array([7, 8, 9, 10, 11, 12, 13])
+CALVIN_6D_INDICES = np.concatenate([CALVIN_POSITION_INDICES, CALVIN_ORIENTATION_INDICES])
 
 from gym.envs.registration import register
 
@@ -226,6 +227,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
         """Return only position and gripper_width by default"""
         observation_space = {}
         observation_space["position"] = gym.spaces.Box(low=-1, high=1, shape=[3])
+        observation_space["joints"] = gym.spaces.Box(low=-math.pi, high=math.pi, shape=[7])
         observation_space["rgb_gripper"] = gym.spaces.Box(low=-1, high=1, shape=(3, 84, 84))
 
         return gym.spaces.Dict(observation_space)
@@ -234,7 +236,8 @@ class CalvinSkillEnv(PlayTableSimEnv):
         obs = super(CalvinSkillEnv, self).get_obs()
         nobs = {}
         robs = np.array(obs["robot_obs"])
-        nobs["position"] = robs[GYM_POSITION_INDICES]
+        nobs["position"] = robs[CALVIN_POSITION_INDICES]
+        nobs["joints"] = robs[CALVIN_JOINTS_INDICES]
         gr_rgb = obs["rgb_obs"]["rgb_gripper"]
         nobs["rgb_gripper"] = np.moveaxis(gr_rgb, 2, 0)
         return nobs
