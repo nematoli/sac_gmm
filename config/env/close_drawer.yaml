@@ -4,8 +4,8 @@ defaults:
 
 # Environment params
 env_name: calvin
-
-# env_obs_allowed: ["pos", "rgb_static"] # Order is important = [robot_obs, camera_obs]
+ee_noise: ${ee_noise}
+obs_space: ${obs_space}
 
 calvin_env:
   show_gui: ${show_gui}

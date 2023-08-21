@@ -18,10 +18,13 @@ def calc_out_size(w, h, kernel_size, padding=0, stride=1):
 
 
 class PTEncoder(nn.Module):
-    def __init__(self, model_name):
+    def __init__(self, obs_space, model_name):
         super(PTEncoder, self).__init__()
         self.no_encoder = False
-        if model_name == "cifar10-resnet18":
+        if "gripper" not in obs_space:
+            self.no_encoder = True
+            self.feature_size = 0
+        elif model_name == "cifar10-resnet18":
             self.wrap = AE(input_height=32).from_pretrained("cifar10-resnet18").encoder
             self.mean = np.array([x / 255.0 for x in [125.3, 123.0, 113.9]])
             self.std = np.array([x / 255.0 for x in [63.0, 62.1, 66.7]])
@@ -35,8 +38,7 @@ class PTEncoder(nn.Module):
             self.feature_size = 512
             self.wrap.eval()
         else:
-            self.no_encoder = True
-            self.feature_size = 0
+            raise NotImplementedError
 
     def preprocess(self, x, mean, std):
         norm = T.Compose(

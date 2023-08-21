@@ -64,11 +64,9 @@ def evaluate(env, gmm, target, max_steps, render=False, record=False):
         #     log_rank_0("Recording Robot Camera Obs")
         #     env.record_frame(size=64)
 
-        x = observation["position"]
         for step in range(max_steps):
-            d_x = gmm.predict(x - goal)
+            d_x = gmm.predict(env.get_pos_from_obs(observation) - goal)
             observation, reward, done, info = env.step(d_x)
-            x = observation["position"]
             rollout_return += reward
             if record:
                 env.record_frame(size=64)

@@ -62,6 +62,8 @@ class Agent(object):
             state_dim += 7
         if "rgb_gripper" in keys:
             state_dim += feature_size
+        if "state" in keys:
+            state_dim += 21
         return state_dim
 
     def get_action_space(self):

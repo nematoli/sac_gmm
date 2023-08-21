@@ -1,10 +1,12 @@
 defaults:
-  - gmm: bayesian_gmm # manifold_gmm or bayesian_gmm
-  - skill: close_drawer # open_drawer / close_drawer /  
-  - env: close_drawer # open_drawer / close_drawer / ?
+  - gmm: manifold_gmm # manifold_gmm or bayesian_gmm
+  - skill: open_drawer # open_drawer / close_drawer /  
+  - env: open_drawer # open_drawer / close_drawer / ?
 
   - _self_
 
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 
+ee_noise: [0.1, 0.1, 0.05]
+obs_space: ["state", "gripper"] # ["state"], ["pos", "joints"], ["pos", "joints", "gripper"], ["state", "gripper"]

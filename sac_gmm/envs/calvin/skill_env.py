@@ -36,16 +36,13 @@ class CalvinSkillEnv(PlayTableSimEnv):
         super(CalvinSkillEnv, self).__init__(**pt_cfg)
 
         self.init_base_pos, self.init_base_orn = self.p.getBasePositionAndOrientation(self.robot.robot_uid)
-        self.ee_noise = np.array([0.1, 0.1, 0.05])
-        # self.ee_noise = np.array([0.0, 0.0, 0.0])
+        self.ee_noise = np.array(cfg.ee_noise)
+        self.obs_space = cfg.obs_space
 
         self.init_pos = None
 
         self.skill = None
         self.max_episode_steps = None
-
-        self.action_space = self.get_action_space()
-        self.observation_space = self.get_observation_space()
         self.tasks = hydra.utils.instantiate(cfg.calvin_env.tasks)
 
     def set_skill(self, skill):
@@ -187,9 +184,11 @@ class CalvinSkillEnv(PlayTableSimEnv):
         action = {}
         action["type"] = "cartesian_abs"
         action["action"] = np.concatenate([ee_pos, ee_orn, [-1]], axis=0)
-        obs = self.get_obs()
-        while np.linalg.norm(obs["position"] - ee_pos) > error_margin:
+        curr_pos = self.get_pos_from_obs(self.get_obs())
+
+        while np.linalg.norm(curr_pos - ee_pos) > error_margin:
             obs, _, _, _ = self.step(action)
+            curr_pos = self.get_pos_from_obs(obs)
             if count >= max_checks:
                 logger.info("CALVIN is struggling to place the EE at the right initial pose.")
                 if desired_pos is not None:
@@ -217,18 +216,25 @@ class CalvinSkillEnv(PlayTableSimEnv):
         self.calibrate_EE_start_state()
         return self.get_obs()
 
-    @staticmethod
-    def get_action_space():
+    # @staticmethod
+    def get_action_space(self):
         """End effector position and gripper width relative displacement"""
         return gym.spaces.Box(np.array([-1] * 7), np.array([1] * 7))
 
-    @staticmethod
-    def get_observation_space():
+    # @staticmethod
+    def get_observation_space(self):
         """Return only position and gripper_width by default"""
         observation_space = {}
-        observation_space["position"] = gym.spaces.Box(low=-1, high=1, shape=[3])
-        observation_space["joints"] = gym.spaces.Box(low=-math.pi, high=math.pi, shape=[7])
-        observation_space["rgb_gripper"] = gym.spaces.Box(low=-1, high=1, shape=(3, 84, 84))
+        if "pos" in self.obs_space:
+            observation_space["position"] = gym.spaces.Box(low=-1, high=1, shape=[3])
+        if "orn" in self.obs_space:
+            observation_space["orientation"] = gym.spaces.Box(low=-1, high=1, shape=[3])
+        if "joints" in self.obs_space:
+            observation_space["joints"] = gym.spaces.Box(low=-math.pi, high=math.pi, shape=[7])
+        if "gripper" in self.obs_space:
+            observation_space["rgb_gripper"] = gym.spaces.Box(low=-1, high=1, shape=(3, 84, 84))
+        if "state" in self.obs_space:
+            observation_space["state"] = gym.spaces.Box(low=-1, high=1, shape=[21])
 
         return gym.spaces.Dict(observation_space)
 
@@ -236,11 +242,28 @@ class CalvinSkillEnv(PlayTableSimEnv):
         obs = super(CalvinSkillEnv, self).get_obs()
         nobs = {}
         robs = np.array(obs["robot_obs"])
-        nobs["position"] = robs[CALVIN_POSITION_INDICES]
-        nobs["joints"] = robs[CALVIN_JOINTS_INDICES]
-        gr_rgb = obs["rgb_obs"]["rgb_gripper"]
-        nobs["rgb_gripper"] = np.moveaxis(gr_rgb, 2, 0)
+        if "pos" in self.obs_space:
+            nobs["position"] = robs[CALVIN_POSITION_INDICES]
+        if "orn" in self.obs_space:
+            nobs["orientation"] = robs[CALVIN_ORIENTATION_INDICES]
+        if "joints" in self.obs_space:
+            nobs["joints"] = robs[CALVIN_JOINTS_INDICES]
+        if "gripper" in self.obs_space:
+            gr_rgb = obs["rgb_obs"]["rgb_gripper"]
+            nobs["rgb_gripper"] = np.moveaxis(gr_rgb, 2, 0)
+        if "state" in self.obs_space:
+            nobs["state"] = np.concatenate([obs["robot_obs"], obs["scene_obs"]])[:21]
+
         return nobs
+
+    def get_pos_from_obs(self, obs):
+        if "pos" in self.obs_space:
+            curr_pos = obs["position"]
+        elif "state" in self.obs_space:
+            curr_pos = obs["state"][:3]
+        else:
+            raise NotImplementedError
+        return curr_pos
 
     def _success(self):
         """Returns a boolean indicating if the task was performed correctly"""

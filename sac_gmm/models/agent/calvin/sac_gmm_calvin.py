@@ -107,7 +107,8 @@ class CALVINSACGMMAgent(Agent):
             if not conn:
                 done = False
                 break
-            dx = self.gmm.predict(curr_obs["position"] - self.target)
+            pos = self.env.get_pos_from_obs(curr_obs)
+            dx = self.gmm.predict(pos - self.target)
             curr_obs, reward, done, info = self.env.step(dx)
             gmm_reward += reward
             self.episode_env_steps += 1
@@ -152,10 +153,9 @@ class CALVINSACGMMAgent(Agent):
                 self.update_gaussians(gmm_change)
 
                 # Act with the dynamical system in the environment
-                # x = self.obs["position"]
 
                 for _ in range(self.gmm_window):
-                    dx = self.gmm.predict(self.obs["position"] - self.target)
+                    dx = self.gmm.predict(self.env.get_pos_from_obs(self.obs) - self.target)
                     self.obs, reward, done, info = self.env.step(dx)
                     episode_return += reward
                     episode_env_steps += 1
@@ -248,6 +248,8 @@ class CALVINSACGMMAgent(Agent):
                 fc_input = torch.cat((fc_input, obs["orientation"].float()), dim=-1).to(device)
             if "joints" in obs:
                 fc_input = torch.cat((fc_input, torch.tensor(obs["joints"]).to(device)), dim=-1).to(device)
+            if "state" in obs:
+                fc_input = torch.tensor(obs["state"]).to(device)
             if "rgb_gripper" in obs:
                 x = obs["rgb_gripper"]
                 if not torch.is_tensor(x):
