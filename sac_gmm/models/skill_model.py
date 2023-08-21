@@ -38,6 +38,7 @@ class SkillModel(pl.LightningModule):
         actor_lr: float,
         critic_lr: float,
         critic_tau: float,
+        optimize_alpha: bool,
         alpha_lr: float,
         init_alpha: float,
         eval_frequency: int,
@@ -75,6 +76,7 @@ class SkillModel(pl.LightningModule):
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # Entropy: Set target entropy to -|A|
+        self.optimize_alpha = optimize_alpha
         self.alpha = init_alpha
         self.log_alpha = nn.Parameter(torch.Tensor([np.log(init_alpha)]), requires_grad=True)
         self.target_entropy = -self.action_dim
@@ -100,9 +102,10 @@ class SkillModel(pl.LightningModule):
         """Initialize optimizers"""
         critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.critic_lr)
         actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.actor_lr)
-        log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.alpha_lr)
-        optimizers = [critic_optimizer, actor_optimizer, log_alpha_optimizer]
-
+        optimizers = [critic_optimizer, actor_optimizer]
+        if self.optimize_alpha:
+            log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.alpha_lr)
+            optimizers.append(log_alpha_optimizer)
         return optimizers
 
     def train_dataloader(self):

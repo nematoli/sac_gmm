@@ -30,6 +30,7 @@ class SACGMM(SkillModel):
         actor_lr: float,
         critic_lr: float,
         critic_tau: float,
+        optimize_alpha: bool,
         alpha_lr: float,
         init_alpha: float,
         eval_frequency: int,
@@ -45,6 +46,7 @@ class SACGMM(SkillModel):
             actor_lr=actor_lr,
             critic_lr=critic_lr,
             critic_tau=critic_tau,
+            optimize_alpha=optimize_alpha,
             alpha_lr=alpha_lr,
             init_alpha=init_alpha,
             eval_frequency=eval_frequency,
@@ -97,7 +99,11 @@ class SACGMM(SkillModel):
         self.log_metrics(metrics, on_step=False, on_epoch=True)
 
     def loss(self, batch):
-        critic_optimizer, actor_optimizer, alpha_optimizer = self.optimizers()
+        if self.optimize_alpha:
+            critic_optimizer, actor_optimizer, alpha_optimizer = self.optimizers()
+        else:
+            critic_optimizer, actor_optimizer = self.optimizers()
+            alpha_optimizer = None
         critic_loss = self.compute_critic_loss(batch, critic_optimizer)
         actor_loss, alpha_loss = self.compute_actor_and_alpha_loss(batch, actor_optimizer, alpha_optimizer)
 
@@ -143,12 +149,14 @@ class SACGMM(SkillModel):
         self.manual_backward(actor_loss)
         actor_optimizer.step()
 
-        self.log_alpha = self.log_alpha.to(log_pi.device)
-        alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
-        alpha_optimizer.zero_grad()
-        self.manual_backward(alpha_loss)
-        alpha_optimizer.step()
-
-        self.alpha = self.log_alpha.exp()
+        if self.optimize_alpha:
+            self.log_alpha = self.log_alpha.to(log_pi.device)
+            alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
+            alpha_optimizer.zero_grad()
+            self.manual_backward(alpha_loss)
+            alpha_optimizer.step()
+            self.alpha = self.log_alpha.exp()
+        else:
+            alpha_loss = 0
 
         return actor_loss, alpha_loss
