@@ -1,0 +1,8 @@
+image_shape: [32, 32, 3]
+kernel_size: [4, 4, 4, 2]
+stride: [2, 2, 2, 1]
+conv_dim: [32, 64, 128, 256]
+cnn_act: relu
+embed_dim: 256
+hidden_dims: []
+dense_act: elu

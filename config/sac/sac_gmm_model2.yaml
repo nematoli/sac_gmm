@@ -1,0 +1,10 @@
+defaults:
+  - default
+  - encoder: tdmpc
+  - decoder: dreamer
+  - actor: default
+  - critic: default
+  - replay_buffer: default
+
+_target_: sac_gmm.models.sac_gmm_model2.SACGMM2
+_recursive_: false

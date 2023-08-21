@@ -231,8 +231,8 @@ class CalvinSkillEnv(PlayTableSimEnv):
         return gym.spaces.Dict(observation_space)
 
     def get_obs(self):
-        obs = super().get_obs()  # Do not need this if you are not using rgb gripper
-        # obs = self.get_state_obs()
+        obs = super().get_obs()  # Comment this out if you are not using rgb gripper
+        # obs = self.get_state_obs() # Comment above and uncomment this if you are just using state obs
         nobs = {}
         robs = np.array(obs["robot_obs"])
         nobs["position"] = robs[GYM_POSITION_INDICES]
