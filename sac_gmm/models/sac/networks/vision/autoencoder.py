@@ -36,7 +36,7 @@ class PTEncoder(nn.Module):
             self.wrap.eval()
         else:
             self.no_encoder = True
-            self.feature_size = 0
+            self.feature_size = 21
 
     def preprocess(self, x, mean, std):
         norm = T.Compose(

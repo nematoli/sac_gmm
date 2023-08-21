@@ -6,7 +6,7 @@ import tqdm
 import torch
 import pytorch_lightning
 from typing import Dict, List, Union
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning import Callback
 from pytorch_lightning.loggers import Logger
 
@@ -95,6 +95,9 @@ def setup_logger(cfg: DictConfig, name: str = None, evaluate: bool = False) -> L
         cfg.logger.id = cfg.logger.name.replace("/", "_")
 
     logger = hydra.utils.instantiate(cfg.logger)
+
+    logger.experiment.config.update(OmegaConf.to_container(cfg, resolve=True))
+    # logger.experiment.config.update(OmegaConf.to_container(cfg.agent, resolve=True))
 
     return logger
 
