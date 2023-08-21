@@ -202,9 +202,12 @@ class CALVINSACGMMAgent(Agent):
         """
         # TODO: make low and high config variables
         param_space = {}
-        param_space["priors"] = gym.spaces.Box(
-            low=-self.priors_change_range, high=self.priors_change_range, shape=(self.gmm.priors.size,)
-        )
+        if self.priors_change_range != 0:
+            param_space["priors"] = gym.spaces.Box(
+                low=-self.priors_change_range, high=self.priors_change_range, shape=(self.gmm.priors.size,)
+            )
+        else:
+            param_space["priors"] = gym.spaces.Box(low=0, high=0, shape=(0,))
         param_space["mu"] = gym.spaces.Box(
             low=-self.mu_change_range, high=self.mu_change_range, shape=(self.gmm.means.size,)
         )
@@ -243,6 +246,8 @@ class CALVINSACGMMAgent(Agent):
                 fc_input = torch.tensor(obs["position"]).to(device)
             if "orientation" in obs:
                 fc_input = torch.cat((fc_input, obs["orientation"].float()), dim=-1).to(device)
+            if "joints" in obs:
+                fc_input = torch.cat((fc_input, torch.tensor(obs["joints"]).to(device)), dim=-1).to(device)
             if "rgb_gripper" in obs:
                 x = obs["rgb_gripper"]
                 if not torch.is_tensor(x):

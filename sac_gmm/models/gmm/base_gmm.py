@@ -174,10 +174,11 @@ class BaseGMM(object):
         """
         # Priors
         if "priors" in delta:
-            delta_priors = delta["priors"].reshape(self.priors.shape)
-            self.priors += delta_priors
-            self.priors[self.priors < 0] = 0
-            self.priors /= self.priors.sum()
+            if len(delta["priors"]) != 0:
+                delta_priors = delta["priors"].reshape(self.priors.shape)
+                self.priors += delta_priors
+                self.priors[self.priors < 0] = 0
+                self.priors /= self.priors.sum()
 
         # Means
         if "mu" in delta:
