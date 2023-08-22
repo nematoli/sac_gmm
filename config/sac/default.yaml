@@ -14,7 +14,8 @@ critic_tau: 0.005
 
 #alpha
 alpha_lr: 3e-5
-init_alpha: 0.01
+init_alpha: 0.002
+fixed_alpha: true
 
 # #ae
 # ae_lr: 3e-4

@@ -40,6 +40,7 @@ class SkillModel(pl.LightningModule):
         critic_tau: float,
         alpha_lr: float,
         init_alpha: float,
+        fixed_alpha: bool,
         eval_frequency: int,
     ):
         super(SkillModel, self).__init__()
@@ -78,6 +79,7 @@ class SkillModel(pl.LightningModule):
         self.alpha = init_alpha
         self.log_alpha = nn.Parameter(torch.Tensor([np.log(init_alpha)]), requires_grad=True)
         self.target_entropy = -self.action_dim
+        self.fixed_alpha = fixed_alpha
 
         # Optimizers
         self.critic_lr, self.actor_lr, self.alpha_lr = critic_lr, actor_lr, alpha_lr

@@ -35,6 +35,10 @@ def train(cfg: DictConfig) -> None:
     cfg.callbacks.checkpoint.dirpath = model_dir
     os.makedirs(model_dir, exist_ok=True)
 
+    if cfg.seed is None:
+        import numpy as np
+
+        cfg.seed = np.random.randint(0, 10000)
     seed_everything(cfg.seed, workers=True)
 
     log_rank_0(f"Training a SAC-GMM skill with the following config:\n{OmegaConf.to_yaml(cfg)}")

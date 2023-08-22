@@ -32,6 +32,7 @@ class SACGMM(SkillModel):
         critic_tau: float,
         alpha_lr: float,
         init_alpha: float,
+        fixed_alpha: bool,
         eval_frequency: int,
     ):
         super(SACGMM, self).__init__(
@@ -47,6 +48,7 @@ class SACGMM(SkillModel):
             critic_tau=critic_tau,
             alpha_lr=alpha_lr,
             init_alpha=init_alpha,
+            fixed_alpha=fixed_alpha,
             eval_frequency=eval_frequency,
         )
         self.episode_done = False
@@ -143,12 +145,15 @@ class SACGMM(SkillModel):
         self.manual_backward(actor_loss)
         actor_optimizer.step()
 
-        self.log_alpha = self.log_alpha.to(log_pi.device)
-        alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
-        alpha_optimizer.zero_grad()
-        self.manual_backward(alpha_loss)
-        alpha_optimizer.step()
+        if not self.fixed_alpha:
+            self.log_alpha = self.log_alpha.to(log_pi.device)
+            alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
+            alpha_optimizer.zero_grad()
+            self.manual_backward(alpha_loss)
+            alpha_optimizer.step()
 
-        self.alpha = self.log_alpha.exp()
+            self.alpha = self.log_alpha.exp()
+        else:
+            alpha_loss = torch.tensor(0.0)
 
         return actor_loss, alpha_loss
