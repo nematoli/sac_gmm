@@ -58,6 +58,8 @@ class Agent(object):
             state_dim += 3
         if "orientation" in keys:
             state_dim += 3
+        if "robot_obs" in keys:
+            state_dim += 3
         if "rgb_gripper" in keys:
             state_dim += feature_size
         if "obs" in keys:

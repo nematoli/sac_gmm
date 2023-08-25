@@ -24,12 +24,13 @@ class BayesianGMM(BaseGMM):
 
         self.name = "BayesianGMM"
         self.random_state = np.random.RandomState(0)
+        self.skill = skill.skill
 
         self.max_iter = max_iter
         self.bgmm = BayesianGaussianMixture(n_components=self.n_components, max_iter=self.max_iter)
         self.gmm = None
         self.logger = None
-        self.model_dir = os.path.join(Path(skill.skills_dir).expanduser(), skill.name, skill.state_type, self.name)
+        self.model_dir = os.path.join(Path(skill.skills_dir).expanduser(), skill.skill, skill.state_type, self.name)
         os.makedirs(self.model_dir, exist_ok=True)
 
     def fit(self, dataset):
@@ -54,8 +55,8 @@ class BayesianGMM(BaseGMM):
 
         self.logger.log_table(key="fit", columns=["GMM"], data=[[wandb.Video(outfile)]])
 
-    def predict(self, x):
-        cgmm = self.gmm.condition([0, 1, 2], x.reshape(1, -1))
+    def predict_dx_pos(self, x):
+        cgmm = self.gmm.condition([0, 1, 2], (x - self.goal).reshape(1, -1))
         dx = cgmm.sample_confidence_region(1, alpha=0.7).reshape(-1)
         return dx
 

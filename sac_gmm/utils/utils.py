@@ -96,8 +96,8 @@ def setup_logger(cfg: DictConfig, name: str = None, evaluate: bool = False) -> L
 
     logger = hydra.utils.instantiate(cfg.logger)
 
+    # TODO: Check why this fails when running in multi-gpu mode
     logger.experiment.config.update(OmegaConf.to_container(cfg, resolve=True))
-    # logger.experiment.config.update(OmegaConf.to_container(cfg.agent, resolve=True))
 
     return logger
 

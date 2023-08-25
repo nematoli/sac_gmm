@@ -5,6 +5,8 @@ import sys
 import os
 import pkgutil
 import gym
+import cv2
+import imageio
 import pybullet as p
 import pybullet_utils.bullet_client as bc
 import numpy as np
@@ -187,7 +189,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
         action["type"] = "cartesian_abs"
         action["action"] = np.concatenate([ee_pos, ee_orn, [-1]], axis=0)
         obs = self.get_obs()
-        while np.linalg.norm(obs["position"] - ee_pos) > error_margin:
+        while np.linalg.norm(obs["robot_obs"][:3] - ee_pos) > error_margin:
             obs, _, _, _ = self.step(action)
             if count >= max_checks:
                 logger.info("CALVIN is struggling to place the EE at the right initial pose.")
@@ -219,25 +221,25 @@ class CalvinSkillEnv(PlayTableSimEnv):
     @staticmethod
     def get_action_space():
         """End effector position and gripper width relative displacement"""
-        return gym.spaces.Box(np.array([-1] * 7), np.array([1] * 7))
+        return gym.spaces.Box(low=-1, high=1, shape=(7,))
 
     @staticmethod
     def get_observation_space():
         """Return only position and gripper_width by default"""
         observation_space = {}
-        observation_space["position"] = gym.spaces.Box(low=-1, high=1, shape=[3])
+        # observation_space["position"] = gym.spaces.Box(low=-1, high=1, shape=(3,))
+        observation_space["robot_obs"] = gym.spaces.Box(low=-1, high=1, shape=(7,))
         observation_space["rgb_gripper"] = gym.spaces.Box(low=-1, high=1, shape=(3, 84, 84))
-        # observation_space["obs"] = gym.spaces.Box(low=-1, high=1, shape=[21])
+        # observation_space["obs"] = gym.spaces.Box(low=-1, high=1, shape=(21,))
         return gym.spaces.Dict(observation_space)
 
     def get_obs(self):
         obs = super().get_obs()  # Comment this out if you are not using rgb gripper
         # obs = self.get_state_obs() # Comment above and uncomment this if you are just using state obs
         nobs = {}
-        robs = np.array(obs["robot_obs"])
-        nobs["position"] = robs[GYM_POSITION_INDICES]
-        gr_rgb = obs["rgb_obs"]["rgb_gripper"]
-        nobs["rgb_gripper"] = np.moveaxis(gr_rgb, 2, 0)
+        # nobs["position"] = robs[GYM_POSITION_INDICES]
+        nobs["robot_obs"] = obs["robot_obs"][:7]
+        nobs["rgb_gripper"] = np.moveaxis(obs["rgb_obs"]["rgb_gripper"], 2, 0)
         # nobs["obs"] = np.concatenate([obs["robot_obs"], obs["scene_obs"]])[:21]
         return nobs
 
@@ -293,3 +295,29 @@ class CalvinSkillEnv(PlayTableSimEnv):
         info.update(r_info)
         info.update(d_info)
         return obs, reward, done, info
+
+    def record_frame(self, obs_type="rgb", cam_type="static", size=200):
+        """Record RGB obsservations"""
+        rgb_obs, depth_obs = self.get_camera_obs()
+        if obs_type == "rgb":
+            frame = rgb_obs[f"{obs_type}_{cam_type}"]
+        else:
+            frame = depth_obs[f"{obs_type}_{cam_type}"]
+        frame = cv2.resize(frame, (size, size), interpolation=cv2.INTER_AREA)
+        self.frames.append(frame)
+
+    def save_recording(self, outdir, fname):
+        """Save recorded frames as a video"""
+        if len(self.frames) == 0:
+            # This shouldn't happen but if it does, the function
+            # call exits gracefully
+            return None
+        fname = f"{fname}.gif"
+        kargs = {"duration": 33}
+        fpath = os.path.join(outdir, fname)
+        imageio.mimsave(fpath, np.array(self.frames), "GIF", **kargs)
+        return fpath
+
+    def reset_recording(self):
+        """Reset recorded frames"""
+        self.frames = []

@@ -71,8 +71,8 @@ class SACGMM(SkillModel):
         self.soft_update(self.critic_target, self.critic, self.critic_tau)
 
     def on_train_epoch_end(self):
-        metrics = {"eval_episode-avg-return": float("-inf")}
         if self.episode_done:
+            metrics = {"eval_episode-avg-return": float("-inf")}
             log_rank_0(f"episode {self.episode_idx} done")
             train_metrics = {
                 "train_episode-return": self.episode_return,
@@ -96,7 +96,7 @@ class SACGMM(SkillModel):
             self.episode_idx += 1
 
             self.replay_buffer.save()
-        self.log_metrics(metrics, on_step=False, on_epoch=True)
+            self.log_metrics(metrics, on_step=False, on_epoch=True)
 
     def loss(self, batch):
         critic_optimizer, actor_optimizer, alpha_optimizer = self.optimizers()

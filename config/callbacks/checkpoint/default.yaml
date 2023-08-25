@@ -5,5 +5,5 @@ filename: '{train_episode-number}-{eval_episode-avg-return}'
 monitor: 'eval_episode-avg-return' 
 verbose: True
 save_last: True
-save_top_k: 5
+save_top_k: 20
 mode: 'max'

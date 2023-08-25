@@ -43,16 +43,24 @@ class CALVINSACGMMAgent(Agent):
             num_eval_episodes=num_eval_episodes,
         )
 
+        skill.skill = skill.name  # This is a hack to make things consistent with TaskActorWithNSACGMM
         self.skill = skill
 
         # Environment
         self.env.set_skill(self.skill)
 
+        # Dataset
+
+        datamodule.dataset.skill.skill = datamodule.dataset.skill.name
+        self.datamodule = hydra.utils.instantiate(datamodule)
+
         # GMM refine setup
+        gmm.skill.skill = gmm.skill.name
         self.gmm = hydra.utils.instantiate(gmm)
         self.gmm.load_model()
         if "Manifold" in self.gmm.name:
             self.gmm.manifold = self.gmm.make_manifold()
+        self.gmm.set_skill_params(self.datamodule.dataset)
         self.initial_gmm = copy.deepcopy(self.gmm)
         self.priors_change_range = priors_change_range
         self.mu_change_range = mu_change_range
@@ -62,16 +70,12 @@ class CALVINSACGMMAgent(Agent):
         self.gmm_window = self.skill.max_steps // self.adapt_per_episode
 
         # # record setup
-        # self.video_dir = os.path.join(exp_dir, "videos")
-        # os.makedirs(self.video_dir, exist_ok=True)
-        # self.env.set_outdir(self.video_dir)
+        self.video_dir = os.path.join(exp_dir, "videos")
+        os.makedirs(self.video_dir, exist_ok=True)
         self.render = render
         self.record = record
 
-        # Dataset (helps with EE start positions)
-        self.datamodule = hydra.utils.instantiate(datamodule)
-        self.target = self.datamodule.dataset.goal
-        self.env.set_init_pos(self.datamodule.dataset.start)
+        self.env.set_init_pos(self.gmm.start)
         self.reset()
 
     def get_action_space(self):
@@ -107,8 +111,9 @@ class CALVINSACGMMAgent(Agent):
             if not conn:
                 done = False
                 break
-            dx = self.gmm.predict(curr_obs["position"] - self.target)
-            curr_obs, reward, done, info = self.env.step(dx)
+            dx_pos, dx_ori = self.gmm.predict(curr_obs["robot_obs"])
+            env_action = np.append(dx_pos, np.append(dx_ori, -1))
+            curr_obs, reward, done, info = self.env.step(env_action)
             gmm_reward += reward
             self.episode_env_steps += 1
             self.total_env_steps += 1
@@ -142,7 +147,7 @@ class CALVINSACGMMAgent(Agent):
             self.obs = self.env.reset()
             # Recording setup
             if self.record and (episode == rand_idx):
-                self.env.reset_recorded_frames()
+                self.env.reset_recording()
                 self.env.record_frame(size=64)
 
             while episode_env_steps < self.skill.max_steps:
@@ -152,11 +157,10 @@ class CALVINSACGMMAgent(Agent):
                 self.update_gaussians(gmm_change)
 
                 # Act with the dynamical system in the environment
-                # x = self.obs["position"]
-
                 for _ in range(self.gmm_window):
-                    dx = self.gmm.predict(self.obs["position"] - self.target)
-                    self.obs, reward, done, info = self.env.step(dx)
+                    dx_pos, dx_ori = self.gmm.predict(self.obs["robot_obs"])
+                    env_action = np.append(dx_pos, np.append(dx_ori, -1))
+                    self.obs, reward, done, info = self.env.step(env_action)
                     episode_return += reward
                     episode_env_steps += 1
 
@@ -175,11 +179,11 @@ class CALVINSACGMMAgent(Agent):
                 succesful_episodes += 1
             # Recording setup close
             if self.record and (episode == rand_idx):
-                video_path = self.env.save_recorded_frames(
+                video_path = self.env.save_recording(
                     outdir=self.video_dir,
                     fname=f"{self.total_play_steps}_{self.total_env_steps }_{episode}",
                 )
-                self.env.reset_recorded_frames()
+                self.env.reset_recording()
                 saved_video_path = video_path
 
             episodes_returns.append(episode_return)
@@ -243,6 +247,11 @@ class CALVINSACGMMAgent(Agent):
                 fc_input = torch.tensor(obs["position"]).to(device)
             if "orientation" in obs:
                 fc_input = torch.cat((fc_input, obs["orientation"].float()), dim=-1).to(device)
+            if "robot_obs" in obs:
+                if obs["robot_obs"].ndim > 1:
+                    fc_input = torch.tensor(obs["robot_obs"][:, :3]).to(device)
+                else:
+                    fc_input = torch.tensor(obs["robot_obs"][:3]).to(device)
             if "rgb_gripper" in obs:
                 x = obs["rgb_gripper"]
                 if not torch.is_tensor(x):
@@ -252,8 +261,9 @@ class CALVINSACGMMAgent(Agent):
                 features = encoder(x)
                 if features is not None:
                     fc_input = torch.cat((fc_input, features.squeeze()), dim=-1)
-            if "obs" in obs:
-                fc_input = torch.tensor(obs["obs"]).to(device)
+                # fc_input = features.squeeze()
+            # if "obs" in obs:
+            #     fc_input = torch.cat((fc_input, torch.tensor(obs["obs"]).to(device)), dim=-1)
             return fc_input.float()
 
         return obs.float()

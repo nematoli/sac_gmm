@@ -57,6 +57,11 @@ class BaseGMM(object):
         self.plot = plot
         self.model_dir = model_dir
         self.state_type = state_type
+        self.pos_dt = None
+        self.ori_dt = None
+        self.goal = None
+        self.start = None
+        self.fixed_ori = None
 
         self.name = "GMM"
 
@@ -103,6 +108,13 @@ class BaseGMM(object):
 
         return data
 
+    def set_skill_params(self, dataset):
+        self.pos_dt = dataset.pos_dt
+        self.ori_dt = dataset.ori_dt
+        self.fixed_ori = dataset.fixed_ori
+        self.goal = dataset.goal
+        self.start = dataset.start
+
     def set_data_params(self, dataset):
         self.dataset = dataset
         self.dim = self.dataset.X.numpy().shape[-1]
@@ -116,7 +128,7 @@ class BaseGMM(object):
         """
         raise NotImplementedError
 
-    def predict(self, x):
+    def predict_dx_pos(self, x):
         """Infers the remaining state at the partially defined point x.
 
         Args:
@@ -276,3 +288,17 @@ class BaseGMM(object):
         for n in range(self.data.shape[0]):
             reshaped_data[n] = [self.data[n, : self.dim], self.data[n, self.dim :]]
         return reshaped_data
+
+    def predict(self, x):
+        return self.predict_dx_pos(x[:3]), self.predict_dx_ori(x[3:6])
+
+    def normalize_angle(self, angle):
+        """Normalizes the input angle to the range [-pi, pi)."""
+        return (angle + np.pi) % (2 * np.pi) - np.pi
+
+    def get_minimal_rotation(self, current_angles):
+        """Computes the minimal rotation required to get from current_angles to goal_angles."""
+        return self.normalize_angle(self.fixed_ori - current_angles) / self.ori_dt
+
+    def predict_dx_ori(self, x):
+        return self.get_minimal_rotation(x)

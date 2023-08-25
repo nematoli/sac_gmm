@@ -36,10 +36,11 @@ class ManifoldGMM(BaseGMM):
         )
 
         self.name = "ManifoldGMM"
+        self.skill = skill.skill
 
         self.manifold = None
         self.logger = None
-        self.model_dir = os.path.join(Path(skill.skills_dir).expanduser(), skill.name, skill.state_type, self.name)
+        self.model_dir = os.path.join(Path(skill.skills_dir).expanduser(), skill.skill, skill.state_type, self.name)
         os.makedirs(self.model_dir, exist_ok=True)
 
     def make_manifold(self):
@@ -100,14 +101,17 @@ class ManifoldGMM(BaseGMM):
 
         self.logger.log_table(key="fit", columns=["GMM"], data=[[wandb.Video(outfile)]])
 
-    def predict(self, x):
+    def load_model(self):
+        super().load_model()
+
+    def predict_dx_pos(self, x):
         self.reshape_params(to="gmr-specific")
         if self.state_type == "pos_ori":
             out_manifold_idx = [1, 2]
         else:
             out_manifold_idx = [1]
         dx, _, __ = manifold_gmr(
-            x.reshape(1, -1),
+            (x - self.goal).reshape(1, -1),
             self.manifold,
             self.means,
             self.covariances,
@@ -117,6 +121,3 @@ class ManifoldGMM(BaseGMM):
         )
         self.reshape_params(to="generic")
         return dx[0]
-
-    def load_model(self):
-        super().load_model()

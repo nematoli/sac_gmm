@@ -22,7 +22,8 @@ class CALVINDynSysDataset(Dataset):
         self.goal_centered = goal_centered
         self.demos_dir = Path(demos_dir).expanduser()
         self.state_type = self.skill.state_type
-        self.dt = self.skill.dt
+        self.pos_dt = self.skill.pos_dt
+        self.ori_dt = self.skill.ori_dt
         self.normalized = self.skill.normalized
         self.norm_range = [-1, 1]
         self.X_mins = None
@@ -35,15 +36,21 @@ class CALVINDynSysDataset(Dataset):
         else:
             fname = "validation"
         assert self.demos_dir.is_dir(), "Demos directory does not exist!"
-        self.data_file = glob.glob(str(self.demos_dir / self.skill.name / f"{fname}.npy"))[0]
+        self.data_file = glob.glob(str(self.demos_dir / self.skill.skill / f"{fname}.npy"))[0]
 
         start_idx, end_idx = self.get_valid_columns(self.state_type)
         self.X = np.load(self.data_file)[:, :, start_idx:end_idx]
 
         # Get the last orientation from the trajectory (this is bad for orientation dependant tasks)
-        s_idx, e_idx = self.get_valid_columns("ori")
-        temp_ori = np.load(self.data_file)[:, :, s_idx:e_idx]
-        self.fixed_ori = temp_ori[0, -1, :]
+        # s_idx, e_idx = self.get_valid_columns("ori")
+        # temp_ori = np.load(self.data_file)[:, :, s_idx:e_idx]
+        # self.fixed_ori = temp_ori[0, -1, :]
+
+        # Get the euler angles best for the skill
+        if self.skill.skill in ["open_drawer", "close_drawer", "turn_on_led"]:
+            self.fixed_ori = np.array([3.14, 0.0, 1.5])
+        elif self.skill.skill in ["turn_on_lightbulb", "move_slider_left"]:
+            self.fixed_ori = np.array([3.14, -0.5, 1.5])
 
         if self.state_type == "ori" and self.is_quaternion:
             self.X = np.apply_along_axis(p.getQuaternionFromEuler, -1, self.X)
@@ -62,8 +69,8 @@ class CALVINDynSysDataset(Dataset):
             self.X = self.normalize(self.X)
 
         self.dX = np.zeros_like(self.X)
-        self.dX[:, :-1, :3] = (self.X[:, 1:, :3] - self.X[:, :-1, :3]) / self.dt
-        self.dX[:, -1, :3] = 0
+        self.dX[:, :-1, :3] = (self.X[:, 1:, :3] - self.X[:, :-1, :3]) / self.pos_dt
+        self.dX[:, -1, :3] = np.zeros(self.dX.shape[-1])
 
         if self.state_type == "pos_ori":
             self.Ori = self.X[:, :, 3:]

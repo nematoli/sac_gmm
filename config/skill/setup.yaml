@@ -1,8 +1,11 @@
 skills_dir: ${root}/skills_ds
 
-dt: 0.02
+pos_dt: 0.02
+ori_dt: 0.05
 normalized: false
 is_quaternion: false
 
 # Evaluation and DS params
 max_steps: 64
+
+skill: null
