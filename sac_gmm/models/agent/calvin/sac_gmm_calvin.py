@@ -112,8 +112,8 @@ class CALVINSACGMMAgent(Agent):
                 done = False
                 break
             dx_pos, dx_ori = self.gmm.predict(curr_obs["robot_obs"])
-            env_action = np.append(dx_pos, np.append(dx_ori, -1))
-            curr_obs, reward, done, info = self.env.step(env_action)
+            # env_action = np.append(dx_pos, np.append(dx_ori, -1))
+            curr_obs, reward, done, info = self.env.step(dx_pos)
             gmm_reward += reward
             self.episode_env_steps += 1
             self.total_env_steps += 1
@@ -159,8 +159,8 @@ class CALVINSACGMMAgent(Agent):
                 # Act with the dynamical system in the environment
                 for _ in range(self.gmm_window):
                     dx_pos, dx_ori = self.gmm.predict(self.obs["robot_obs"])
-                    env_action = np.append(dx_pos, np.append(dx_ori, -1))
-                    self.obs, reward, done, info = self.env.step(env_action)
+                    # env_action = np.append(dx_pos, np.append(dx_ori, -1))
+                    self.obs, reward, done, info = self.env.step(dx_pos)
                     episode_return += reward
                     episode_env_steps += 1
 

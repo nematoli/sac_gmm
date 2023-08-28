@@ -41,11 +41,6 @@ class CALVINDynSysDataset(Dataset):
         start_idx, end_idx = self.get_valid_columns(self.state_type)
         self.X = np.load(self.data_file)[:, :, start_idx:end_idx]
 
-        # Get the last orientation from the trajectory (this is bad for orientation dependant tasks)
-        # s_idx, e_idx = self.get_valid_columns("ori")
-        # temp_ori = np.load(self.data_file)[:, :, s_idx:e_idx]
-        # self.fixed_ori = temp_ori[0, -1, :]
-
         # Get the euler angles best for the skill
         if self.skill.skill in ["open_drawer", "close_drawer", "turn_on_led"]:
             self.fixed_ori = np.array([3.14, 0.0, 1.5])
