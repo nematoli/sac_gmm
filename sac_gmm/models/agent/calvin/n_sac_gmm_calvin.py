@@ -10,7 +10,7 @@ from tqdm import tqdm
 import copy
 from pytorch_lightning.utilities import rank_zero_only
 from sac_gmm.models.agent.agent import Agent
-from sac_gmm.models.task_actor import TaskActorWithNSACGMM
+from sac_gmm.models.skill_actor_nsacgmm import SkillActorWithNSACGMM
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +70,8 @@ class CALVIN_NSACGMMAgent(Agent):
         self.adapt_per_skill = adapt_per_skill
         self.gmm_window = self.task.max_steps // (self.adapt_per_skill * len(self.task.skills))
 
-        # One TaskActor per set of skills
-        self.actor = TaskActorWithNSACGMM(self.task)
+        # One SkillActorWithNSACGMM per set of skills
+        self.actor = SkillActorWithNSACGMM(self.task)
         # The order of skills inside actor should always be the same as the order of skills in the SKILLS enum
         self.actor.skill_names = [e.name for e in SKILLS]
         # GMM

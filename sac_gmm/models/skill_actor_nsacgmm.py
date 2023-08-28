@@ -6,7 +6,7 @@ import hydra
 import torch
 
 
-class TaskActorWithNSACGMM:
+class SkillActorWithNSACGMM:
     """
     This class handles all functions related to CALVIN skills
     """
