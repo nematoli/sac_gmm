@@ -79,7 +79,7 @@ class Agent(object):
         """
         log_rank_0("Populating replay buffer with random warm up steps")
         for _ in tqdm(range(self.num_init_steps)):
-            self.play_step(actor=actor, strategy="random", replay_buffer=replay_buffer)
+            self.play_step(actor, strategy="random", replay_buffer=replay_buffer)
         replay_buffer.save()
 
     def get_action(self, actor, observation, strategy="stochastic", device="cuda"):

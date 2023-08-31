@@ -1,6 +1,6 @@
 defaults:
   - gmm: manifold_gmm # manifold_gmm or bayesian_gmm
-  - task: ABCD # open_drawer / close_drawer /  
+  - skill: ABCD # open_drawer / close_drawer /  
   - env: default_task # open_drawer / close_drawer / ?
 
   - _self_

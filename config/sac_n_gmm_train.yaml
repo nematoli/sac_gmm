@@ -1,0 +1,41 @@
+defaults:
+  - setup
+  - task_setup
+  - callbacks: default
+  - datamodule: calvin_ds
+  - sac: sac_n_gmm_model
+  - agent: sac_n_gmm_calvin
+  - logger: wandb
+  - trainer: default
+
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+  - _self_
+
+show_gui: true
+# evaluation frequency:
+eval_frequency: 50
+num_init_steps: 256
+num_eval_episodes: 10
+
+# Dataset params:
+train: true # false to load validation dataset
+goal_centered: true # this must be false during evaluation
+
+# Visualization
+render: false
+record: true
+
+logger.group: sac-n-gmm-train
+
+hydra:
+  run:
+    dir: ${log_dir}/sac-n-gmm-train/${now:%Y_%m_%d}/${now:%H_%M_%S}
+  sweep:
+    dir: ${log_dir}/sac-n-gmm-train/${now:%Y_%m_%d}/${now:%H_%M_%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir

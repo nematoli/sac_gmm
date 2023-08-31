@@ -8,4 +8,4 @@ state_type: 'pos'
 
 # GMM params
 n_components: 3
-max_steps: 360
+max_steps: 180

@@ -1,6 +1,6 @@
 deterministic: true
 accelerator: gpu
-devices: auto
+devices: 1 #auto
 strategy: auto #"ddp", "ddp_spawn", "deepspeed"
 precision: 32
 max_epochs: -1
