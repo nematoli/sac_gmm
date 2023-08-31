@@ -10,7 +10,7 @@ num_eval_episodes: ${num_eval_episodes}
 priors_change_range: 0.0
 mu_change_range: 0.05
 
-task: ${task}
+task: ${skill}
 gmm: ${gmm}
 adapt_cov: false
 mean_shift: false

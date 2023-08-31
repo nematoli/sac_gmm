@@ -21,6 +21,8 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
+# This helps load each skill's model checkpoints in an set order
+# irrespective of the skill order given in the config file
 class SKILLS(Enum):
     open_drawer = 0
     turn_on_lightbulb = 1
@@ -75,12 +77,10 @@ class CALVIN_NSACGMMAgent(Agent):
         # The order of skills inside actor should always be the same as the order of skills in the SKILLS enum
         self.actor.skill_names = [e.name for e in SKILLS]
         # GMM
-        gmm.skill = self.task
         self.actor.make_skills(gmm)
         # Load GMM weights of each skill
         self.actor.load_models()
         # Use Dataset to set skill parameters - goal, fixed_ori, pos_dt, ori_dt
-        datamodule.dataset.skill = self.task
         self.actor.set_skill_params(datamodule.dataset)
         if "Manifold" in self.actor.name:
             self.actor.make_manifolds()
@@ -92,12 +92,11 @@ class CALVIN_NSACGMMAgent(Agent):
         first_skill = SKILLS[self.task.skills[0]].value
         self.env.set_init_pos(init_pos=self.actor.skills[first_skill].start)
         # # record setup
-        # self.video_dir = os.path.join(exp_dir, "videos")
-        # os.makedirs(self.video_dir, exist_ok=True)
-        # self.env.set_outdir(self.video_dir)
+        self.video_dir = os.path.join(exp_dir, "videos")
+        os.makedirs(self.video_dir, exist_ok=True)
+
         self.render = render
         self.record = record
-        self.exp_dir = exp_dir
 
         self.reset()
         self.skill_count = 0
@@ -171,7 +170,7 @@ class CALVIN_NSACGMMAgent(Agent):
             # Recording setup close
             if self.record:  # and (episode == rand_idx):
                 video_path = self.env.save_recording(
-                    outdir=self.exp_dir,
+                    outdir=self.video_dir,
                     fname=f"{self.total_play_steps}_{self.total_env_steps }_{episode}",
                 )
                 self.env.reset_recording()
@@ -239,7 +238,10 @@ class CALVIN_NSACGMMAgent(Agent):
             if "orientation" in obs:
                 fc_input = torch.cat((fc_input, obs["orientation"].float()), dim=-1).to(device)
             if "robot_obs" in obs:
-                fc_input = torch.tensor(obs["robot_obs"][:3]).to(device)
+                if obs["robot_obs"].ndim > 1:
+                    fc_input = torch.tensor(obs["robot_obs"][:, :3]).to(device)
+                else:
+                    fc_input = torch.tensor(obs["robot_obs"][:3]).to(device)
             if "rgb_gripper" in obs:
                 x = obs["rgb_gripper"]
                 if not torch.is_tensor(x):

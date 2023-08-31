@@ -16,7 +16,7 @@ show_gui: true
 # evaluation frequency:
 eval_frequency: 50
 num_init_steps: 256
-num_eval_episodes: 10
+num_eval_episodes: 50
 
 # Dataset params:
 train: true # false to load validation dataset
@@ -24,9 +24,7 @@ goal_centered: false # this must be false during evaluation
 
 # Visualization
 render: false
-record: true
-
-skill: null
+record: false
 
 model_ckpts: [
   "logs/sacgmm-train/2023_08_21/16_11_16/model_weights/last.ckpt",

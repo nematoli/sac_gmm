@@ -1,9 +1,0 @@
-defaults:
-  - setup
-
-# Dataset params:
-skills: ['turn_on_led', 'move_slider_left', 'turn_on_lightbulb', 'open_drawer']
-state_type: 'pos'
-
-# GMM params
-n_components: 3
