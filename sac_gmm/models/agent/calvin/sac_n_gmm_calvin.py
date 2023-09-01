@@ -85,8 +85,8 @@ class CALVIN_SACNGMMAgent(Agent):
             self.skill_actor.make_manifolds()
         self.initial_gmms = copy.deepcopy(self.skill_actor.skills)
 
-        # Set initial pos and orn
-        self.env.set_init_pos(init_pos=self.skill_actor.skills[0].start)
+        # Store skill info - starts, goals, fixed_ori, pos_dt, ori_dt
+        self.env.store_skill_info(self.skill_actor.skills)
         # # record setup
         self.video_dir = os.path.join(exp_dir, "videos")
         os.makedirs(self.video_dir, exist_ok=True)
@@ -94,7 +94,7 @@ class CALVIN_SACNGMMAgent(Agent):
         self.record = record
 
         self.reset()
-        self.skill_id = 0
+        self.skill_id = self.task.skills.index(self.env.chosen_skill)
 
     def get_action_space(self):
         parameter_space = self.get_update_range_parameter_space()
@@ -135,19 +135,21 @@ class CALVIN_SACNGMMAgent(Agent):
             self.episode_env_steps += 1
             self.total_env_steps += 1
             if reward > 0:
-                self.skill_id = (self.skill_id + 1) % len(self.task.skills)
+                # self.skill_id = (self.skill_id + 1) % len(self.task.skills)
+                done = True
+                # Note that this only check if any of the skills is done, not the chosen skill
             if done:
                 break
 
-        if self.episode_env_steps >= self.task.max_steps:
+        if self.episode_env_steps >= self.task.skill_max_steps:
             done = True
 
-        if done and (self.episode_env_steps < self.task.max_steps):
-            # If the episode is done, the self.skill_counter rotates back to 0
-            # but this is not the true next skill, so we need to set it to the actual last skill of the task
-            next_skill_id = len(self.task.skills) - 1
-        else:
-            next_skill_id = self.skill_id
+        # if done and (self.episode_env_steps < self.task.max_steps):
+        #     # If the episode is done, the self.skill_counter rotates back to 0
+        #     # but this is not the true next skill, so we need to set it to the actual last skill of the task
+        #     next_skill_id = len(self.task.skills) - 1
+        # else:
+        next_skill_id = self.skill_id
 
         replay_buffer.add(self.obs, self.skill_id, gmm_change, gmm_reward, curr_obs, next_skill_id, done)
         self.obs = curr_obs
@@ -157,7 +159,7 @@ class CALVIN_SACNGMMAgent(Agent):
 
         if done or not conn:
             self.reset()
-            self.skill_id = 0
+            self.skill_id = self.task.skills.index(self.env.chosen_skill)
         return gmm_reward, done
 
     @torch.no_grad()
@@ -169,7 +171,7 @@ class CALVIN_SACNGMMAgent(Agent):
         succesful_skill_ids = []
         # Choose a random episode to record
         rand_idx = np.random.randint(1, self.num_eval_episodes + 1)
-
+        self.env.eval_mode = True
         for episode in tqdm(range(1, self.num_eval_episodes + 1)):
             episode_return, episode_env_steps = 0, 0
             self.obs = self.env.reset()
@@ -223,7 +225,7 @@ class CALVIN_SACNGMMAgent(Agent):
             episodes_returns.append(episode_return)
             episodes_lengths.append(episode_env_steps)
         accuracy = succesful_episodes / self.num_eval_episodes
-
+        self.env.eval_mode = False
         return (
             accuracy,
             np.mean(episodes_returns),
@@ -287,10 +289,10 @@ class CALVIN_SACNGMMAgent(Agent):
             if "robot_obs" in obs:
                 if obs["robot_obs"].ndim > 1:  # When obs is of shape (Batch x obs_dim)
                     fc_input = torch.tensor(obs["robot_obs"][:, :3]).to(device)
-                    skill_one_hot = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()]
+                    skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()]
                 else:
                     fc_input = torch.tensor(obs["robot_obs"][:3]).to(device)
-                    skill_one_hot = torch.eye(len(self.task.skills))[skill_id]
+                    skill_vector = torch.eye(len(self.task.skills))[skill_id]
             if "rgb_gripper" in obs:
                 x = obs["rgb_gripper"]
                 if not torch.is_tensor(x):
@@ -303,7 +305,7 @@ class CALVIN_SACNGMMAgent(Agent):
                 # fc_input = features.squeeze()
             # if "obs" in obs:
             #     fc_input = torch.cat((fc_input, torch.tensor(obs["obs"]).to(device)), dim=-1)
-            fc_input = torch.cat((fc_input, skill_one_hot.to(device)), dim=-1)
+            fc_input = torch.cat((fc_input, skill_vector.to(device)), dim=-1)
             return fc_input.float()
 
         return obs.float()

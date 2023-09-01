@@ -47,6 +47,12 @@ class CalvinTaskEnv(PlayTableSimEnv):
         self.init_base_pos, self.init_base_orn = self.p.getBasePositionAndOrientation(self.robot.robot_uid)
         self.ee_noise = np.array([0.1, 0.1, 0.05])  # Units: meters
         self.init_pos = None
+        self.chosen_skill = None
+        self.eval_mode = False
+
+        self.skill_starts = {}
+        self.skill_goals = {}
+        self.skill_oris = {}
 
     @staticmethod
     def get_action_space():
@@ -82,6 +88,12 @@ class CalvinTaskEnv(PlayTableSimEnv):
         self.p.stepSimulation(physicsClientId=self.cid)
 
         self.start_info = self.get_info()
+        if self.eval_mode:
+            self.chosen_skill = self.target_tasks[0]
+            self.sequential = True
+        else:
+            self.sequential = False
+            self.chosen_skill = np.random.choice(self.target_tasks)
         obs = self.calibrate_EE_start_state(self.get_state_obs()["robot_obs"])
         self.start_info = self.get_info()
         self._t = 0
@@ -151,13 +163,11 @@ class CalvinTaskEnv(PlayTableSimEnv):
         if len(action) == 3:
             coords = action
             orientation = np.zeros(3)
-            gripper_action = [0]
+            gripper_action = [-1]
             env_action = np.concatenate([coords, orientation, gripper_action], axis=0)
         else:
             env_action = action.copy()
 
-        # Transform gripper action to discrete space
-        env_action[-1] = (int(action[-1] >= 0) * 2) - 1
         self.robot.apply_action(env_action)
         for _ in range(self.action_repeat):
             self.p.stepSimulation(physicsClientId=self.cid)
@@ -202,13 +212,39 @@ class CalvinTaskEnv(PlayTableSimEnv):
         else:
             self.init_pos = init_pos
 
+    def store_skill_info(self, skills):
+        """Stores each skill's info - start, goal, fixed_ori."""
+        for skill in skills:
+            self.skill_starts[skill.skill] = np.round(skill.start, 3)
+            self.skill_goals[skill.skill] = np.round(skill.goal, 3)
+            self.skill_oris[skill.skill] = skill.fixed_ori
+
+    def get_init_pos(self, strategy="starts"):
+        """Gets the initial position of the end effector based on the chosen skill.
+        When strategy is "starts", the initial position is the skill's start.
+        When strategy is "goals", the initial position is a random goal of the other skills
+        or the skills's own start.
+        """
+        if strategy == "starts":
+            return self.skill_starts[self.chosen_skill]
+        elif strategy == "goals":
+            goals = [v for k, v in self.skill_goals.items() if k != self.chosen_skill]
+            # Add chosen skill's start to the list of other skills' goals
+            goals.append(self.skill_starts[self.chosen_skill])
+            return goals[np.random.choice(range(len(goals)))]
+
+    def get_init_orn(self):
+        """Gets the initial orientation of the end effector based on the chosen skill."""
+        return self.skill_oris[self.chosen_skill]
+
     def sample_ee_pose(self):
         """Samples a random end effector pose within a small range around the initial pose."""
-        if self.init_pos is None:
-            self.init_gripper_pos = self.robot.target_pos
-        else:
-            self.init_gripper_pos = self.init_pos
-        self.init_gripper_orn = self.robot.target_orn
+        # if self.init_pos is None:
+        #     self.init_gripper_pos = self.robot.target_pos
+        # else:
+        #     self.init_gripper_pos = self.init_pos
+        self.init_gripper_pos = self.get_init_pos("goals")
+        self.init_gripper_orn = self.get_init_orn()
         offset = np.random.uniform(-self.ee_noise, self.ee_noise, 3)
         gripper_pos = self.init_gripper_pos + offset
         gripper_orn = self.init_gripper_orn
@@ -218,7 +254,6 @@ class CalvinTaskEnv(PlayTableSimEnv):
         """Called only by calibrate_EE_start_state to perform a absolute steps in the environment."""
         # Transform gripper action to discrete space
         env_action = action.copy()
-        env_action[-1] = (int(action[-1] >= 0) * 2) - 1
         self.robot.apply_action(env_action)
         for _ in range(self.action_repeat):
             self.p.stepSimulation(physicsClientId=self.cid)

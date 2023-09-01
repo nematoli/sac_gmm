@@ -8,4 +8,5 @@ state_type: 'pos'
 
 # GMM params
 n_components: 3
-max_steps: 180
+max_steps: 150
+skill_max_steps: 64
