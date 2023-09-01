@@ -107,20 +107,20 @@ class CalvinTaskEnv(PlayTableSimEnv):
         completed_tasks = self.tasks.get_task_info_for_set(self.start_info, current_info, self.target_tasks)
         next_task = self.tasks_to_complete[0]
 
+        reward = 0
         for task in list(completed_tasks):
             if self.sequential:
                 if task == next_task:
+                    reward += 1
                     self.tasks_to_complete.pop(0)
                     self.completed_tasks.append(task)
             else:
                 if task in self.tasks_to_complete:
+                    reward += 1
                     self.tasks_to_complete.remove(task)
                     self.completed_tasks.append(task)
-        # When sparse_reward is True, reward is 1 only if all tasks are completed
-        # sparse * (len(tasks_to_complete) == 0) + (1 - sparse) * len(completed_tasks)
-        reward = int(self.sparse_reward) * int(len(self.tasks_to_complete) == 0) + (1 - int(self.sparse_reward)) * len(
-            self.completed_tasks
-        )
+        if self.sparse_reward:
+            reward = int(len(self.tasks_to_complete) == 0)
         reward *= self.reward_scale
         r_info = {"reward": reward}
         return reward, r_info
@@ -151,7 +151,7 @@ class CalvinTaskEnv(PlayTableSimEnv):
         if len(action) == 3:
             coords = action
             orientation = np.zeros(3)
-            gripper_action = [-1]
+            gripper_action = [0]
             env_action = np.concatenate([coords, orientation, gripper_action], axis=0)
         else:
             env_action = action.copy()

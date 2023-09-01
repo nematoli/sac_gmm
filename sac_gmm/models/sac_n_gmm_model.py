@@ -99,10 +99,15 @@ class SACNGMM(TaskModel):
             metrics.update(eval_metrics)
             # Log the skill distribution
             if len(eval_skill_ids) > 0:
-                skill_ids = Counter(eval_skill_ids)
+                skill_id_counts = Counter(eval_skill_ids)
                 skill_ids = {
-                    f"eval/{self.agent.task.skills[k]}": v / self.agent.num_eval_episodes for k, v in skill_ids.items()
+                    f"eval/{self.agent.task.skills[k]}": v / self.agent.num_eval_episodes
+                    for k, v in skill_id_counts.items()
                 }
+                # Add 0 values for skills that were not used at all
+                unused_skill_ids = set(range(len(self.agent.task.skills))) - set(skill_id_counts.keys())
+                if len(unused_skill_ids) > 0:
+                    skill_ids.update({f"eval/{self.agent.task.skills[k]}": 0 for k in list(unused_skill_ids)})
             else:
                 skill_ids = {f"eval/{k}": 0 for k in self.agent.task.skills}
             metrics.update(skill_ids)
