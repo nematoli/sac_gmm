@@ -12,7 +12,9 @@ defaults:
   - override hydra/hydra_logging: colorlog
   - _self_
 
-logger.group: sacgmm-ae
+logger:
+  group: sacgmm-ae
+
 show_gui: true
 # evaluation frequency:
 eval_frequency: 20

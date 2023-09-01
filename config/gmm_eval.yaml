@@ -4,7 +4,8 @@ defaults:
   - datamodule: calvin_ds
   - logger: wandb
 
-logger.group: gmm-eval
+logger:
+  group: gmm-eval
 
 # Dataset params:
 train: false # false to load validation dataset

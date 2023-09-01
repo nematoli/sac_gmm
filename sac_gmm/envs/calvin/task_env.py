@@ -42,6 +42,7 @@ class CalvinTaskEnv(PlayTableSimEnv):
         self._t = 0
         self.sequential = True
         self.reward_scale = 10
+        self.sparse_reward = False
 
         self.init_base_pos, self.init_base_orn = self.p.getBasePositionAndOrientation(self.robot.robot_uid)
         self.ee_noise = np.array([0.1, 0.1, 0.05])  # Units: meters
@@ -106,19 +107,20 @@ class CalvinTaskEnv(PlayTableSimEnv):
         completed_tasks = self.tasks.get_task_info_for_set(self.start_info, current_info, self.target_tasks)
         next_task = self.tasks_to_complete[0]
 
-        reward = 0
         for task in list(completed_tasks):
             if self.sequential:
                 if task == next_task:
-                    reward += 1
                     self.tasks_to_complete.pop(0)
                     self.completed_tasks.append(task)
             else:
                 if task in self.tasks_to_complete:
-                    reward += 1
                     self.tasks_to_complete.remove(task)
                     self.completed_tasks.append(task)
-
+        # When sparse_reward is True, reward is 1 only if all tasks are completed
+        # sparse * (len(tasks_to_complete) == 0) + (1 - sparse) * len(completed_tasks)
+        reward = int(self.sparse_reward) * int(len(self.tasks_to_complete) == 0) + (1 - int(self.sparse_reward)) * len(
+            self.completed_tasks
+        )
         reward *= self.reward_scale
         r_info = {"reward": reward}
         return reward, r_info

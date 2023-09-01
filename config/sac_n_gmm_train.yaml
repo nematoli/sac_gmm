@@ -12,7 +12,11 @@ defaults:
   - override hydra/hydra_logging: colorlog
   - _self_
 
+# Env params
 show_gui: true
+agent: 
+  sparse_reward: true
+
 # evaluation frequency:
 eval_frequency: 50
 num_init_steps: 256
@@ -26,7 +30,9 @@ goal_centered: true # this must be false during evaluation
 render: false
 record: true
 
-logger.group: sac-n-gmm-train
+# Logging
+logger:
+  group: sac_n_gmm
 
 hydra:
   run:

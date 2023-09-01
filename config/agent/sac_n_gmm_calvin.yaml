@@ -23,3 +23,4 @@ record: ${record}
 
 sac: ${sac}
 device: ${device}
+sparse_reward: false

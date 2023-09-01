@@ -48,6 +48,7 @@ class CALVIN_SACNGMMAgent(Agent):
         record: bool,
         sac: DictConfig,
         device: str,
+        sparse_reward: bool,
     ) -> None:
         super().__init__(
             env=calvin_env,
@@ -60,6 +61,7 @@ class CALVIN_SACNGMMAgent(Agent):
         # Environment
         self.env.set_task(self.task.skills)
         self.env.max_episode_steps = self.task.max_steps
+        self.env.sparse_reward = sparse_reward
 
         # Refine parameters
         self.priors_change_range = priors_change_range
