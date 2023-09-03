@@ -89,15 +89,16 @@ class CalvinTaskEnv(PlayTableSimEnv):
 
         self.start_info = self.get_info()
         if self.eval_mode:
-            self.chosen_skill = self.target_tasks[0]
             self.sequential = True
+            self.chosen_skill = self.target_tasks[0]
+            self.tasks_to_complete = copy.deepcopy(self.target_tasks)
         else:
             self.sequential = False
             self.chosen_skill = np.random.choice(self.target_tasks)
+            self.tasks_to_complete = [self.chosen_skill]
         obs = self.calibrate_EE_start_state(self.get_state_obs()["robot_obs"])
         self.start_info = self.get_info()
         self._t = 0
-        self.tasks_to_complete = copy.deepcopy(self.target_tasks)
         self.completed_tasks = []
         self.solved_subtasks = defaultdict(lambda: 0)
         return self.get_obs()
@@ -243,7 +244,10 @@ class CalvinTaskEnv(PlayTableSimEnv):
         #     self.init_gripper_pos = self.robot.target_pos
         # else:
         #     self.init_gripper_pos = self.init_pos
-        self.init_gripper_pos = self.get_init_pos("goals")
+        if self.eval_mode:
+            self.init_gripper_pos = self.get_init_pos("starts")
+        else:
+            self.init_gripper_pos = self.get_init_pos("goals")
         self.init_gripper_orn = self.get_init_orn()
         offset = np.random.uniform(-self.ee_noise, self.ee_noise, 3)
         gripper_pos = self.init_gripper_pos + offset

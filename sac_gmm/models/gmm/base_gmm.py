@@ -298,7 +298,7 @@ class BaseGMM(object):
 
     def get_minimal_rotation(self, current_angles):
         """Computes the minimal rotation required to get from current_angles to goal_angles."""
-        return self.normalize_angle(self.fixed_ori - current_angles) / self.ori_dt
+        return self.normalize_angle(self.fixed_ori - current_angles) / (10 * self.ori_dt)
 
     def predict_dx_ori(self, x):
         return self.get_minimal_rotation(x)

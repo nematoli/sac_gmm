@@ -89,8 +89,7 @@ class CALVIN_NSACGMMAgent(Agent):
         self.sacgmms = self.actor.make_sacgmms(sac, model_ckpts, root_dir, device, self.get_action_space())
 
         # Set initial pos and orn
-        first_skill = SKILLS[self.task.skills[0]].value
-        self.env.set_init_pos(init_pos=self.actor.skills[first_skill].start)
+        self.env.store_skill_info(self.actor.skills)
         # # record setup
         self.video_dir = os.path.join(exp_dir, "videos")
         os.makedirs(self.video_dir, exist_ok=True)
@@ -125,7 +124,7 @@ class CALVIN_NSACGMMAgent(Agent):
         saved_video_path = None
         # Choose a random episode to record
         rand_idx = np.random.randint(1, self.num_eval_episodes + 1)
-
+        self.env.eval_mode = True
         for episode in tqdm(range(1, self.num_eval_episodes + 1)):
             episode_return, episode_env_steps = 0, 0
             self.obs = self.env.reset()
@@ -147,7 +146,7 @@ class CALVIN_NSACGMMAgent(Agent):
 
                 for _ in range(self.gmm_window):
                     env_action = self.actor.act(self.obs["robot_obs"], skill_id)
-                    self.obs, reward, done, info = self.env.step(env_action[:3])
+                    self.obs, reward, done, info = self.env.step(env_action)
                     episode_return += reward
                     episode_env_steps += 1
 
@@ -179,7 +178,7 @@ class CALVIN_NSACGMMAgent(Agent):
             episodes_returns.append(episode_return)
             episodes_lengths.append(episode_env_steps)
         accuracy = succesful_episodes / self.num_eval_episodes
-
+        self.env.eval_mode = False
         return (
             accuracy,
             np.mean(episodes_returns),

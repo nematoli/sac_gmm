@@ -60,7 +60,8 @@ class TaskModel(pl.LightningModule):
         self.state_dim = self.agent.get_state_dim(feature_size=self.encoder.feature_size)
 
         # Actor
-        actor.input_dim = self.state_dim + len(self.agent.task.skills)  # State + Skill ID
+        # actor.input_dim = self.state_dim + len(self.agent.task.skills)  # State + Skill Vector
+        actor.input_dim = self.state_dim + self.action_dim  # State + Skill Vector (Priors + Means)
         actor.action_dim = self.action_dim
         self.actor = hydra.utils.instantiate(actor)  # .to(self.device)
         self.actor.set_action_space(self.action_space)
@@ -68,8 +69,10 @@ class TaskModel(pl.LightningModule):
 
         # Critic
         self.critic_tau = critic_tau
-        critic.input_dim = self.state_dim + len(self.agent.task.skills) + self.action_dim  # State + Skill ID + Action
-
+        # critic.input_dim = self.state_dim + len(self.agent.task.skills) + self.action_dim  # State + Skill Vector + Action
+        critic.input_dim = (
+            self.state_dim + self.action_dim + self.action_dim
+        )  # State + Skill Vector (Priors + Means) + Action
         self.critic = hydra.utils.instantiate(critic)  # .to(device)
 
         self.critic_target = hydra.utils.instantiate(critic)  # .to(device)

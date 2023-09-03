@@ -48,3 +48,9 @@ class SkillActor:
     def act(self, x, skill_id):
         dx_pos, dx_ori = self.skills[skill_id].predict(x)
         return np.append(dx_pos, np.append(dx_ori, -1))
+
+    def get_all_skill_params(self, initial_gmms):
+        skill_params = []
+        for skill in initial_gmms:
+            skill_params.append(skill.model_params())
+        return np.array(skill_params)
