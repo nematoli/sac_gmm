@@ -43,9 +43,9 @@ class Agent(object):
         self.obs = None
         # Agent resets - env and state variable self.obs
 
-    def reset(self) -> None:
+    def reset(self, target_skill=None) -> None:
         """Resets the environment, moves the EE to a good start state and updates the agent state"""
-        self.obs = self.env.reset()
+        self.obs = self.env.reset(target_skill=target_skill)
         self.episode_play_steps = 0
         self.episode_env_steps = 0
 

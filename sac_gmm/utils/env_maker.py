@@ -1,6 +1,7 @@
 from omegaconf import DictConfig
 from sac_gmm.envs.calvin.skill_env import CalvinSkillEnv
 from sac_gmm.envs.calvin.task_env import CalvinTaskEnv
+from sac_gmm.envs.calvin.rand_skill_env import CalvinRandSkillEnv
 
 
 def make_env(cfg_env: DictConfig):
@@ -8,6 +9,8 @@ def make_env(cfg_env: DictConfig):
         env = CalvinSkillEnv(cfg_env)
     elif cfg_env.env_name == "calvin_task":
         env = CalvinTaskEnv(cfg_env)
+    elif cfg_env.env_name == "calvin_rand_skill":
+        env = CalvinRandSkillEnv(cfg_env)
     else:
         raise NotImplementedError
 

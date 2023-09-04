@@ -57,6 +57,7 @@ class CALVIN_SACNGMMAgent(Agent):
         )
 
         self.task = task
+        self.task.max_steps = self.task.skill_max_steps
 
         # Environment
         self.env.set_task(self.task.skills)
@@ -95,7 +96,7 @@ class CALVIN_SACNGMMAgent(Agent):
         self.record = record
 
         self.reset()
-        self.skill_id = self.task.skills.index(self.env.chosen_skill)
+        self.skill_id = self.task.skills.index(self.env.target_skill)
 
     def get_action_space(self):
         parameter_space = self.get_update_range_parameter_space()
@@ -160,7 +161,7 @@ class CALVIN_SACNGMMAgent(Agent):
 
         if done or not conn:
             self.reset()
-            self.skill_id = self.task.skills.index(self.env.chosen_skill)
+            self.skill_id = self.task.skills.index(self.env.target_skill)
         return gmm_reward, done
 
     @torch.no_grad()
@@ -168,71 +169,69 @@ class CALVIN_SACNGMMAgent(Agent):
         """Evaluates the actor in the environment"""
         log_rank_0("Evaluation episodes in process")
         succesful_episodes, episodes_returns, episodes_lengths = 0, [], []
-        saved_video_path = None
+        saved_video_paths = {}
         succesful_skill_ids = []
         # Choose a random episode to record
-        rand_idx = np.random.randint(1, self.num_eval_episodes + 1)
-        self.env.eval_mode = True
-        for episode in tqdm(range(1, self.num_eval_episodes + 1)):
-            episode_return, episode_env_steps = 0, 0
-            self.obs = self.env.reset()
-            skill_id = 0
-            # Recording setup
-            if self.record and (episode == rand_idx):
-                self.env.reset_recording()
-                self.env.record_frame(size=100)
+        for skill in self.task.skills:
+            rand_idx = np.random.randint(1, self.num_eval_episodes + 1)
+            for episode in tqdm(range(1, self.num_eval_episodes + 1)):
+                episode_return, episode_env_steps = 0, 0
+                self.obs = self.env.reset(target_skill=skill)
+                skill_id = self.task.skills.index(skill)
+                # Recording setup
+                if self.record and (episode == rand_idx):
+                    self.env.reset_recording()
+                    self.env.record_frame(size=100)
 
-            while episode_env_steps < self.task.max_steps:
-                # Change dynamical system
-                self.skill_actor.copy_model(self.initial_gmms, skill_id)
-                gmm_change = self.get_action(refine_actor, skill_id, self.obs, "deterministic", device)
-                self.update_gaussians(gmm_change, skill_id)
+                while episode_env_steps < self.task.max_steps:
+                    # Change dynamical system
+                    self.skill_actor.copy_model(self.initial_gmms, skill_id)
+                    gmm_change = self.get_action(refine_actor, skill_id, self.obs, "deterministic", device)
+                    self.update_gaussians(gmm_change, skill_id)
 
-                # Act with the dynamical system in the environment
-                # x = self.obs["position"]
+                    # Act with the dynamical system in the environment
+                    # x = self.obs["position"]
 
-                for _ in range(self.gmm_window):
-                    env_action = self.skill_actor.act(self.obs["robot_obs"], skill_id)
-                    self.obs, reward, done, info = self.env.step(env_action)
-                    episode_return += reward
-                    episode_env_steps += 1
+                    for _ in range(self.gmm_window):
+                        env_action = self.skill_actor.act(self.obs["robot_obs"], skill_id)
+                        self.obs, reward, done, info = self.env.step(env_action)
+                        episode_return += reward
+                        episode_env_steps += 1
 
-                    if self.record and (episode == rand_idx):
-                        self.env.record_frame(size=100)
-                    if self.render:
-                        self.env.render()
-                    if reward > 0:
-                        succesful_skill_ids.append(skill_id)
-                        skill_id = (skill_id + 1) % len(self.task.skills)
+                        if self.record and (episode == rand_idx):
+                            self.env.record_frame(size=100)
+                        if self.render:
+                            self.env.render()
+                        if reward > 0:
+                            succesful_skill_ids.append(skill_id)
+                        if done:
+                            break
+
                     if done:
+                        self.reset(target_skill=skill)
+                        skill_id = self.task.skills.index(skill)
                         break
 
-                if done:
-                    self.reset()
-                    skill_id = 0
-                    break
-
-            if ("success" in info) and info["success"]:
-                succesful_episodes += 1
-            # Recording setup close
-            if self.record and (episode == rand_idx):
-                video_path = self.env.save_recording(
-                    outdir=self.video_dir,
-                    fname=f"PlaySteps{self.total_play_steps}_EnvSteps{self.total_env_steps }_{episode}",
-                )
-                self.env.reset_recording()
-                saved_video_path = video_path
+                if ("success" in info) and info["success"]:
+                    succesful_episodes += 1
+                # Recording setup close
+                if self.record and (episode == rand_idx):
+                    video_path = self.env.save_recording(
+                        outdir=self.video_dir,
+                        fname=f"PlaySteps{self.total_play_steps}_EnvSteps{self.total_env_steps }_{skill}",
+                    )
+                    self.env.reset_recording()
+                    saved_video_paths[skill] = video_path
 
             episodes_returns.append(episode_return)
             episodes_lengths.append(episode_env_steps)
-        accuracy = succesful_episodes / self.num_eval_episodes
-        self.env.eval_mode = False
+        accuracy = succesful_episodes / (self.num_eval_episodes * len(self.task.skills))
         return (
             accuracy,
             np.mean(episodes_returns),
             np.mean(episodes_lengths),
             succesful_skill_ids,
-            saved_video_path,
+            saved_video_paths,
         )
 
     def get_update_range_parameter_space(self):

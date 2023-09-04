@@ -1,0 +1,11 @@
+defaults:
+  - calvin_env: new_default
+  # - override calvin_env/scene: calvin_scene_A
+
+# Environment params
+env_name: calvin_rand_skill
+
+# env_obs_allowed: ["pos", "rgb_static"] # Order is important = [robot_obs, camera_obs]
+
+calvin_env:
+  show_gui: ${show_gui}

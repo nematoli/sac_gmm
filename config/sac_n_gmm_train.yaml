@@ -1,6 +1,6 @@
 defaults:
   - setup
-  - task_setup
+  - rand_skill_setup
   - callbacks: default
   - datamodule: calvin_ds
   - sac: sac_n_gmm_model
@@ -18,7 +18,7 @@ agent:
   sparse_reward: false
 
 # evaluation frequency:
-eval_frequency: 50
+eval_frequency: 100
 num_init_steps: 256
 num_eval_episodes: 10
 

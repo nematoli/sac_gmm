@@ -86,7 +86,7 @@ class SACNGMM(TaskModel):
             eval_return = float("-inf")
             eval_accuracy = float("-inf")
             if self.episode_idx % self.eval_frequency == 0:
-                eval_accuracy, eval_return, eval_length, eval_skill_ids, eval_video_path = self.agent.evaluate(
+                eval_accuracy, eval_return, eval_length, eval_skill_ids, eval_video_paths = self.agent.evaluate(
                     self.actor
                 )
                 eval_metrics = {
@@ -112,8 +112,9 @@ class SACNGMM(TaskModel):
                     skill_ids = {f"eval/{k}": 0 for k in self.agent.task.skills}
                 metrics.update(skill_ids)
                 # Log the video GIF to wandb if exists
-                if eval_video_path is not None:
-                    self.log_video(eval_video_path, "eval/video")
+                if eval_video_paths is not None and len(eval_video_paths.keys()) > 0:
+                    for skill_name, video_path in eval_video_paths.items():
+                        self.log_video(video_path, f"eval/{skill_name}_video")
 
             self.episode_return, self.episode_play_steps = 0, 0
             self.episode_idx += 1
