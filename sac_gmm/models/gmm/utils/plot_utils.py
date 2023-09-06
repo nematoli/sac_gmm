@@ -2,6 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from mpl_toolkits.mplot3d import Axes3D
 
 
 def visualize_3d_gmm(points, priors, means, covariances, save_dir):
