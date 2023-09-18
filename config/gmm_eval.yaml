@@ -1,11 +1,13 @@
 defaults:
   - setup
   - skill_setup
-  - datamodule: calvin_ds
+  - datamodule: calvin_ds2
   - logger: wandb
 
 logger:
   group: gmm-eval
+
+show_gui: true
 
 # Dataset params:
 train: false # false to load validation dataset

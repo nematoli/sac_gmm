@@ -4,6 +4,7 @@ import sys
 import wandb
 from pathlib import Path
 from pytorch_lightning.utilities import rank_zero_only
+import time
 
 cwd_path = Path(__file__).absolute().parents[0]
 sac_gmm_path = cwd_path.parents[0]
@@ -75,6 +76,7 @@ class ManifoldGMM(BaseGMM):
         if self.state_type == "pos_ori":
             total_dim += 4
         log_rank_0("Manifold GMM with K-Means priors")
+        start = time.time()
         init_covariances = np.concatenate(self.n_components * [np.eye(total_dim)[None]], 0)
         init_priors = np.zeros(self.n_components)
         for k in range(self.n_components):
@@ -88,11 +90,13 @@ class ManifoldGMM(BaseGMM):
             initial_priors=init_priors,
             logger=logger,
         )
-        # Reshape means from (n_components, 2) to (n_components, 2, state_size)
-        self.means = self.get_reshaped_means()
+        log_rank_0(f"GMM train time: {time.time() - start} seconds")
+        if self.state_type != "pos_ori":
+            # Reshape means from (n_components, 2) to (n_components, 2, state_size)
+            self.means = self.get_reshaped_means()
 
-        # Save GMM params
-        self.reshape_params(to="generic")
+            # Save GMM params
+            self.reshape_params(to="generic")
         self.save_model()
 
         # Plot GMM
@@ -105,13 +109,13 @@ class ManifoldGMM(BaseGMM):
         super().load_model()
 
     def predict_dx_pos(self, x):
-        self.reshape_params(to="gmr-specific")
+        # self.reshape_params(to="gmr-specific")
         if self.state_type == "pos_ori":
             out_manifold_idx = [1, 2]
         else:
             out_manifold_idx = [1]
         dx, _, __ = manifold_gmr(
-            (x - self.goal).reshape(1, -1),
+            (x).reshape(1, -1),
             self.manifold,
             self.means,
             self.covariances,
@@ -119,5 +123,6 @@ class ManifoldGMM(BaseGMM):
             in_manifold_idx=[0],
             out_manifold_idx=out_manifold_idx,
         )
-        self.reshape_params(to="generic")
+        # self.reshape_params(to="generic")
+
         return dx[0]

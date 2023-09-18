@@ -47,11 +47,11 @@ class CALVINDynSysDataset(Dataset):
         elif self.skill.skill in ["turn_on_lightbulb", "move_slider_left"]:
             self.fixed_ori = np.array([3.14, -0.5, 1.5])
 
-        if self.state_type == "ori" and self.is_quaternion:
-            self.X = np.apply_along_axis(p.getQuaternionFromEuler, -1, self.X)
-        elif self.state_type == "pos_ori" and self.is_quaternion:
-            oris = np.apply_along_axis(p.getQuaternionFromEuler, -1, self.X[:, :, 3:])
-            self.X = np.concatenate([self.X[:, :, :3], oris], axis=-1)
+        # if self.state_type == "ori" and self.is_quaternion:
+        #     self.X = np.apply_along_axis(p.getQuaternionFromEuler, -1, self.X)
+        # elif self.state_type == "pos_ori" and self.is_quaternion:
+        #     oris = np.apply_along_axis(p.getQuaternionFromEuler, -1, self.X[:, :, 3:])
+        #     self.X = np.concatenate([self.X[:, :, :3], oris], axis=-1)
 
         self.start = np.mean(self.X[:, 0, :3], axis=0)
         self.goal = np.mean(self.X[:, -1, :3], axis=0)

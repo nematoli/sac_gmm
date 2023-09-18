@@ -1,0 +1,3 @@
+defaults:
+  - dataset: calvin_ds2
+  - transforms: calvin

@@ -37,7 +37,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
         super(CalvinSkillEnv, self).__init__(**pt_cfg)
 
         self.init_base_pos, self.init_base_orn = self.p.getBasePositionAndOrientation(self.robot.robot_uid)
-        self.ee_noise = np.array([0.1, 0.1, 0.05])
+        self.ee_noise = np.array([0.3, 0.2, 0.1])
         # self.ee_noise = np.array([0.0, 0.0, 0.0])
 
         self.init_pos = None
@@ -48,6 +48,9 @@ class CalvinSkillEnv(PlayTableSimEnv):
         self.action_space = self.get_action_space()
         self.observation_space = self.get_observation_space()
         self.tasks = hydra.utils.instantiate(cfg.calvin_env.tasks)
+        self.frames = []
+
+        self.centroid = np.array([0.036, -0.13, 0.507875])
 
     def set_skill(self, skill):
         """Set skill"""
@@ -169,8 +172,13 @@ class CalvinSkillEnv(PlayTableSimEnv):
             self.init_gripper_pos = self.init_pos
 
         self.init_gripper_orn = self.robot.target_orn
-        offset = np.random.uniform(-self.ee_noise, self.ee_noise, 3)
-        gripper_pos = self.init_gripper_pos + offset
+        offset = [0, 0, 0]
+        offset[0] = np.random.uniform(-self.ee_noise[0], self.ee_noise[0], 1)[0]
+        offset[1] = np.random.uniform(-self.ee_noise[1], self.ee_noise[1] / 2, 1)[0]
+        offset[2] = np.random.uniform(-self.ee_noise[2] / 2, self.ee_noise[2], 1)[0]
+        gripper_pos = self.centroid + offset
+        # ee_noise = np.array([0.1, 0.1, 0.05])
+        # gripper_pos = self.init_gripper_pos + np.random.uniform(-ee_noise, ee_noise, 3)
         gripper_orn = self.init_gripper_orn
         return gripper_pos, gripper_orn
 

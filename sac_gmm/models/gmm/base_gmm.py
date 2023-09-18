@@ -6,6 +6,7 @@ import gym
 from sac_gmm.models.gmm.utils.plot_utils import visualize_3d_gmm
 from sac_gmm.utils.posdef import isPD, nearestPD
 from pytorch_lightning.utilities import rank_zero_only
+import pybullet
 
 cwd_path = Path(__file__).absolute().parents[0]
 sac_gmm_path = cwd_path.parents[0]
@@ -57,8 +58,8 @@ class BaseGMM(object):
         self.plot = plot
         self.model_dir = model_dir
         self.state_type = state_type
-        self.pos_dt = None
-        self.ori_dt = None
+        self.pos_dt = 0.02
+        self.ori_dt = 0.05
         self.goal = None
         self.start = None
         self.fixed_ori = None
@@ -83,16 +84,21 @@ class BaseGMM(object):
             self.covariances = np.asarray(self.covariances)
 
     def preprocess_data(self, dataset, normalize=False):
+        # Data size
+        data_size = dataset.X.shape[0]
+        # data_size = 100
         if self.state_type == "pos_ori":
             # Stack position, velocity and quaternion data
-            demos_xdx = [np.hstack([dataset.X[i], dataset.dX[i], dataset.Ori[i]]) for i in range(dataset.X.shape[0])]
+            demos_xdx = [
+                np.hstack([dataset.X[i], dataset.dX[i, :, :3], dataset.dX[i, :, 3:]]) for i in range(data_size)
+            ]
         else:
             # Stack position and velocity data
             demos_xdx = [np.hstack([dataset.X[i], dataset.dX[i]]) for i in range(dataset.X.shape[0])]
 
         # Stack demos
         demos = demos_xdx[0]
-        for i in range(1, dataset.X.shape[0]):
+        for i in range(1, data_size):
             demos = np.vstack([demos, demos_xdx[i]])
 
         X = demos[:, : self.dim]
@@ -193,8 +199,13 @@ class BaseGMM(object):
 
         # Means
         if "mu" in delta:
-            delta_means = delta["mu"].reshape(self.means.shape)
-            self.means += delta_means
+            # delta_means = delta["mu"].reshape(self.means.shape)
+            # self.means += delta_means
+            idx = 0
+            for i in range(self.means.shape[0]):
+                self.means[i, 0] += delta["mu"][idx : idx + 3]
+                self.means[i, 1] += delta["mu"][idx : idx + 3]
+                idx += 3
 
         pass
         # # Covariances
@@ -231,7 +242,10 @@ class BaseGMM(object):
         """
         priors = self.priors
         means = self.means.flatten()
-        params = np.concatenate((priors, means), axis=-1)
+        # params = np.concatenate((priors, means), axis=-1)
+        params = priors
+        for x in means:
+            params = np.append(params, x)
 
         return params
 
@@ -241,7 +255,7 @@ class BaseGMM(object):
         # else:
         #     means = self.means
 
-        self.reshape_params(to="gmr-specific")
+        # self.reshape_params(to="gmr-specific")
 
         # Pick 15 random datapoints from X to plot
         points = self.dataset.X.numpy()[:, :, :3]
@@ -277,28 +291,76 @@ class BaseGMM(object):
 
     def get_reshaped_means(self):
         """Reshape means from (n_components, 2) to (n_components, 2, state_size)"""
-        new_means = np.empty((self.n_components, 2, self.dim))
+        if self.state_type == "pos_ori":
+            new_means = np.empty((self.n_components, 2, self.dim + self.dim + 4))
+        else:
+            new_means = np.empty((self.n_components, 2, self.dim))
         for i in range(new_means.shape[0]):
             for j in range(new_means.shape[1]):
                 new_means[i, j, :] = self.means[i][j]
         return new_means
 
     def get_reshape_data(self):
-        reshaped_data = np.empty((self.data.shape[0], 2), dtype=object)
-        for n in range(self.data.shape[0]):
-            reshaped_data[n] = [self.data[n, : self.dim], self.data[n, self.dim :]]
-        return reshaped_data
+        if self.state_type != "pos_ori":
+            reshaped_data = np.empty((self.data.shape[0], 2), dtype=object)
+            for n in range(self.data.shape[0]):
+                reshaped_data[n] = [self.data[n, : self.dim], self.data[n, self.dim :]]
+            return reshaped_data
+        else:
+            return np.copy(self.data)
 
     def predict(self, x):
-        return self.predict_dx_pos(x[:3]), self.predict_dx_ori(x[3:6])
+        out = self.predict_dx_pos(x[:3])
+        if np.isnan(out[0]):
+            return np.zeros(3), np.zeros(3), True
+        dx_pos = self.compute_pos_difference(out[:3], x[:3])
+        dx_ori = self.compute_euler_difference(pybullet.getEulerFromQuaternion(out[3:]), x[3:6])
+        return dx_pos, dx_ori, False
 
-    def normalize_angle(self, angle):
-        """Normalizes the input angle to the range [-pi, pi)."""
-        return (angle + np.pi) % (2 * np.pi) - np.pi
+    def predict2(self, x):
+        return self.predict_dx_pos(x[:3])  # , self.predict_dx_ori(x[3:6])
 
-    def get_minimal_rotation(self, current_angles):
-        """Computes the minimal rotation required to get from current_angles to goal_angles."""
-        return self.normalize_angle(self.fixed_ori - current_angles) / (10 * self.ori_dt)
+    def compute_pos_difference(self, goal_pos, current_pos):
+        return (goal_pos - current_pos) / self.pos_dt
 
-    def predict_dx_ori(self, x):
-        return self.get_minimal_rotation(x)
+    def compute_euler_difference(self, goal_angles, current_angles):
+        """
+        1. Convert Euler Angles to Rotation Matrices
+        2. Find the Relative Rotation Matrix
+        3. Extract Euler Angles from the Relative Rotation Matrix
+        """
+        R_rel = relative_rotation_matrix(current_angles, goal_angles)
+        euler_rel = rotation_matrix_to_euler(R_rel)
+        return euler_rel
+
+
+def euler_to_rotation_matrix(theta, phi, psi):
+    """
+    Converts Euler angles to a rotation matrix.
+    """
+    R_x = np.array([[1, 0, 0], [0, np.cos(theta), -np.sin(theta)], [0, np.sin(theta), np.cos(theta)]])
+
+    R_y = np.array([[np.cos(phi), 0, np.sin(phi)], [0, 1, 0], [-np.sin(phi), 0, np.cos(phi)]])
+
+    R_z = np.array([[np.cos(psi), -np.sin(psi), 0], [np.sin(psi), np.cos(psi), 0], [0, 0, 1]])
+
+    return np.dot(R_z, np.dot(R_y, R_x))
+
+
+def relative_rotation_matrix(angles1, angles2):
+    """
+    Computes the relative rotation matrix between two sets of Euler angles.
+    """
+    R1 = euler_to_rotation_matrix(angles1[0], angles1[1], angles1[2])
+    R2 = euler_to_rotation_matrix(angles2[0], angles2[1], angles2[2])
+    return np.dot(R2, np.linalg.inv(R1))
+
+
+def rotation_matrix_to_euler(R):
+    """
+    Extracts Euler angles from a rotation matrix.
+    """
+    theta = np.arctan2(R[2, 1], R[2, 2])
+    phi = np.arctan2(-R[2, 0], np.sqrt(R[2, 1] ** 2 + R[2, 2] ** 2))
+    psi = np.arctan2(R[1, 0], R[0, 0])
+    return np.array((theta, phi, psi))

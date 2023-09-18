@@ -1,7 +1,7 @@
 defaults:
   - setup
   - skill_setup
-  - datamodule: calvin_ds
+  - datamodule: calvin_ds2
   - logger: wandb
 
 # Dataset params:
