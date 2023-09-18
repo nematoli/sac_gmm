@@ -2,7 +2,7 @@ defaults:
   - setup
   - skill_setup
   - callbacks: default
-  - datamodule: calvin_ds
+  - datamodule: calvin_ds2
   - sac: sac_gmm_model
   - agent: sac_gmm_calvin
   - logger: wandb
@@ -24,7 +24,11 @@ goal_centered: true # this must be false during evaluation
 
 # Visualization
 render: false
-record: false
+record: true
+
+# Logging
+logger:
+  group: sacgmm
 
 hydra:
   run:

@@ -9,6 +9,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only
 from sac_gmm.datasets.rl_dataset import RLDataset
 from torch.utils.data import DataLoader
+import wandb
 
 
 logger = logging.getLogger(__name__)
@@ -141,13 +142,14 @@ class SkillModel(pl.LightningModule):
     def log_loss(self, loss: Dict[str, torch.Tensor]):
         for key, val in loss.items():
             if loss[key] != 0:
-                info = key.split("_")
-                self.log(info[0] + "_" + info[1], loss[key], on_step=True, on_epoch=False)
+                self.log(key, loss[key], on_step=True, on_epoch=False)
 
     def log_metrics(self, metrics: Dict[str, torch.Tensor], on_step: bool, on_epoch: bool):
         for key, val in metrics.items():
-            info = key.split("_")
-            self.log(info[0] + "_" + info[1], metrics[key], on_step=on_step, on_epoch=on_epoch)
+            self.log(key, val, on_step=on_step, on_epoch=on_epoch)
+
+    def log_video(self, video_path, name: str):
+        self.logger.experiment.log({name: wandb.Video(video_path, fps=30, format="gif")})
 
     def check_batch(self, batch):
         """Verifies if everything is as expected inside a batch"""

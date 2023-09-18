@@ -78,6 +78,9 @@ class CALVINSACGMMAgent(Agent):
         self.env.set_init_pos(self.gmm.start)
         self.reset()
 
+        # NaN counter
+        self.nan_counter = 0
+
     def get_action_space(self):
         parameter_space = self.get_update_range_parameter_space()
         mu_high = np.ones(parameter_space["mu"].shape[0])
@@ -111,12 +114,17 @@ class CALVINSACGMMAgent(Agent):
             if not conn:
                 done = False
                 break
-            dx_pos, dx_ori = self.gmm.predict(curr_obs["robot_obs"])
-            # env_action = np.append(dx_pos, np.append(dx_ori, -1))
-            curr_obs, reward, done, info = self.env.step(dx_pos)
-            gmm_reward += reward
-            self.episode_env_steps += 1
-            self.total_env_steps += 1
+            dx_pos, dx_ori, is_nan = self.gmm.predict(curr_obs["robot_obs"])
+            if is_nan:
+                self.nan_counter += 1
+                done = True
+                log_rank_0("Nan in prediction, aborting episode")
+            else:
+                env_action = np.append(dx_pos, np.append(dx_ori, -1))
+                curr_obs, reward, done, info = self.env.step(env_action)
+                gmm_reward += reward
+                self.episode_env_steps += 1
+                self.total_env_steps += 1
             if done:
                 break
 
@@ -158,11 +166,15 @@ class CALVINSACGMMAgent(Agent):
 
                 # Act with the dynamical system in the environment
                 for _ in range(self.gmm_window):
-                    dx_pos, dx_ori = self.gmm.predict(self.obs["robot_obs"])
-                    # env_action = np.append(dx_pos, np.append(dx_ori, -1))
-                    self.obs, reward, done, info = self.env.step(dx_pos)
-                    episode_return += reward
-                    episode_env_steps += 1
+                    dx_pos, dx_ori, is_nan = self.gmm.predict(self.obs["robot_obs"])
+                    if is_nan:
+                        done = True
+                        log_rank_0("Nan in prediction, aborting episode")
+                    else:
+                        env_action = np.append(dx_pos, np.append(dx_ori, -1))
+                        self.obs, reward, done, info = self.env.step(env_action)
+                        episode_return += reward
+                        episode_env_steps += 1
 
                     if self.record and (episode == rand_idx):
                         self.env.record_frame(size=64)
@@ -175,7 +187,7 @@ class CALVINSACGMMAgent(Agent):
                     self.reset()
                     break
 
-            if ("success" in info) and info["success"]:
+            if not is_nan and ("success" in info) and info["success"]:
                 succesful_episodes += 1
             # Recording setup close
             if self.record and (episode == rand_idx):
@@ -209,9 +221,12 @@ class CALVINSACGMMAgent(Agent):
         param_space["priors"] = gym.spaces.Box(
             low=-self.priors_change_range, high=self.priors_change_range, shape=(self.gmm.priors.size,)
         )
-        param_space["mu"] = gym.spaces.Box(
-            low=-self.mu_change_range, high=self.mu_change_range, shape=(self.gmm.means.size,)
-        )
+        # param_space["mu"] = gym.spaces.Box(
+        #     low=-self.mu_change_range, high=self.mu_change_range, shape=(self.gmm.means.size,)
+        # )
+
+        # Do not refine Quaternion means (30-12=18)
+        param_space["mu"] = gym.spaces.Box(low=-self.mu_change_range, high=self.mu_change_range, shape=(9,))
 
         # dim = self.gmm.means.shape[1] // 2
         # num_gaussians = self.gmm.means.shape[0]

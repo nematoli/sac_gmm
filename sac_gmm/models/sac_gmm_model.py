@@ -72,25 +72,29 @@ class SACGMM(SkillModel):
 
     def on_train_epoch_end(self):
         if self.episode_done:
-            metrics = {"eval_episode-avg-return": float("-inf")}
+            metrics = {"eval/episode-avg-return": float("-inf")}
             log_rank_0(f"episode {self.episode_idx} done")
             train_metrics = {
-                "train_episode-return": self.episode_return,
-                "train_episode-length": self.episode_length,
-                "train_episode-number": self.episode_idx,
+                "train/episode-return": self.episode_return,
+                "train/episode-length": self.episode_length * self.agent.gmm_window,
+                "train/episode-number": self.episode_idx,
+                "train/nan-counter": self.agent.nan_counter,
             }
             metrics.update(train_metrics)
             eval_return = float("-inf")
             eval_accuracy = float("-inf")
             if self.episode_idx % self.eval_frequency == 0:
-                eval_accuracy, eval_return, eval_length, _ = self.agent.evaluate(self.actor)
+                eval_accuracy, eval_return, eval_length, eval_video_path = self.agent.evaluate(self.actor)
                 eval_metrics = {
-                    "eval_accuracy": eval_accuracy,
-                    "eval_episode-avg-return": eval_return,
-                    "eval_episode-avg-length": eval_length,
-                    "eval_total-env-steps": self.agent.total_env_steps,
+                    "eval/accuracy": eval_accuracy,
+                    "eval/episode-avg-return": eval_return,
+                    "eval/episode-avg-length": eval_length,
+                    "eval/total-env-steps": self.agent.total_env_steps,
                 }
                 metrics.update(eval_metrics)
+                # Log the video GIF to wandb if exists
+                if eval_video_path is not None:
+                    self.log_video(eval_video_path, f"eval/video")
 
             self.episode_return, self.episode_length = 0, 0
             self.episode_idx += 1
@@ -104,10 +108,10 @@ class SACGMM(SkillModel):
         actor_loss, alpha_loss = self.compute_actor_and_alpha_loss(batch, actor_optimizer, alpha_optimizer)
 
         losses = {
-            "loss_critic": critic_loss,
-            "loss_actor": actor_loss,
-            "loss_alpha": alpha_loss,
-            "alpha_value": self.alpha,
+            "loss/critic": critic_loss,
+            "loss/actor": actor_loss,
+            "loss/alpha": alpha_loss,
+            "loss/alpha_value": self.alpha,
         }
         return losses
 

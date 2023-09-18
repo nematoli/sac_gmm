@@ -14,7 +14,7 @@ skill: ${skill}
 gmm: ${gmm}
 adapt_cov: false
 mean_shift: false
-adapt_per_episode: 4
+adapt_per_episode: 8
 
 exp_dir: ${exp_dir}
 render: ${render}
