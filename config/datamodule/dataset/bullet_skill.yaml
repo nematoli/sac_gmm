@@ -1,0 +1,4 @@
+_target_: sac_gmm.datasets.bullet_skill.BulletSkillDataset
+skill: ${skill}
+goal_centered: ${goal_centered}
+demos_dir: ${demos_dir}

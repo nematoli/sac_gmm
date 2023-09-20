@@ -1,0 +1,5 @@
+_target_: sac_gmm.datasets.calvin_skill.CALVINSkillDataset
+skill: ${skill}
+goal_centered: ${goal_centered}
+flatten: ${flatten}
+demos_dir: ${demos_dir}
