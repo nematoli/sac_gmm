@@ -1,0 +1,19 @@
+defaults:
+  - setup
+  - skill_setup
+  - override datamodule: calvin_clean
+
+
+remove_failures: true
+
+hydra:
+  run:
+    dir: ${log_dir}/play-demos-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/play-demos-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir

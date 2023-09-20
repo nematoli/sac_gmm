@@ -1,0 +1,7 @@
+_target_: sac_gmm.utils.augmenter.Augmenter
+_recursive_: false
+
+augment: true
+cover_dist: [10,20]
+margin: 5
+min_cover_dist: 0.0

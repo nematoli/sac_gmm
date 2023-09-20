@@ -1,21 +1,12 @@
-_target_: sac_gmm.models.agent.calvin.sac_gmm_calvin.CALVINSACGMMAgent
-_recursive_: false
+defaults:
+  - default
 
+name: SACGMM
 calvin_env: ${env}
-datamodule: ${datamodule}
-
-num_init_steps: ${num_init_steps}
-num_eval_episodes: ${num_eval_episodes}
 
 priors_change_range: 0.0
-mu_change_range: 0.05
-
-skill: ${skill}
-gmm: ${gmm}
-adapt_cov: false
-mean_shift: false
+mu_change_range: 0.03
 adapt_per_episode: 4
 
-exp_dir: ${exp_dir}
-render: ${render}
-record: ${record}
+_target_: sac_gmm.agents.calvin.sac_gmm_agent.SACGMMAgent
+_recursive_: false

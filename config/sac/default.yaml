@@ -1,5 +1,8 @@
-#misc
-# device: ${device}
+defaults:
+  - actor: default
+  - critic: default
+  - replay_buffer: default
+
 discount: 0.99
 
 #rl dataset
@@ -16,11 +19,6 @@ critic_tau: 0.005
 optimize_alpha: false
 alpha_lr: 3e-5
 init_alpha: 0.002
-
-# #ae
-# ae_lr: 3e-4
-# shared_encoder: true
-# fixed_encoder: false
 
 # evaluation frequency:
 eval_frequency: ${eval_frequency}

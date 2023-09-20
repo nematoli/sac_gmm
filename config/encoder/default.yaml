@@ -1,0 +1,5 @@
+_target_: sac_gmm.sac.networks.vision.autoencoder.PTEncoder
+_recursive_: false
+model_name: cifar10-resnet18  # cifar10-resnet18, imagenet-resnet18, imagenet-resnet50
+obs_space: ${obs_space}
+feature_size: 512

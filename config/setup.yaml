@@ -2,10 +2,16 @@ seed: 42
 slurm: false
 device: cuda
 
-root: /home/${developer}/sac_gmm
+root: /home/${developer}/ws/src/sac_gmm
 log_dir: ${root}/logs
 demos_dir: ${root}/demonstrations
-exp_dir: null
+exp_dir: null  
+chk_dir: null 
 
 developer: "nematoli"
 comment: ""
+
+# Environment params
+render: false
+record: false
+show_gui: false

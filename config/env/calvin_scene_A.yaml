@@ -1,0 +1,13 @@
+defaults:
+  - calvin_env: calvin_default
+  - override calvin_env/scene: calvin_scene_A
+
+# Environment params
+env_name: calvin
+ee_noise: [0.1, 0.07, 0.07]
+obs_space: ${obs_space} # ["state"], ["pos", "joints"], ["pos", "joints", "gripper"], ["state", "gripper"]
+
+show_gui: ${show_gui}
+
+is_source: false
+

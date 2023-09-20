@@ -1,4 +1,4 @@
-deterministic: true
+deterministic: false
 accelerator: gpu
 precision: 32
 max_epochs: -1

@@ -2,9 +2,7 @@ defaults:
   - setup
   - skill_setup
   - callbacks: default
-  - datamodule: calvin_ds
   - sac: sac_model
-  - agent: sac_gmm_calvin
   - logger: wandb
   - trainer: default
 
@@ -16,14 +14,6 @@ defaults:
 eval_frequency: 100
 num_init_steps: 2
 num_eval_episodes: 20
-
-# Dataset params:
-train: true # false to load validation dataset
-goal_centered: true # this must be false during evaluation
-
-# Visualization
-render: false
-record: false
 
 hydra:
   run:

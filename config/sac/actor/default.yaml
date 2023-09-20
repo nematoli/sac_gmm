@@ -1,4 +1,4 @@
-_target_: sac_gmm.models.sac.networks.actor.base_actor.Actor
+_target_: sac_gmm.sac.networks.actor.base_actor.Actor
 input_dim: ???
 action_dim: ???
 hidden_dim: 1024

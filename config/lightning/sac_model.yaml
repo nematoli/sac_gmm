@@ -1,0 +1,5 @@
+_target_: sac_gmm.models.sac_model.SAC
+_recursive_: false
+
+sac: ${sac}
+agent: ${agent}

@@ -1,0 +1,6 @@
+defaults:
+  - dataset: calvin_skill
+  - transforms: calvin
+
+dataset:
+  flatten: true

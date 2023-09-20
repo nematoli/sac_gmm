@@ -1,8 +1,0 @@
-_target_: sac_gmm.models.sac.networks.vision.autoencoder.AutoEncoder
-_recursive_: false
-img_res: 64
-in_channels: 1
-hidden_dim: 8
-late_fusion: true
-latent_lambda: 0
-device: ${device}

@@ -1,0 +1,30 @@
+defaults:
+  - setup
+  - skill_setup
+  - kp_det: default
+  - augmenter: default
+  - lightning: kis_gmm_model
+  - callbacks: default
+  - logger: wandb
+  - trainer: default
+
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+  - _self_
+
+# evaluation frequency:
+eval_frequency: 20
+num_init_steps: 32
+num_eval_episodes: 10
+
+hydra:
+  run:
+    dir: ${log_dir}/kisgmm-train/${now:%Y_%m_%d}/${now:%H_%M_%S}
+  sweep:
+    dir: ${log_dir}/kisgmm-train/${now:%Y_%m_%d}/${now:%H_%M_%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir

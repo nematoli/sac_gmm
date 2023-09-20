@@ -1,0 +1,15 @@
+defaults:
+  - default
+
+name: KISGMM
+calvin_env: ${env}
+
+priors_change_range: 0.0
+mu_change_range: 0.08
+adapt_per_episode: 4
+
+mimic_sac_gmm: false
+
+_target_: sac_gmm.agents.calvin.kis_gmm_agent.KISGMMAgent
+_recursive_: false
+

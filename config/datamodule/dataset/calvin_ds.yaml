@@ -1,5 +1,0 @@
-_target_: sac_gmm.datasets.calvin_dynsys.CALVINDynSysDataset
-skill: ${skill}
-train: ${train}
-goal_centered: ${goal_centered}
-demos_dir: ${demos_dir}
