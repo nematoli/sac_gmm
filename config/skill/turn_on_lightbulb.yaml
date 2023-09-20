@@ -1,9 +1,0 @@
-defaults:
-  - setup
-
-# Dataset params:
-name: turn_on_lightbulb
-state_type: 'pos'
-
-# GMM params
-n_components: 3

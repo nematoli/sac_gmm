@@ -1,0 +1,7 @@
+defaults:
+  - setup
+
+# GMM params
+n_components: 3
+
+

@@ -34,17 +34,18 @@ def train_gmm(cfg: DictConfig) -> None:
     seed_everything(cfg.seed, workers=True)
     log_rank_0(f"Training a GMM skill with the following config:\n{OmegaConf.to_yaml(cfg)}")
     log_rank_0(print_system_env_info())
-    log_rank_0(f"Training gmm for skill {cfg.skill.name} with {cfg.skill.state_type} as the input")
+    log_rank_0(f"Training gmm for skill {cfg.skill.name} with GMM type {cfg.gmm.gmm_type}")
 
     # Load dataset
+    cfg.datamodule.dataset.skill.skill = cfg.datamodule.dataset.skill.name
     train_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
-    log_rank_0(f"Skill: {cfg.skill.name}, Train Data: {train_dataset.X.size()}")
+    log_rank_0(f"Skill: {cfg.skill.name}, Train Data: {train_dataset.X_pos.size()}")
 
     # Model
     gmm = hydra.utils.instantiate(cfg.gmm)
 
     # Setup logger
-    logger_name = f"{cfg.skill.name}_{cfg.skill.state_type}_{gmm.name}_{gmm.n_components}"
+    logger_name = f"{cfg.skill.name}_{gmm.name}_type{gmm.gmm_type}_{gmm.n_components}"
     gmm.logger = setup_logger(cfg, name=logger_name)
 
     gmm.fit(dataset=train_dataset)

@@ -5,6 +5,7 @@ from pathlib import Path
 import gym
 from sac_gmm.models.gmm.utils.plot_utils import visualize_3d_gmm
 from sac_gmm.utils.posdef import isPD, nearestPD
+from sac_gmm.models.gmm.utils.rotation_utils import compute_euler_difference
 from pytorch_lightning.utilities import rank_zero_only
 import pybullet
 
@@ -31,6 +32,12 @@ def log_rank_0(*args, **kwargs):
 class BaseGMM(object):
     """Gaussian Mixture Model.
 
+    Type 1: GMM with position as input and velocity as output
+    Type 2: GMM with position as input and next position as output
+    Type 3: GMM with position as input and next position and next orientation as output
+    Type 4: One GMM with position as input and velocity as output and
+            another GMM with position as input and orientation as output
+
     Parameters
     ----------
     n_components : int
@@ -48,7 +55,7 @@ class BaseGMM(object):
     """
 
     def __init__(
-        self, n_components=3, priors=None, means=None, covariances=None, plot=None, model_dir=None, state_type=None
+        self, n_components=3, priors=None, means=None, covariances=None, plot=None, model_dir=None, gmm_type=None
     ):
         # GMM
         self.n_components = n_components
@@ -57,7 +64,7 @@ class BaseGMM(object):
         self.covariances = covariances
         self.plot = plot
         self.model_dir = model_dir
-        self.state_type = state_type
+        self.gmm_type = gmm_type
         self.pos_dt = 0.02
         self.ori_dt = 0.05
         self.goal = None
@@ -69,12 +76,6 @@ class BaseGMM(object):
         # Data
         self.dataset = None
         self.data = None
-        if self.state_type == "pos" or "ori":
-            self.dim = 3
-        elif self.state_type == "pos_ori":
-            self.dim = 6
-        else:
-            raise NotImplementedError
 
         if self.priors is not None:
             self.priors = np.asarray(self.priors)
@@ -83,36 +84,43 @@ class BaseGMM(object):
         if self.covariances is not None:
             self.covariances = np.asarray(self.covariances)
 
-    def preprocess_data(self, dataset, normalize=False):
-        # Data size
-        data_size = dataset.X.shape[0]
-        # data_size = 100
-        if self.state_type == "pos_ori":
-            # Stack position, velocity and quaternion data
-            demos_xdx = [
-                np.hstack([dataset.X[i], dataset.dX[i, :, :3], dataset.dX[i, :, 3:]]) for i in range(data_size)
-            ]
-        else:
-            # Stack position and velocity data
-            demos_xdx = [np.hstack([dataset.X[i], dataset.dX[i]]) for i in range(dataset.X.shape[0])]
+        # Useful for GMM type 4
+        self.data2 = None
+        self.priors2 = None
+        self.means2 = None
+        self.covariances2 = None
 
-        # Stack demos
-        demos = demos_xdx[0]
-        for i in range(1, data_size):
-            demos = np.vstack([demos, demos_xdx[i]])
+    def fit(self, dataset):
+        """
+        fits a GMM on demonstrations
+        Args:
+            dataset: skill demonstrations
+        """
+        raise NotImplementedError
 
-        X = demos[:, : self.dim]
-        Y = demos[:, self.dim : self.dim + self.dim]
+    def predict1(self, x):
+        """
+        Predict function for GMM type 1
+        """
+        raise NotImplementedError
 
-        if self.state_type == "pos_ori":
-            Y_Ori = demos[:, self.dim + self.dim :]
-            data = np.empty((X.shape[0], 3), dtype=object)
-            for n in range(X.shape[0]):
-                data[n] = [X[n], Y[n], Y_Ori[n]]
-        else:
-            data = np.hstack((X, Y))
+    def predict2(self, x):
+        """
+        Predict function for GMM type 2
+        """
+        raise NotImplementedError
 
-        return data
+    def predict3(self, x):
+        """
+        Predict function for GMM type 3
+        """
+        raise NotImplementedError
+
+    def predict4(self, x):
+        """
+        Predict function for GMM type 4
+        """
+        raise NotImplementedError
 
     def set_skill_params(self, dataset):
         self.pos_dt = dataset.pos_dt
@@ -123,28 +131,52 @@ class BaseGMM(object):
 
     def set_data_params(self, dataset):
         self.dataset = dataset
-        self.dim = self.dataset.X.numpy().shape[-1]
-        self.data = self.preprocess_data(dataset, normalize=False)
+        self.data, self.data2 = self.preprocess_data()
 
-    def fit(self, dataset):
-        """
-        fits a GMM on demonstrations
-        Args:
-            dataset: skill demonstrations
-        """
-        raise NotImplementedError
+    def preprocess_data(self):
+        data, data2 = None, None
+        # Data size
+        data_size = self.dataset.X_pos.shape[0]
+        # Horizontal stack demos
+        if self.gmm_type in [1, 2, 4]:
+            # Stack X_pos and dX_pos data
+            demos_xdx = [
+                np.hstack([self.dataset.X_pos[i], self.dataset.dX_pos[i]]) for i in range(self.dataset.X_pos.shape[0])
+            ]
+        else:
+            # Stack X_pos, dX_pos and X_ori data
+            demos_xdx = [
+                np.hstack([self.dataset.X_pos[i], self.dataset.dX_pos[i], self.dataset.X_ori[i]])
+                for i in range(data_size)
+            ]
+        # Vertical stack demos
+        demos = demos_xdx[0]
+        for i in range(1, data_size):
+            demos = np.vstack([demos, demos_xdx[i]])
 
-    def predict_dx_pos(self, x):
-        """Infers the remaining state at the partially defined point x.
+        X_pos = demos[:, :3]
+        dX_pos = demos[:, 3:6]
 
-        Args:
-            x (np.array): Partial point to infer remaining state at.
+        if self.gmm_type in [1, 2, 4]:
+            data = np.hstack((X_pos, dX_pos))
+        else:
+            X_ori = demos[:, 6:]
+            data = np.empty((X_pos.shape[0], 3), dtype=object)
+            for n in range(X_pos.shape[0]):
+                data[n] = [X_pos[n], dX_pos[n], X_ori[n]]
 
-        Returns:
-            np.array: Inferred remaining state at x.
-        """
+        # Data for the second GMM
+        if self.gmm_type == 4:
+            # Stack X_pos and X_ori data
+            demos_xdx = [np.hstack([self.dataset.X_pos[i], self.dataset.X_ori[i]]) for i in range(data_size)]
+            demos = demos_xdx[0]
+            for i in range(1, data_size):
+                demos = np.vstack([demos, demos_xdx[i]])
+            X_pos = demos[:, :3]
+            X_ori = demos[:, 3:]
+            data2 = np.hstack((X_pos, X_ori))
 
-        raise NotImplementedError
+        return data, data2
 
     def save_model(self):
         filename = self.model_dir + "/gmm_params.npy"
@@ -157,6 +189,17 @@ class BaseGMM(object):
             },
         )
         log_rank_0(f"Saved GMM params at {filename}")
+        if self.gmm_type == 4:
+            filename = self.model_dir + "/gmm_params2.npy"
+            np.save(
+                filename,
+                {
+                    "priors": self.priors2,
+                    "mu": self.means2,
+                    "sigma": self.covariances2,
+                },
+            )
+            log_rank_0(f"Saved second GMM params at {filename}")
 
     def load_model(self):
         filename = self.model_dir + "/gmm_params.npy"
@@ -167,6 +210,15 @@ class BaseGMM(object):
         self.priors = np.array(gmm["priors"])
         self.means = np.array(gmm["mu"])
         self.covariances = np.array(gmm["sigma"])
+        if self.gmm_type == 4:
+            filename = self.model_dir + "/gmm_params2.npy"
+            log_rank_0(f"Loading second GMM params from {filename}")
+
+            gmm = np.load(filename, allow_pickle=True).item()
+
+            self.priors2 = np.array(gmm["priors"])
+            self.means2 = np.array(gmm["mu"])
+            self.covariances2 = np.array(gmm["sigma"])
 
     def copy_model(self, gmm):
         """Copies GMM params to self from the input GMM class object
@@ -180,6 +232,29 @@ class BaseGMM(object):
         self.priors = np.copy(gmm.priors)
         self.means = np.copy(gmm.means)
         self.covariances = np.copy(gmm.covariances)
+
+        if gmm.gmm_type == 4:
+            self.priors2 = np.copy(gmm.priors2)
+            self.means2 = np.copy(gmm.means2)
+            self.covariances2 = np.copy(gmm.covariances2)
+
+    def model_params(self, cov=False):
+        """Returns GMM priors and means as a flattened vector
+
+        Args:
+            None
+
+        Returns:
+            params (np.array): GMM params flattened
+        """
+        priors = self.priors
+        means = self.means.flatten()
+        # params = np.concatenate((priors, means), axis=-1)
+        params = priors
+        for x in means:
+            params = np.append(params, x)
+
+        return params
 
     def update_model(self, delta):
         """Updates GMM parameters by given delta changes (i.e. SAC's output)
@@ -199,14 +274,16 @@ class BaseGMM(object):
 
         # Means
         if "mu" in delta:
-            # delta_means = delta["mu"].reshape(self.means.shape)
-            # self.means += delta_means
-            idx = 0
-            for i in range(self.means.shape[0]):
-                self.means[i, 0] += delta["mu"][idx : idx + 3]
-                self.means[i, 1] += delta["mu"][idx : idx + 3]
-                idx += 3
-
+            if self.gmm_type in [1, 2]:
+                delta_means = delta["mu"].reshape(self.means.shape)
+                self.means += delta_means
+            elif self.gmm_type == 3:
+                # Only update position and next position means
+                idx = 0
+                for i in range(self.means.shape[0]):
+                    self.means[i, 0] += delta["mu"][idx : idx + 3]
+                    self.means[i, 1] += delta["mu"][idx : idx + 3]
+                    idx += 3
         pass
         # # Covariances
         # if "sigma" in delta:
@@ -231,34 +308,8 @@ class BaseGMM(object):
         #     d_sigma_cc = d_sigma_cc.reshape((dim, dim, num_gaussians))
         #     self.covariances[dim : 2 * dim, 0:dim] += d_sigma_cc
 
-    def model_params(self, cov=False):
-        """Returns GMM priors and means as a flattened vector
-
-        Args:
-            None
-
-        Returns:
-            params (np.array): GMM params flattened
-        """
-        priors = self.priors
-        means = self.means.flatten()
-        # params = np.concatenate((priors, means), axis=-1)
-        params = priors
-        for x in means:
-            params = np.append(params, x)
-
-        return params
-
     def plot_gmm(self, obj_type=True):
-        # if not obj_type:
-        #     means = self.float_to_object(self.means)
-        # else:
-        #     means = self.means
-
-        # self.reshape_params(to="gmr-specific")
-
-        # Pick 15 random datapoints from X to plot
-        points = self.dataset.X.numpy()[:, :, :3]
+        points = self.dataset.X_pos.numpy()
         rand_idx = np.random.choice(np.arange(0, len(points)), size=15)
         points = np.vstack(points[rand_idx, :, :])
         means = np.vstack(self.means[:, 0])
@@ -281,86 +332,56 @@ class BaseGMM(object):
 
         Gmr-specific: self.means = (N, 2, S)
         """
-        # priors and covariances already match shape
-        shape = None
-        if to == "generic":
-            shape = (self.n_components, 2 * self.dim)
-        else:
-            shape = (self.n_components, 2, self.dim)
-        self.means = self.means.reshape(shape)
+        if self.gmm_type in [1, 2]:
+            # priors and covariances already match shape
+            shape = None
+            if to == "generic":
+                shape = (self.n_components, 2 * 3)
+            else:
+                shape = (self.n_components, 2, 3)
+            self.means = self.means.reshape(shape)
 
     def get_reshaped_means(self):
         """Reshape means from (n_components, 2) to (n_components, 2, state_size)"""
-        if self.state_type == "pos_ori":
-            new_means = np.empty((self.n_components, 2, self.dim + self.dim + 4))
+        if self.gmm_type in [1, 2]:
+            new_means = np.empty((self.n_components, 2, 3))
+            for i in range(new_means.shape[0]):
+                for j in range(new_means.shape[1]):
+                    new_means[i, j, :] = self.means[i][j]
+            return new_means
         else:
-            new_means = np.empty((self.n_components, 2, self.dim))
-        for i in range(new_means.shape[0]):
-            for j in range(new_means.shape[1]):
-                new_means[i, j, :] = self.means[i][j]
-        return new_means
+            return np.copy(self.means)
 
-    def get_reshape_data(self):
-        if self.state_type != "pos_ori":
+    def get_reshaped_data(self):
+        reshaped_data, reshaped_data2 = None, None
+        if self.gmm_type in [1, 2, 4]:
             reshaped_data = np.empty((self.data.shape[0], 2), dtype=object)
             for n in range(self.data.shape[0]):
-                reshaped_data[n] = [self.data[n, : self.dim], self.data[n, self.dim :]]
-            return reshaped_data
+                reshaped_data[n] = [self.data[n, :3], self.data[n, 3:]]
+            if self.gmm_type == 4:
+                reshaped_data2 = np.empty((self.data2.shape[0], 2), dtype=object)
+                for n in range(self.data.shape[0]):
+                    reshaped_data2[n] = [self.data2[n, :3], self.data2[n, 3:]]
+            return reshaped_data, reshaped_data2
         else:
-            return np.copy(self.data)
+            return np.copy(self.data), None
 
     def predict(self, x):
-        out = self.predict_dx_pos(x[:3])
-        if np.isnan(out[0]):
-            return np.zeros(3), np.zeros(3), True
-        dx_pos = self.compute_pos_difference(out[:3], x[:3])
-        dx_ori = self.compute_euler_difference(pybullet.getEulerFromQuaternion(out[3:]), x[3:6])
+        if self.gmm_type == 1:
+            dx_pos = self.predict1(x[:3])
+            target_ori = self.fixed_ori
+        elif self.gmm_type == 2:
+            next_pos = self.predict2(x[:3])
+            dx_pos = (next_pos + self.goal - x[:3]) / self.pos_dt
+            target_ori = self.fixed_ori
+        elif self.gmm_type == 3:
+            out = self.predict3(x[:3])
+            if np.isnan(out[0]):
+                return np.zeros(3), np.zeros(3), True
+            dx_pos = (out[:3] + self.goal - x[:3]) / self.pos_dt
+            target_ori = pybullet.getEulerFromQuaternion(out[3:])
+        else:
+            dx_pos, x_ori = self.predict4(x[:3])
+            target_ori = pybullet.getEulerFromQuaternion(x_ori)
+        dx_ori = compute_euler_difference(target_ori, x[3:6])
         return dx_pos, dx_ori, False
-
-    def predict2(self, x):
-        return self.predict_dx_pos(x[:3])  # , self.predict_dx_ori(x[3:6])
-
-    def compute_pos_difference(self, goal_pos, current_pos):
-        return (goal_pos - current_pos) / self.pos_dt
-
-    def compute_euler_difference(self, goal_angles, current_angles):
-        """
-        1. Convert Euler Angles to Rotation Matrices
-        2. Find the Relative Rotation Matrix
-        3. Extract Euler Angles from the Relative Rotation Matrix
-        """
-        R_rel = relative_rotation_matrix(current_angles, goal_angles)
-        euler_rel = rotation_matrix_to_euler(R_rel)
-        return euler_rel
-
-
-def euler_to_rotation_matrix(theta, phi, psi):
-    """
-    Converts Euler angles to a rotation matrix.
-    """
-    R_x = np.array([[1, 0, 0], [0, np.cos(theta), -np.sin(theta)], [0, np.sin(theta), np.cos(theta)]])
-
-    R_y = np.array([[np.cos(phi), 0, np.sin(phi)], [0, 1, 0], [-np.sin(phi), 0, np.cos(phi)]])
-
-    R_z = np.array([[np.cos(psi), -np.sin(psi), 0], [np.sin(psi), np.cos(psi), 0], [0, 0, 1]])
-
-    return np.dot(R_z, np.dot(R_y, R_x))
-
-
-def relative_rotation_matrix(angles1, angles2):
-    """
-    Computes the relative rotation matrix between two sets of Euler angles.
-    """
-    R1 = euler_to_rotation_matrix(angles1[0], angles1[1], angles1[2])
-    R2 = euler_to_rotation_matrix(angles2[0], angles2[1], angles2[2])
-    return np.dot(R2, np.linalg.inv(R1))
-
-
-def rotation_matrix_to_euler(R):
-    """
-    Extracts Euler angles from a rotation matrix.
-    """
-    theta = np.arctan2(R[2, 1], R[2, 2])
-    phi = np.arctan2(-R[2, 0], np.sqrt(R[2, 1] ** 2 + R[2, 2] ** 2))
-    psi = np.arctan2(R[1, 0], R[0, 0])
-    return np.array((theta, phi, psi))

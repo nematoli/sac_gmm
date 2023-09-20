@@ -31,57 +31,53 @@ def log_rank_0(*args, **kwargs):
 
 
 class ManifoldGMM(BaseGMM):
-    def __init__(self, skill, plot):
+    def __init__(self, skill, plot, gmm_type):
         super(ManifoldGMM, self).__init__(
-            n_components=skill.n_components, plot=plot, model_dir=skill.skills_dir, state_type=skill.state_type
+            n_components=skill.n_components, plot=plot, model_dir=skill.skills_dir, gmm_type=gmm_type
         )
 
         self.name = "ManifoldGMM"
         self.skill = skill.skill
 
         self.manifold = None
+        self.manifold2 = None  # Only applies to gmm type 4
         self.logger = None
-        self.model_dir = os.path.join(Path(skill.skills_dir).expanduser(), skill.skill, skill.state_type, self.name)
+        self.model_dir = os.path.join(Path(skill.skills_dir).expanduser(), skill.skill, self.name, f"type{gmm_type}")
         os.makedirs(self.model_dir, exist_ok=True)
 
     def make_manifold(self):
-        if self.state_type in ["pos", "joint"]:
-            in_manifold = Euclidean(self.dim)
-            out_manifold = Euclidean(self.dim)
-        elif self.state_type == "ori":
-            in_manifold = Sphere(self.dim)
-            out_manifold = Sphere(self.dim)
-        elif self.state_type == "pos_ori":
-            in_dim = 3
-            out_dim_e = 3
-            out_dim_q = 4
-            in_manifold = Euclidean(in_dim)
-            out_manifold1 = Euclidean(out_dim_e)
-            out_manifold2 = Sphere(out_dim_q)
-            manifold = Product([in_manifold, out_manifold1, out_manifold2])
-            return manifold
-        manifold = Product([in_manifold, out_manifold])
-        return manifold
+        manifold, manifold2 = None, None
+        if self.gmm_type in [1, 2]:
+            manifold = Product([Euclidean(3), Euclidean(3)])
+        elif self.gmm_type == 3:
+            manifold = Product([Euclidean(3), Euclidean(3), Sphere(4)])
+        elif self.gmm_type == 4:
+            manifold = Product([Euclidean(3), Euclidean(3)])
+            manifold2 = Product([Euclidean(3), Sphere(4)])
+        return manifold, manifold2
 
     def fit(self, dataset):
         # Dataset
         self.set_data_params(dataset)
-        self.data = self.get_reshape_data()
-        self.manifold = self.make_manifold()
+        self.data, self.data2 = self.get_reshaped_data()
+        self.manifold, self.manifold2 = self.make_manifold()
+
+        if self.gmm_type in [1, 2, 4]:
+            total_dim = 3 + 3
+        else:
+            total_dim = 3 + 3 + 4
 
         # K-Means
         km_means, km_assignments = manifold_k_means(self.manifold, self.data, nb_clusters=self.n_components)
+
         # GMM
-        total_dim = self.dim + self.dim
-        if self.state_type == "pos_ori":
-            total_dim += 4
-        log_rank_0("Manifold GMM with K-Means priors")
+        log_rank_0(f"Type {self.gmm_type} Manifold GMM with K-Means priors")
         start = time.time()
         init_covariances = np.concatenate(self.n_components * [np.eye(total_dim)[None]], 0)
         init_priors = np.zeros(self.n_components)
         for k in range(self.n_components):
             init_priors[k] = np.sum(km_assignments == k) / len(km_assignments)
-        self.means, self.covariances, self.priors, self.assignments = manifold_gmm_em(
+        self.means, self.covariances, self.priors, assignments = manifold_gmm_em(
             self.manifold,
             self.data,
             self.n_components,
@@ -90,13 +86,32 @@ class ManifoldGMM(BaseGMM):
             initial_priors=init_priors,
             logger=logger,
         )
-        log_rank_0(f"GMM train time: {time.time() - start} seconds")
-        if self.state_type != "pos_ori":
-            # Reshape means from (n_components, 2) to (n_components, 2, state_size)
-            self.means = self.get_reshaped_means()
+        # Train another GMM if type 4
+        if self.gmm_type == 4 and self.manifold2 is not None:
+            total_dim = 3 + 4
+            km_means, km_assignments = manifold_k_means(self.manifold2, self.data2, nb_clusters=self.n_components)
+            log_rank_0(f"Type {self.gmm_type} Second Manifold GMM with K-Means priors")
+            init_covariances = np.concatenate(self.n_components * [np.eye(total_dim)[None]], 0)
+            init_priors = np.zeros(self.n_components)
+            for k in range(self.n_components):
+                init_priors[k] = np.sum(km_assignments == k) / len(km_assignments)
+            self.means2, self.covariances2, self.priors2, assignments = manifold_gmm_em(
+                self.manifold2,
+                self.data2,
+                self.n_components,
+                initial_means=km_means,
+                initial_covariances=init_covariances,
+                initial_priors=init_priors,
+                logger=logger,
+            )
 
-            # Save GMM params
-            self.reshape_params(to="generic")
+        log_rank_0(f"Type {self.gmm_type} GMM train time: {time.time() - start} seconds")
+        # Reshape means from (n_components, 2) to (n_components, 2, state_size)
+        # Only applies to gmm type 1 and 2
+        self.means = self.get_reshaped_means()
+
+        # Save GMM params
+        # self.reshape_params(to="generic")  # Only applies to gmm type 1 and 2
         self.save_model()
 
         # Plot GMM
@@ -105,24 +120,41 @@ class ManifoldGMM(BaseGMM):
 
         self.logger.log_table(key="fit", columns=["GMM"], data=[[wandb.Video(outfile)]])
 
-    def load_model(self):
-        super().load_model()
-
-    def predict_dx_pos(self, x):
-        # self.reshape_params(to="gmr-specific")
-        if self.state_type == "pos_ori":
-            out_manifold_idx = [1, 2]
-        else:
-            out_manifold_idx = [1]
+    def predict1(self, x):
         dx, _, __ = manifold_gmr(
-            (x).reshape(1, -1),
+            (x - self.goal).reshape(1, -1),
             self.manifold,
             self.means,
             self.covariances,
             self.priors,
             in_manifold_idx=[0],
-            out_manifold_idx=out_manifold_idx,
+            out_manifold_idx=[1],
         )
-        # self.reshape_params(to="generic")
-
         return dx[0]
+
+    def predict2(self, x):
+        return self.predict1(x)
+
+    def predict3(self, x):
+        dx, _, __ = manifold_gmr(
+            (x - self.goal).reshape(1, -1),
+            self.manifold,
+            self.means,
+            self.covariances,
+            self.priors,
+            in_manifold_idx=[0],
+            out_manifold_idx=[1, 2],
+        )
+        return dx[0]
+
+    def predict4(self, x):
+        dx, _, __ = manifold_gmr(
+            (x - self.goal).reshape(1, -1),
+            self.manifold2,
+            self.means2,
+            self.covariances2,
+            self.priors2,
+            in_manifold_idx=[0],
+            out_manifold_idx=[1],
+        )
+        return self.predict1(x), dx[0]

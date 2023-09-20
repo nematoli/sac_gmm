@@ -1,6 +1,6 @@
 defaults:
   - gmm: manifold_gmm # manifold_gmm or bayesian_gmm
-  - skill: open_drawer # open_drawer / close_drawer /  
+  - skill: default
   - env: default_skill # open_drawer / close_drawer / ?
 
   - _self_
@@ -9,5 +9,5 @@ defaults:
   - override hydra/hydra_logging: colorlog
 
 skill:
-  state_type: 'pos_ori'
+  name: move_slider_left
   max_steps: 128

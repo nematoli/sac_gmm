@@ -1,9 +1,0 @@
-defaults:
-  - setup
-
-# Dataset params:
-name: open_drawer
-state_type: 'pos'
-
-# GMM params
-n_components: 3

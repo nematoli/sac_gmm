@@ -9,9 +9,9 @@ from pathlib import Path
 from omegaconf import DictConfig
 
 
-class CALVINDynSysDataset(Dataset):
+class CALVINDynSysDataset3(Dataset):
     """
-    Use this to train GMM: Position -> Velocity
+    Use this to train GMM: Position -> Next Position + Next Orientation
     """
 
     def __init__(
@@ -41,8 +41,8 @@ class CALVINDynSysDataset(Dataset):
         assert self.demos_dir.is_dir(), "Demos directory does not exist!"
         self.data_file = glob.glob(str(self.demos_dir / self.skill.skill / f"{fname}.npy"))[0]
 
-        # Get position only
-        self.X_pos = np.load(self.data_file)[:, :, :3]
+        # Get position and orientation
+        data = np.load(self.data_file)[:, :, :6]
 
         # Record the euler angles best for the skill
         if self.skill.skill in ["turn_on_lightbulb", "move_slider_left"]:
@@ -50,23 +50,36 @@ class CALVINDynSysDataset(Dataset):
         else:
             self.fixed_ori = np.array([3.14, 0.0, 1.5])
 
+        self.X_pos = data[:, :, :3]
         # Store average start and goal positions
         self.start = np.mean(self.X_pos[:, 0, :], axis=0)
         self.goal = np.mean(self.X_pos[:, -1, :], axis=0)
 
         # Make X goal centered i.e., subtract each trajectory with its goal
         if self.goal_centered:
-            self.X_pos[:, :, :] = self.X_pos[:, :, :] - np.expand_dims(self.X_pos[:, -1, :], axis=1)
+            self.X_pos = self.X_pos - np.expand_dims(self.X_pos[:, -1, :], axis=1)
 
-        self.dX_pos = np.zeros_like(self.X_pos)
-        self.dX_pos[:, :-1, :] = (self.X_pos[:, 1:, :] - self.X_pos[:, :-1, :]) / self.pos_dt
-        self.dX_pos[:, -1, :] = np.zeros(self.dX_pos.shape[-1])
+        # Model: Pos -> Next Pos + Next Ori
+        self.dX_pos = np.copy(self.X_pos[:, 1:, :])
+        self.X_pos = np.copy(self.X_pos[:, :-1, :])
+
+        # Convert Euler anglers to Quaternions
+        self.X_ori = data[:, :, 3:]
+        oris = np.apply_along_axis(p.getQuaternionFromEuler, -1, self.X_ori)
+        # Make all quaternions positive
+        for traj in range(oris.shape[0]):
+            for t_step in range(oris.shape[1]):
+                if oris[traj, t_step, 0] < 0:
+                    oris[traj, t_step, :] *= -1
+        self.X_ori = np.copy(oris)
+        self.X_ori = np.copy(self.X_ori[:, 1:, :])
 
         self.X_pos = torch.from_numpy(self.X_pos).type(torch.FloatTensor)
         self.dX_pos = torch.from_numpy(self.dX_pos).type(torch.FloatTensor)
+        self.X_ori = torch.from_numpy(self.X_ori).type(torch.FloatTensor)
 
     def __len__(self):
         return len(self.X_pos)
 
     def __getitem__(self, idx):
-        return self.X_pos[idx], self.dX_pos[idx]
+        return self.X_pos[idx], self.dX_pos[idx], self.X_ori[idx]

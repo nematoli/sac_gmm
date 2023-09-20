@@ -33,45 +33,27 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-def evaluate(env, gmm, target, max_steps, render=False, record=False):
+def evaluate(env, gmm, target, max_steps, render=False, record=False, out_dir=None):
     succesful_rollouts, rollout_returns, rollout_lengths = 0, [], []
     # for idx, (xi, d_xi) in enumerate(dataloader):
-    val_rollouts = 100
+    val_rollouts = 10
     for idx in range(val_rollouts):
         if (idx % 5 == 0) or (idx == val_rollouts):
             log_rank_0(f"Test Trajectory {idx+1}/{val_rollouts}")
         # x0 = xi.squeeze()[0, :].numpy()
-        goal = target
         rollout_return = 0
         observation = env.reset()
-        # current_state = observation["position"]
-        # # log_rank_0(f'Adjusting EE position to match the initial pose from the dataset')
-        # count = 0
-        # error_margin = 0.01
-        # while np.linalg.norm(x0 - current_state) >= error_margin:
-        #     dx = (x0 - current_state) / dt
-        #     observation, reward, done, info = env.step(dx)
-        #     current_state = observation["position"]
-        #     count += 1
-        #     if count >= 300:
-        #         # x0 = current_state
-        #         log_rank_0("CALVIN is struggling to place the EE at the right initial pose")
-        #         log_rank_0(f"{np.linalg.norm(x0 - current_state)}")
-        #         break
-        # # log_rank_0(f'Simulating with gmm')
-        # print("count from here")
-        # if record:
-        #     log_rank_0("Recording Robot Camera Obs")
-        #     env.record_frame(size=64)
 
-        x = observation["position"]
+        x = observation["robot_obs"]
         for step in range(max_steps):
-            d_x = gmm.predict(x - goal)
-            observation, reward, done, info = env.step(d_x)
-            x = observation["position"]
+            dx_pos, dx_ori, is_nan = gmm.predict(x)
+            action = np.append(dx_pos, np.append(dx_ori, -1))
+            log_rank_0(f"Step: {step} Observation: {observation['robot_obs'][:3]}")
+            observation, reward, done, info = env.step(action)
+            x = observation["robot_obs"]
             rollout_return += reward
             if record:
-                env.record_frame(size=64)
+                env.record_frame(size=200)
             if render:
                 env.render()
             if done:
@@ -85,8 +67,8 @@ def evaluate(env, gmm, target, max_steps, render=False, record=False):
         log_rank_0(f"{idx+1}: {status}!")
         if record:
             log_rank_0("Saving Robot Camera Obs")
-            video_path = env.save_recorded_frames(outdir=env.outdir, fname=idx)
-            env.reset_recorded_frames()
+            video_path = env.save_recording(outdir=out_dir, fname=idx)
+            env.reset_recording()
             status = None
             gmm.logger.log_table(key="eval", columns=["GMM"], data=[[wandb.Video(video_path, fps=30, format="gif")]])
 
@@ -107,24 +89,26 @@ def eval_gmm(cfg: DictConfig) -> None:
     cfg.exp_dir = hydra.core.hydra_config.HydraConfig.get()["runtime"]["output_dir"]
 
     seed_everything(cfg.seed, workers=True)
-    log_rank_0(f"Evaluating {cfg.skill} skill with the following config:\n{OmegaConf.to_yaml(cfg)}")
+    log_rank_0(f"Evaluating {cfg.skill.name} skill with the following config:\n{OmegaConf.to_yaml(cfg)}")
     log_rank_0(print_system_env_info())
-    log_rank_0(f"Evaluating gmm for {cfg.skill.name} skill with {cfg.skill.state_type} as the input")
+    log_rank_0(f"Evaluating gmm for {cfg.skill.name} skill with GMM type {cfg.gmm.gmm_type}")
 
     # Load dataset
     # Obtain X_mins and X_maxs from training data to normalize in real-time
     cfg.datamodule.dataset.train = True
+    cfg.datamodule.dataset.skill.skill = cfg.datamodule.dataset.skill.name
     train_dataset = hydra.utils.instantiate(cfg.datamodule.dataset)
 
     # Create and load models to evaluate
     gmm = hydra.utils.instantiate(cfg.gmm)
     gmm.load_model()
+    gmm.set_skill_params(train_dataset)
 
     if "Manifold" in gmm.name:
-        gmm.manifold = gmm.make_manifold()
+        gmm.manifold, gmm.manifold2 = gmm.make_manifold()
 
     # Setup logger
-    logger_name = f"{cfg.skill.name}_{cfg.skill.state_type}_{gmm.name}_{gmm.n_components}"
+    logger_name = f"{cfg.skill.name}_type{cfg.gmm.gmm_type}_{gmm.name}_{gmm.n_components}"
     gmm.logger = setup_logger(cfg, name=logger_name)
 
     # Evaluate by simulating in the CALVIN environment
@@ -139,6 +123,7 @@ def eval_gmm(cfg: DictConfig) -> None:
         max_steps=cfg.skill.max_steps,
         render=cfg.render,
         record=cfg.record,
+        out_dir=cfg.exp_dir,
     )
 
     # Log evaluation output

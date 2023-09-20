@@ -1,21 +1,27 @@
 defaults:
   - setup
   - skill_setup
-  - datamodule: calvin_ds2
+  - datamodule: calvin_ds4
   - logger: wandb
 
 logger:
   group: gmm-eval
 
-show_gui: true
+show_gui: false
+
+skill:
+  name: turn_on_led
 
 # Dataset params:
 train: false # false to load validation dataset
 goal_centered: false # this must be false during evaluation
 
+# GMM Type
+gmm_type: 4
+
 # Environment params
 render: false
-record: false
+record: true
 
 hydra:
   run:

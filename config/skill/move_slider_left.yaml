@@ -1,9 +1,0 @@
-defaults:
-  - setup
-
-# Dataset params:
-name: move_slider_left
-state_type: 'pos'
-
-# GMM params
-n_components: 3
