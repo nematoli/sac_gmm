@@ -59,7 +59,7 @@ class CALVINSACGMMAgent(Agent):
         self.gmm = hydra.utils.instantiate(gmm)
         self.gmm.load_model()
         if "Manifold" in self.gmm.name:
-            self.gmm.manifold = self.gmm.make_manifold()
+            self.gmm.manifold, self.gmm.manifold2 = self.gmm.make_manifold()
         self.gmm.set_skill_params(self.datamodule.dataset)
         self.initial_gmm = copy.deepcopy(self.gmm)
         self.priors_change_range = priors_change_range
@@ -224,9 +224,14 @@ class CALVINSACGMMAgent(Agent):
         # param_space["mu"] = gym.spaces.Box(
         #     low=-self.mu_change_range, high=self.mu_change_range, shape=(self.gmm.means.size,)
         # )
-
-        # Do not refine Quaternion means (30-12=18)
-        param_space["mu"] = gym.spaces.Box(low=-self.mu_change_range, high=self.mu_change_range, shape=(9,))
+        if self.gmm.gmm_type in [1, 4]:
+            param_space["mu"] = gym.spaces.Box(
+                low=-self.mu_change_range, high=self.mu_change_range, shape=(self.gmm.means.size,)
+            )
+        elif self.gmm.gmm_type in [2, 5]:
+            param_space["mu"] = gym.spaces.Box(
+                low=-self.mu_change_range, high=self.mu_change_range, shape=(self.gmm.means.size // 2,)
+            )
 
         # dim = self.gmm.means.shape[1] // 2
         # num_gaussians = self.gmm.means.shape[0]

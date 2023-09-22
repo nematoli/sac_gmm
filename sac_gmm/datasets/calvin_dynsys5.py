@@ -9,9 +9,11 @@ from pathlib import Path
 from omegaconf import DictConfig
 
 
-class CALVINDynSysDataset3(Dataset):
+class CALVINDynSysDataset5(Dataset):
     """
-    Use this to train GMM: Position -> Next Position + Next Orientation
+    Use this to train two GMMs:
+     1. Position -> Next Position
+     2. Position -> Orientation
     """
 
     def __init__(
@@ -51,6 +53,7 @@ class CALVINDynSysDataset3(Dataset):
             self.fixed_ori = np.array([3.14, 0.0, 1.5])
 
         self.X_pos = data[:, :, :3]
+
         # Store average start and goal positions
         self.start = np.mean(self.X_pos[:, 0, :], axis=0)
         self.goal = np.mean(self.X_pos[:, -1, :], axis=0)
@@ -59,7 +62,7 @@ class CALVINDynSysDataset3(Dataset):
         if self.goal_centered:
             self.X_pos = self.X_pos - np.expand_dims(self.X_pos[:, -1, :], axis=1)
 
-        # Model: Pos -> Next Pos + Next Ori
+        # Model1: Pos -> Next Pos
         # self.dX_pos = np.copy(self.X_pos[:, 1:, :])
         # self.X_pos = np.copy(self.X_pos[:, :-1, :])
 
@@ -67,16 +70,16 @@ class CALVINDynSysDataset3(Dataset):
         self.dX_pos[:, :-1, :] = np.copy(self.X_pos[:, 1:, :])
         self.dX_pos[:, -1, :] = np.copy(self.X_pos[:, -1, :])
 
-        # Convert Euler anglers to Quaternions
+        # Model2: Pos -> Orientation
         self.X_ori = data[:, :, 3:]
+        # Convert Euler anglers to Quaternions
         oris = np.apply_along_axis(p.getQuaternionFromEuler, -1, self.X_ori)
-        # Make all quaternions positive
+        # Make all Quaternions positive
         for traj in range(oris.shape[0]):
             for t_step in range(oris.shape[1]):
                 if oris[traj, t_step, 0] < 0:
                     oris[traj, t_step, :] *= -1
         self.X_ori = np.copy(oris)
-        # self.X_ori = np.copy(self.X_ori[:, 1:, :])
 
         self.X_pos = torch.from_numpy(self.X_pos).type(torch.FloatTensor)
         self.dX_pos = torch.from_numpy(self.dX_pos).type(torch.FloatTensor)

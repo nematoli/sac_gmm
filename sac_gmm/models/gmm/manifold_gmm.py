@@ -51,7 +51,7 @@ class ManifoldGMM(BaseGMM):
             manifold = Product([Euclidean(3), Euclidean(3)])
         elif self.gmm_type == 3:
             manifold = Product([Euclidean(3), Euclidean(3), Sphere(4)])
-        elif self.gmm_type == 4:
+        elif self.gmm_type in [4, 5]:
             manifold = Product([Euclidean(3), Euclidean(3)])
             manifold2 = Product([Euclidean(3), Sphere(4)])
         return manifold, manifold2
@@ -62,7 +62,7 @@ class ManifoldGMM(BaseGMM):
         self.data, self.data2 = self.get_reshaped_data()
         self.manifold, self.manifold2 = self.make_manifold()
 
-        if self.gmm_type in [1, 2, 4]:
+        if self.gmm_type in [1, 2, 4, 5]:
             total_dim = 3 + 3
         else:
             total_dim = 3 + 3 + 4
@@ -87,7 +87,7 @@ class ManifoldGMM(BaseGMM):
             logger=logger,
         )
         # Train another GMM if type 4
-        if self.gmm_type == 4 and self.manifold2 is not None:
+        if self.gmm_type in [4, 5] and self.manifold2 is not None:
             total_dim = 3 + 4
             km_means, km_assignments = manifold_k_means(self.manifold2, self.data2, nb_clusters=self.n_components)
             log_rank_0(f"Type {self.gmm_type} Second Manifold GMM with K-Means priors")
@@ -107,7 +107,7 @@ class ManifoldGMM(BaseGMM):
 
         log_rank_0(f"Type {self.gmm_type} GMM train time: {time.time() - start} seconds")
         # Reshape means from (n_components, 2) to (n_components, 2, state_size)
-        # Only applies to gmm type 1 and 2
+        # Only applies to gmm type 1, 2, 4, 5
         self.means = self.get_reshaped_means()
 
         # Save GMM params
@@ -158,3 +158,6 @@ class ManifoldGMM(BaseGMM):
             out_manifold_idx=[1],
         )
         return self.predict1(x), dx[0]
+
+    def predict5(self, x):
+        return self.predict4(x)

@@ -64,7 +64,7 @@ class SACGMM(SkillModel):
         """
         reward, self.episode_done = self.agent.play_step(self.actor, "stochastic", self.replay_buffer, self.device)
         self.episode_return += reward
-        self.episode_length += 1
+        self.episode_play_steps += 1
 
         losses = self.loss(self.check_batch(batch))
         self.log_loss(losses)
@@ -76,7 +76,8 @@ class SACGMM(SkillModel):
             log_rank_0(f"episode {self.episode_idx} done")
             train_metrics = {
                 "train/episode-return": self.episode_return,
-                "train/episode-length": self.episode_length * self.agent.gmm_window,
+                "train/episode-play-steps": self.episode_play_steps,
+                "train/episode-length": self.episode_play_steps * self.agent.gmm_window,
                 "train/episode-number": self.episode_idx,
                 "train/nan-counter": self.agent.nan_counter,
             }
@@ -90,13 +91,14 @@ class SACGMM(SkillModel):
                     "eval/episode-avg-return": eval_return,
                     "eval/episode-avg-length": eval_length,
                     "eval/total-env-steps": self.agent.total_env_steps,
+                    "eval/episode-number": self.episode_idx,
                 }
                 metrics.update(eval_metrics)
                 # Log the video GIF to wandb if exists
                 if eval_video_path is not None:
                     self.log_video(eval_video_path, f"eval/video")
 
-            self.episode_return, self.episode_length = 0, 0
+            self.episode_return, self.episode_play_steps = 0, 0
             self.episode_idx += 1
 
             self.replay_buffer.save()

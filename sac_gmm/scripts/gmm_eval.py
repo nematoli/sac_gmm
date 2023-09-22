@@ -36,7 +36,7 @@ def log_rank_0(*args, **kwargs):
 def evaluate(env, gmm, target, max_steps, render=False, record=False, out_dir=None):
     succesful_rollouts, rollout_returns, rollout_lengths = 0, [], []
     # for idx, (xi, d_xi) in enumerate(dataloader):
-    val_rollouts = 10
+    val_rollouts = 50
     for idx in range(val_rollouts):
         if (idx % 5 == 0) or (idx == val_rollouts):
             log_rank_0(f"Test Trajectory {idx+1}/{val_rollouts}")
@@ -48,7 +48,7 @@ def evaluate(env, gmm, target, max_steps, render=False, record=False, out_dir=No
         for step in range(max_steps):
             dx_pos, dx_ori, is_nan = gmm.predict(x)
             action = np.append(dx_pos, np.append(dx_ori, -1))
-            log_rank_0(f"Step: {step} Observation: {observation['robot_obs'][:3]}")
+            # log_rank_0(f"Step: {step} Observation: {observation['robot_obs'][:3]}")
             observation, reward, done, info = env.step(action)
             x = observation["robot_obs"]
             rollout_return += reward

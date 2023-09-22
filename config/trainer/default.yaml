@@ -3,8 +3,8 @@ accelerator: gpu
 devices: 1 #auto
 strategy: auto #"ddp", "ddp_spawn", "deepspeed"
 precision: 32
-max_epochs: -1
-max_steps: 8e4 # 10K episodes
+max_epochs: -1 # TODO: Need to try this out
+max_steps: 8e4 # Just over 8.5K episodes
 log_every_n_steps:       1             #help='print/disp/save frequency'
 resume_from_checkpoint:  null            #help='path to latest checkpoint'
 val_check_interval:      1.0             #help=How often to check the validation set.

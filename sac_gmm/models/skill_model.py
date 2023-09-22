@@ -91,7 +91,7 @@ class SkillModel(pl.LightningModule):
         # Logic values
         self.episode_idx = 0
         self.episode_return = 0
-        self.episode_length = 0
+        self.episode_play_steps = 0
         self.eval_frequency = eval_frequency
 
         # PyTorch Lightning

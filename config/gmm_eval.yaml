@@ -1,7 +1,7 @@
 defaults:
   - setup
   - skill_setup
-  - datamodule: calvin_ds4
+  - datamodule: calvin_ds5
   - logger: wandb
 
 logger:
@@ -10,18 +10,18 @@ logger:
 show_gui: false
 
 skill:
-  name: turn_on_led
+  name: open_drawer
 
 # Dataset params:
 train: false # false to load validation dataset
 goal_centered: false # this must be false during evaluation
 
 # GMM Type
-gmm_type: 4
+gmm_type: 5
 
 # Environment params
 render: false
-record: true
+record: false
 
 hydra:
   run:

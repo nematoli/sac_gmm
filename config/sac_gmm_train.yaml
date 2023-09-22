@@ -2,7 +2,7 @@ defaults:
   - setup
   - skill_setup
   - callbacks: default
-  - datamodule: calvin_ds2
+  - datamodule: calvin_ds5
   - sac: sac_gmm_model
   - agent: sac_gmm_calvin
   - logger: wandb
@@ -12,7 +12,16 @@ defaults:
   - override hydra/hydra_logging: colorlog
   - _self_
 
-show_gui: true
+show_gui: false
+
+# GMM params
+gmm_type: 5
+
+# Skill
+skill:
+  name: move_slider_left
+  max_steps: 128
+
 # evaluation frequency:
 eval_frequency: 50
 num_init_steps: 256

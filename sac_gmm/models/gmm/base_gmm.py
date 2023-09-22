@@ -37,6 +37,8 @@ class BaseGMM(object):
     Type 3: GMM with position as input and next position and next orientation as output
     Type 4: One GMM with position as input and velocity as output and
             another GMM with position as input and orientation as output
+    Type 5: One GMM with position as input and next position as output and
+            another GMM with position as input and orientation as output
 
     Parameters
     ----------
@@ -138,7 +140,7 @@ class BaseGMM(object):
         # Data size
         data_size = self.dataset.X_pos.shape[0]
         # Horizontal stack demos
-        if self.gmm_type in [1, 2, 4]:
+        if self.gmm_type in [1, 2, 4, 5]:
             # Stack X_pos and dX_pos data
             demos_xdx = [
                 np.hstack([self.dataset.X_pos[i], self.dataset.dX_pos[i]]) for i in range(self.dataset.X_pos.shape[0])
@@ -157,7 +159,7 @@ class BaseGMM(object):
         X_pos = demos[:, :3]
         dX_pos = demos[:, 3:6]
 
-        if self.gmm_type in [1, 2, 4]:
+        if self.gmm_type in [1, 2, 4, 5]:
             data = np.hstack((X_pos, dX_pos))
         else:
             X_ori = demos[:, 6:]
@@ -166,7 +168,7 @@ class BaseGMM(object):
                 data[n] = [X_pos[n], dX_pos[n], X_ori[n]]
 
         # Data for the second GMM
-        if self.gmm_type == 4:
+        if self.gmm_type in [4, 5]:
             # Stack X_pos and X_ori data
             demos_xdx = [np.hstack([self.dataset.X_pos[i], self.dataset.X_ori[i]]) for i in range(data_size)]
             demos = demos_xdx[0]
@@ -189,7 +191,7 @@ class BaseGMM(object):
             },
         )
         log_rank_0(f"Saved GMM params at {filename}")
-        if self.gmm_type == 4:
+        if self.gmm_type in [4, 5]:
             filename = self.model_dir + "/gmm_params2.npy"
             np.save(
                 filename,
@@ -210,7 +212,7 @@ class BaseGMM(object):
         self.priors = np.array(gmm["priors"])
         self.means = np.array(gmm["mu"])
         self.covariances = np.array(gmm["sigma"])
-        if self.gmm_type == 4:
+        if self.gmm_type in [4, 5]:
             filename = self.model_dir + "/gmm_params2.npy"
             log_rank_0(f"Loading second GMM params from {filename}")
 
@@ -233,10 +235,10 @@ class BaseGMM(object):
         self.means = np.copy(gmm.means)
         self.covariances = np.copy(gmm.covariances)
 
-        if gmm.gmm_type == 4:
-            self.priors2 = np.copy(gmm.priors2)
-            self.means2 = np.copy(gmm.means2)
-            self.covariances2 = np.copy(gmm.covariances2)
+        # if gmm.gmm_type == 4:
+        #     self.priors2 = np.copy(gmm.priors2)
+        #     self.means2 = np.copy(gmm.means2)
+        #     self.covariances2 = np.copy(gmm.covariances2)
 
     def model_params(self, cov=False):
         """Returns GMM priors and means as a flattened vector
@@ -249,10 +251,12 @@ class BaseGMM(object):
         """
         priors = self.priors
         means = self.means.flatten()
-        # params = np.concatenate((priors, means), axis=-1)
-        params = priors
-        for x in means:
-            params = np.append(params, x)
+        if self.gmm_type in [1, 2, 4, 5]:
+            params = np.concatenate((priors, means), axis=-1)
+        else:
+            params = priors
+            for x in means:
+                params = np.append(params, x)
 
         return params
 
@@ -274,10 +278,10 @@ class BaseGMM(object):
 
         # Means
         if "mu" in delta:
-            if self.gmm_type in [1, 2]:
+            if self.gmm_type in [1, 4]:
                 delta_means = delta["mu"].reshape(self.means.shape)
                 self.means += delta_means
-            elif self.gmm_type == 3:
+            else:
                 # Only update position and next position means
                 idx = 0
                 for i in range(self.means.shape[0]):
@@ -343,7 +347,7 @@ class BaseGMM(object):
 
     def get_reshaped_means(self):
         """Reshape means from (n_components, 2) to (n_components, 2, state_size)"""
-        if self.gmm_type in [1, 2]:
+        if self.gmm_type in [1, 2, 4, 5]:
             new_means = np.empty((self.n_components, 2, 3))
             for i in range(new_means.shape[0]):
                 for j in range(new_means.shape[1]):
@@ -354,11 +358,11 @@ class BaseGMM(object):
 
     def get_reshaped_data(self):
         reshaped_data, reshaped_data2 = None, None
-        if self.gmm_type in [1, 2, 4]:
+        if self.gmm_type in [1, 2, 4, 5]:
             reshaped_data = np.empty((self.data.shape[0], 2), dtype=object)
             for n in range(self.data.shape[0]):
                 reshaped_data[n] = [self.data[n, :3], self.data[n, 3:]]
-            if self.gmm_type == 4:
+            if self.gmm_type in [4, 5]:
                 reshaped_data2 = np.empty((self.data2.shape[0], 2), dtype=object)
                 for n in range(self.data.shape[0]):
                     reshaped_data2[n] = [self.data2[n, :3], self.data2[n, 3:]]
@@ -367,21 +371,29 @@ class BaseGMM(object):
             return np.copy(self.data), None
 
     def predict(self, x):
-        if self.gmm_type == 1:
-            dx_pos = self.predict1(x[:3])
-            target_ori = self.fixed_ori
-        elif self.gmm_type == 2:
-            next_pos = self.predict2(x[:3])
+        if self.gmm_type == 5:
+            next_pos, x_ori = self.predict4(x[:3])
+            if np.isnan(next_pos[0]) or np.isnan(x_ori[0]):
+                return np.zeros(3), np.zeros(3), True
             dx_pos = (next_pos + self.goal - x[:3]) / self.pos_dt
-            target_ori = self.fixed_ori
+            target_ori = pybullet.getEulerFromQuaternion(x_ori)
+        elif self.gmm_type == 4:
+            dx_pos, x_ori = self.predict4(x[:3])
+            if np.isnan(dx_pos[0]) or np.isnan(x_ori[0]):
+                return np.zeros(3), np.zeros(3), True
+            target_ori = pybullet.getEulerFromQuaternion(x_ori)
         elif self.gmm_type == 3:
             out = self.predict3(x[:3])
             if np.isnan(out[0]):
                 return np.zeros(3), np.zeros(3), True
             dx_pos = (out[:3] + self.goal - x[:3]) / self.pos_dt
             target_ori = pybullet.getEulerFromQuaternion(out[3:])
-        else:
-            dx_pos, x_ori = self.predict4(x[:3])
-            target_ori = pybullet.getEulerFromQuaternion(x_ori)
+        elif self.gmm_type == 2:
+            next_pos = self.predict2(x[:3])
+            dx_pos = (next_pos + self.goal - x[:3]) / self.pos_dt
+            target_ori = self.fixed_ori
+        elif self.gmm_type == 1:
+            dx_pos = self.predict1(x[:3])
+            target_ori = self.fixed_ori
         dx_ori = compute_euler_difference(target_ori, x[3:6])
         return dx_pos, dx_ori, False

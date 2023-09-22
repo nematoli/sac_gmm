@@ -1,8 +1,20 @@
 defaults:
   - setup
   - skill_setup
-  - datamodule: calvin_ds2
+  - datamodule: calvin_ds5
   - logger: wandb
+
+logger:
+  group: gmm-train
+
+show_gui: false
+
+
+# GMM Type
+gmm_type: 5
+
+skill:
+  name: move_slider_left
 
 # Dataset params:
 train: true # false to load validation dataset
