@@ -153,12 +153,11 @@ class SkillModel(pl.LightningModule):
 
     @torch.no_grad()
     def log_keypoint(self, rgb, heatmap, zs, ps, xyzo):
-        if self.episode_idx % 5 * self.eval_frequency == 0:
-            dst, caption = self.get_heatmap_img(heatmap, rgb.unsqueeze(0), ps, xyzo)
-            z = np.array2string(xyzo[2].cpu().numpy(), sign=" ", precision=3, floatmode="fixed")
-            lz = np.array2string(zs.cpu().numpy(), sign=" ", precision=3, floatmode="fixed")
-            caption += "\n z pred: " + z + ", label: " + lz
-            self.log_img_wandb(dst, caption, "detected target")
+        dst, caption = self.get_heatmap_img(heatmap, rgb.unsqueeze(0), ps, xyzo)
+        z = np.array2string(xyzo[2].cpu().numpy(), sign=" ", precision=3, floatmode="fixed")
+        lz = np.array2string(zs.cpu().numpy(), sign=" ", precision=3, floatmode="fixed")
+        caption += "\n z pred: " + z + ", label: " + lz
+        self.log_img_wandb(dst, caption, "detected target")
 
     @staticmethod
     @torch.no_grad()
