@@ -1,0 +1,26 @@
+_target_: sac_gmm.models.agent.calvin.sac_n_gmm_ft_calvin.CALVIN_SACNGMMAgent_FT
+_recursive_: false
+
+calvin_env: ${env}
+datamodule: ${datamodule}
+
+num_init_steps: ${num_init_steps}
+num_eval_episodes: ${num_eval_episodes}
+
+priors_change_range: 0.0
+mu_change_range: 0.05
+
+task: ${skill}
+gmm: ${gmm}
+adapt_cov: false
+mean_shift: false
+adapt_per_skill: 4
+
+exp_dir: ${exp_dir}
+root_dir: ${root}
+render: ${render}
+record: ${record}
+
+sac: ${sac}
+device: ${device}
+sparse_reward: false
