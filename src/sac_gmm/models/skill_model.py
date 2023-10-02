@@ -153,16 +153,15 @@ class SkillModel(pl.LightningModule):
 
     @torch.no_grad()
     def log_keypoint(self, rgb, heatmap, zs, ps, xyzo):
-        if self.episode_idx % 5 * self.eval_frequency == 0:
-            dst, caption = self.get_heatmap_img(heatmap, rgb.unsqueeze(0), ps, xyzo[:3])
-            z = np.array2string(xyzo[2].cpu().numpy(), sign=" ", precision=3, floatmode="fixed")
-            lz = np.array2string(zs.cpu().numpy(), sign=" ", precision=3, floatmode="fixed")
-            caption += "\n z pred: " + z + ", label: " + lz
-            self.log_img_wandb(dst, caption, "detected target")
+        dst, caption = self.get_heatmap_img(heatmap, rgb.unsqueeze(0), ps, xyzo)
+        z = np.array2string(xyzo[2].cpu().numpy(), sign=" ", precision=3, floatmode="fixed")
+        lz = np.array2string(zs.cpu().numpy(), sign=" ", precision=3, floatmode="fixed")
+        caption += "\n z pred: " + z + ", label: " + lz
+        self.log_img_wandb(dst, caption, "detected target")
 
     @staticmethod
     @torch.no_grad()
-    def get_heatmap_img(mp, orig_img, lab_px, pred_xyo):
+    def get_heatmap_img(mp, orig_img, lab_px, pred_xyzo):
         # obtain heatmap
         hm = mp[0][0].cpu()
         hmm = (hm - hm.min()) / (hm.max() - hm.min())
@@ -184,7 +183,7 @@ class SkillModel(pl.LightningModule):
         draw.point((x, y), "yellow")
 
         # draw prediction
-        x, y = pred_xyo[0].cpu(), pred_xyo[1].cpu()
+        x, y = pred_xyzo[0].cpu(), pred_xyzo[1].cpu()
         draw.ellipse([(x - rad_px, y - rad_px), (x + rad_px, y + rad_px)], fill="green")
         draw.point((x, y), "red")
         caption = (
@@ -197,7 +196,7 @@ class SkillModel(pl.LightningModule):
             + np.array2string(hm.max().cpu().numpy(), sign=" ", precision=3, floatmode="fixed")
             + "\n"
             + "objectness: "
-            + str(pred_xyo[2].cpu().numpy())
+            + str(pred_xyzo[3].cpu().numpy())
         )
 
         # merge

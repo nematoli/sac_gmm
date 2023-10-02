@@ -38,11 +38,6 @@ def log_rank_0(*args, **kwargs):
 
 
 def run_test(cfg: DictConfig) -> None:
-    log_rank_0(
-        f"Evaluating {cfg.agent.name} for {cfg.agent.skill.name} skill with the config:\n{OmegaConf.to_yaml(cfg)}"
-    )
-    log_rank_0(print_system_env_info())
-
     if cfg.agent.name == "GMM":
         actor = None
         agent = hydra.utils.instantiate(cfg.agent)
@@ -71,10 +66,41 @@ def run_test(cfg: DictConfig) -> None:
     var_acc = np.var(np.array(accs))
     log_rank_0(f"Mean: {mean_acc}, Var: {var_acc}")
 
+    return mean_acc
+
 
 @hydra.main(version_base="1.1", config_path="../config", config_name="agent_eval")
 def eval_agent(cfg: DictConfig) -> None:
-    run_test(cfg)
+    cli = HydraConfig.get().overrides["task"]
+
+    # agents = ["gmm_calvin", "kis_sg_mimic_calvin", "kis_gmm_calvin"]
+    agents = ["gmm_calvin"]
+    envs = ["calvin_scene_A", "calvin_scene_B", "calvin_scene_C", "calvin_scene_D"]
+    means = []
+
+    for agent in agents:
+        for env in envs:
+            ovds = [
+                "agent=" + agent,
+                "env=" + env,
+            ]
+            cliovds = dict([s.split("=", 1) for s in cli])
+            cliovds.update(dict([s.split("=", 1) for s in ovds]))
+            ovds = [l + "=" + r for l, r in cliovds.items()]
+            fconf = compose("agent_eval", overrides=ovds, return_hydra_config=True)
+            HydraConfig.instance().set_config(fconf)
+            log_rank_0(
+                f"Evaluating {fconf.agent.name} for {fconf.agent.skill.name} skill in Env: {env} with the config:\n{OmegaConf.to_yaml(fconf)}"
+            )
+            mean_acc = run_test(fconf)
+            means.append(mean_acc)
+
+    for i in range(len(agents)):
+        for j in range(len(envs)):
+            k = (i * len(envs)) + j
+            log_rank_0(
+                f"{agents[i]} -> {cfg.agent.skill.name} -> {envs[j]} ->  -> Skill Accuracy: {round(means[k], 2)}"
+            )
 
 
 if __name__ == "__main__":

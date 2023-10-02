@@ -49,7 +49,7 @@ class Agent(object):
         self.encoder = hydra.utils.instantiate(encoder)
 
         self.demos_target = self.datamodule.dataset.goal
-        self.kp_mock = hydra.utils.instantiate(kp_mock)
+        self.kp_mock = hydra.utils.instantiate(kp_mock, env_is_source=self.env.is_source)
         self.gt_keypoint = None
         self.kp_target_shift = None
 
