@@ -13,8 +13,9 @@ show_gui: false
 # GMM Type
 gmm_type: 5
 
+skill_name: null
 skill:
-  name: move_slider_left
+  name: ${skill_name}
 
 # Dataset params:
 train: true # false to load validation dataset

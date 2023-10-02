@@ -98,6 +98,8 @@ class CALVIN_SACNGMMAgent(Agent):
         self.reset()
         self.skill_id = self.task.skills.index(self.env.target_skill)
 
+        self.nan_counter = 0
+
     def get_action_space(self):
         parameter_space = self.get_update_range_parameter_space()
         mu_high = np.ones(parameter_space["mu"].shape[0])
@@ -131,14 +133,19 @@ class CALVIN_SACNGMMAgent(Agent):
             if not conn:
                 done = False
                 break
-            env_action = self.skill_actor.act(curr_obs["robot_obs"], self.skill_id)
-            curr_obs, reward, done, info = self.env.step(env_action)
-            gmm_reward += reward
-            self.episode_env_steps += 1
-            self.total_env_steps += 1
-            if reward > 0:
-                # self.skill_id = (self.skill_id + 1) % len(self.task.skills)
+            env_action, is_nan = self.skill_actor.act(curr_obs["robot_obs"], self.skill_id)
+            if is_nan:
+                self.nan_counter += 1
                 done = True
+                log_rank_0("Nan in prediction, aborting episode")
+            else:
+                curr_obs, reward, done, info = self.env.step(env_action)
+                gmm_reward += reward
+                self.episode_env_steps += 1
+                self.total_env_steps += 1
+                if reward > 0:
+                    # self.skill_id = (self.skill_id + 1) % len(self.task.skills)
+                    done = True
 
             if done:
                 break
@@ -178,6 +185,7 @@ class CALVIN_SACNGMMAgent(Agent):
                 episode_return, episode_env_steps = 0, 0
                 self.obs = self.env.reset(target_skill=skill)
                 skill_id = self.task.skills.index(skill)
+                # log_rank_0(f"Skill: {skill} - Obs: {self.obs['robot_obs']}")
                 # Recording setup
                 if self.record and (episode == rand_idx):
                     self.env.reset_recording()
@@ -193,17 +201,21 @@ class CALVIN_SACNGMMAgent(Agent):
                     # x = self.obs["position"]
 
                     for _ in range(self.gmm_window):
-                        env_action = self.skill_actor.act(self.obs["robot_obs"], skill_id)
-                        self.obs, reward, done, info = self.env.step(env_action)
-                        episode_return += reward
-                        episode_env_steps += 1
+                        env_action, is_nan = self.skill_actor.act(self.obs["robot_obs"], skill_id)
+                        if is_nan:
+                            done = True
+                            log_rank_0("Nan in prediction, aborting episode")
+                        else:
+                            self.obs, reward, done, info = self.env.step(env_action)
+                            episode_return += reward
+                            episode_env_steps += 1
 
+                            if reward > 0:
+                                succesful_skill_ids.append(skill_id)
                         if self.record and (episode == rand_idx):
                             self.env.record_frame(size=100)
                         if self.render:
                             self.env.render()
-                        if reward > 0:
-                            succesful_skill_ids.append(skill_id)
                         if done:
                             break
 
@@ -246,11 +258,19 @@ class CALVIN_SACNGMMAgent(Agent):
         param_space["priors"] = gym.spaces.Box(
             low=-self.priors_change_range,
             high=self.priors_change_range,
-            shape=(self.skill_actor.skills[0].priors.size,),
+            shape=(self.skill_actor.priors_size,),
         )
-        param_space["mu"] = gym.spaces.Box(
-            low=-self.mu_change_range, high=self.mu_change_range, shape=(self.skill_actor.skills[0].means.size,)
-        )
+
+        if self.skill_actor.gmm_type in [1, 4]:
+            param_space["mu"] = gym.spaces.Box(
+                low=-self.mu_change_range, high=self.mu_change_range, shape=(self.skill_actor.means_size,)
+            )
+        elif self.skill_actor.gmm_type in [2, 5]:
+            param_space["mu"] = gym.spaces.Box(
+                low=-self.mu_change_range,
+                high=self.mu_change_range,
+                shape=(self.skill_actor.means_size // 2,),
+            )
 
         # dim = self.gmm.means.shape[1] // 2
         # num_gaussians = self.gmm.means.shape[0]

@@ -5,7 +5,7 @@ from pathlib import Path
 import gym
 from sac_gmm.models.gmm.utils.plot_utils import visualize_3d_gmm
 from sac_gmm.utils.posdef import isPD, nearestPD
-from sac_gmm.models.gmm.utils.rotation_utils import compute_euler_difference
+from sac_gmm.models.gmm.utils.rotation_utils import compute_euler_difference2
 from pytorch_lightning.utilities import rank_zero_only
 import pybullet
 
@@ -372,11 +372,12 @@ class BaseGMM(object):
 
     def predict(self, x):
         if self.gmm_type == 5:
-            next_pos, x_ori = self.predict4(x[:3])
+            next_pos, x_ori = self.predict5(x[:3])
             if np.isnan(next_pos[0]) or np.isnan(x_ori[0]):
                 return np.zeros(3), np.zeros(3), True
             dx_pos = (next_pos + self.goal - x[:3]) / self.pos_dt
-            target_ori = pybullet.getEulerFromQuaternion(x_ori)
+            # target_ori = pybullet.getEulerFromQuaternion(x_ori)
+            target_ori = x_ori
         elif self.gmm_type == 4:
             dx_pos, x_ori = self.predict4(x[:3])
             if np.isnan(dx_pos[0]) or np.isnan(x_ori[0]):
@@ -395,5 +396,5 @@ class BaseGMM(object):
         elif self.gmm_type == 1:
             dx_pos = self.predict1(x[:3])
             target_ori = self.fixed_ori
-        dx_ori = compute_euler_difference(target_ori, x[3:6])
+        dx_ori = compute_euler_difference2(target_ori, x[3:6])
         return dx_pos, dx_ori, False

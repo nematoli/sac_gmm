@@ -41,13 +41,14 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         self.reward_scale = 10
 
         self.init_base_pos, self.init_base_orn = self.p.getBasePositionAndOrientation(self.robot.robot_uid)
-        self.ee_noise = np.array([0.1, 0.1, 0.05])  # Units: meters
+        self.ee_noise = np.array([0.3, 0.2, 0.1])  # Units: meters
         self.init_pos = None
         self.eval_mode = False
 
         self.skill_starts = {}
         self.skill_goals = {}
         self.skill_oris = {}
+        self.centroid = None
 
     @staticmethod
     def get_action_space():
@@ -193,6 +194,8 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
             self.skill_starts[skill.skill] = np.round(skill.start, 3)
             self.skill_goals[skill.skill] = np.round(skill.goal, 3)
             self.skill_oris[skill.skill] = skill.fixed_ori
+        self.centroid = np.concatenate([list(self.skill_goals.values()) + list(self.skill_starts.values())])
+        self.centroid = np.mean(self.centroid, axis=0)
 
     def get_init_pos(self, strategy="starts"):
         """Gets the initial position of the end effector based on the chosen skill.
@@ -210,7 +213,7 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
 
     def get_init_orn(self):
         """Gets the initial orientation of the end effector based on the chosen skill."""
-        return self.skill_oris[self.target_skill]
+        return np.array([3.14, 0.0, 1.5])  # Default
 
     def sample_ee_pose(self):
         """Samples a random end effector pose within a small range around the initial pose."""
@@ -218,10 +221,14 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         #     self.init_gripper_pos = self.robot.target_pos
         # else:
         #     self.init_gripper_pos = self.init_pos
-        self.init_gripper_pos = self.get_init_pos(strategy="goals")
-        self.init_gripper_orn = self.get_init_orn()
-        offset = np.random.uniform(-self.ee_noise, self.ee_noise, 3)
-        gripper_pos = self.init_gripper_pos + offset
+        # self.init_gripper_pos = self.get_init_pos()
+        self.init_gripper_orn = self.robot.target_orn
+        offset = [0, 0, 0]
+        np.random.seed(np.random.randint(0, 1000))
+        offset[0] = np.random.uniform(-self.ee_noise[0], self.ee_noise[0], 1)[0]
+        offset[1] = np.random.uniform(-self.ee_noise[1], self.ee_noise[1] / 2, 1)[0]
+        offset[2] = np.random.uniform(-self.ee_noise[2] / 2, self.ee_noise[2], 1)[0]
+        gripper_pos = self.centroid + offset
         gripper_orn = self.init_gripper_orn
         return gripper_pos, gripper_orn
 
@@ -253,6 +260,7 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
                 count = 0
             count += 1
         self.robot.update_target_pose()
+        self.scene.reset()
 
     def record_frame(self, obs_type="rgb", cam_type="static", size=200):
         """Record RGB obsservations"""

@@ -1,4 +1,18 @@
 import numpy as np
+from scipy.spatial.transform import Rotation
+
+
+def compute_euler_difference2(goal_quat, current_euler):
+    """
+    1. Convert Quaternions to Rotation Matrices
+    2. Find the Relative Rotation Matrix
+    3. Extract Euler Angles from the Relative Rotation Matrix
+    """
+    R_goal = Rotation.from_quat(goal_quat)
+    R_current = Rotation.from_euler("xyz", current_euler, degrees=False)
+    R_rel = R_goal * R_current.inv()
+    euler_rel = R_rel.as_euler("xyz", degrees=False)
+    return euler_rel
 
 
 def compute_euler_difference(goal_angles, current_angles):
@@ -29,7 +43,7 @@ def relative_rotation_matrix(angles1, angles2):
     """
     R1 = euler_to_rotation_matrix(angles1[0], angles1[1], angles1[2])
     R2 = euler_to_rotation_matrix(angles2[0], angles2[1], angles2[2])
-    return np.dot(R2, np.linalg.inv(R1))
+    return np.dot(R2, R1.T)
 
 
 def rotation_matrix_to_euler(R):

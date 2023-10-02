@@ -8,3 +8,6 @@ defaults:
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 
+skill:
+  state_type: 'pos_ori'
+  max_steps: 128

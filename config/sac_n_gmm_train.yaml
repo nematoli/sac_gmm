@@ -2,7 +2,7 @@ defaults:
   - setup
   - rand_skill_setup
   - callbacks: default
-  - datamodule: calvin_ds
+  - datamodule: calvin_ds5
   - sac: sac_n_gmm_model
   - agent: sac_n_gmm_calvin
   - logger: wandb
@@ -13,7 +13,11 @@ defaults:
   - _self_
 
 # Env params
-show_gui: true
+show_gui: false
+
+# GMM params
+gmm_type: 5
+
 agent: 
   sparse_reward: false
 

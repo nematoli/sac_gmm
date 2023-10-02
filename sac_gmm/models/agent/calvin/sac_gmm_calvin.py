@@ -221,9 +221,7 @@ class CALVINSACGMMAgent(Agent):
         param_space["priors"] = gym.spaces.Box(
             low=-self.priors_change_range, high=self.priors_change_range, shape=(self.gmm.priors.size,)
         )
-        # param_space["mu"] = gym.spaces.Box(
-        #     low=-self.mu_change_range, high=self.mu_change_range, shape=(self.gmm.means.size,)
-        # )
+
         if self.gmm.gmm_type in [1, 4]:
             param_space["mu"] = gym.spaces.Box(
                 low=-self.mu_change_range, high=self.mu_change_range, shape=(self.gmm.means.size,)

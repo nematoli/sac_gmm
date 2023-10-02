@@ -74,12 +74,14 @@ class SACNGMM(TaskModel):
     def on_train_epoch_end(self):
         if self.episode_done:
             metrics = {"eval/episode-avg-return": float("-inf")}
+            metrics = {"episode-avg-return": float("-inf")}
             log_rank_0(f"Episode Done: {self.episode_idx}")
             train_metrics = {
                 "train/episode-return": self.episode_return,
                 "train/episode-play-steps": self.episode_play_steps,
                 "train/episode-length": self.episode_play_steps * self.agent.gmm_window,
                 "train/episode-number": self.episode_idx,
+                "train/nan-counter": self.agent.nan_counter,
                 "train/total-env-steps": self.agent.total_env_steps,
             }
             metrics.update(train_metrics)
@@ -94,7 +96,12 @@ class SACNGMM(TaskModel):
                     "eval/episode-avg-return": eval_return,
                     "eval/episode-avg-length": eval_length,
                     "eval/total-env-steps": self.agent.total_env_steps,
+                    "eval/nan-counter": self.agent.nan_counter,
                     "eval/episode-number": self.episode_idx,
+                    # The following are for lightning to save checkpoints
+                    "episode-avg-return": eval_return,
+                    "episode-number": self.episode_idx,
+                    "total-env-steps": self.agent.total_env_steps,
                 }
                 metrics.update(eval_metrics)
                 # Log the skill distribution

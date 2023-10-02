@@ -79,6 +79,13 @@ class CALVINDynSysDataset5(Dataset):
             for t_step in range(oris.shape[1]):
                 if oris[traj, t_step, 0] < 0:
                     oris[traj, t_step, :] *= -1
+        count = 0
+        for traj in range(oris.shape[0]):
+            for t_step in range(1, oris.shape[1]):
+                if np.inner(oris[traj, t_step - 1, :], oris[traj, t_step, :]) < 0:
+                    oris[traj, t_step, :] *= -1
+                    count += 1
+        print("Neg. Dot Product Count", count)
         self.X_ori = np.copy(oris)
 
         self.X_pos = torch.from_numpy(self.X_pos).type(torch.FloatTensor)

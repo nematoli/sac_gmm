@@ -9,8 +9,9 @@ logger:
 
 show_gui: false
 
+skill_name: null
 skill:
-  name: open_drawer
+  name: ${skill_name}
 
 # Dataset params:
 train: false # false to load validation dataset

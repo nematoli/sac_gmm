@@ -284,13 +284,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
         output:
             observation, reward, done info
         """
-        if len(action) == 3:
-            coords = action
-            orientation = np.zeros(3)
-            gripper_action = [-1]
-            env_action = np.concatenate([coords, orientation, gripper_action], axis=0)
-        else:
-            env_action = action
+        env_action = action
 
         self.robot.apply_action(env_action)
         for i in range(self.action_repeat):

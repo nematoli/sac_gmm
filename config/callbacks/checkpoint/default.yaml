@@ -1,7 +1,7 @@
 _target_: pytorch_lightning.callbacks.ModelCheckpoint
 _recursive_: false
 dirpath: ??
-filename: '{episode-number}-{episode-avg-return}'
+filename: "{episode_number}_{total-env-steps}_{episode_avg_return}"
 monitor: 'episode-avg-return' 
 verbose: True
 save_last: True

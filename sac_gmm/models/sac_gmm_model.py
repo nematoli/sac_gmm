@@ -92,6 +92,10 @@ class SACGMM(SkillModel):
                     "eval/episode-avg-length": eval_length,
                     "eval/total-env-steps": self.agent.total_env_steps,
                     "eval/episode-number": self.episode_idx,
+                    # The following are for lightning to save checkpoints
+                    "episode-avg-return": eval_return,
+                    "episode-number": self.episode_idx,
+                    "total-env-steps": self.agent.total_env_steps,
                 }
                 metrics.update(eval_metrics)
                 # Log the video GIF to wandb if exists
