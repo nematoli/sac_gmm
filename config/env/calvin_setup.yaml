@@ -1,0 +1,5 @@
+# Environment params
+env_name: calvin
+show_gui: ${show_gui}
+ee_noise: [0.03, 0.03, 0.03]
+obs_space: ${obs_space} # ["state"], ["pos", "joints"], ["pos", "joints", "gripper"], ["state", "gripper"]

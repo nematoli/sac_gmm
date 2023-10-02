@@ -153,12 +153,13 @@ class KeypointDetector(nn.Module):
 
 
 class KeypointMock:
-    def __init__(self, kp_noise_high, kp_noise_low):
+    def __init__(self, kp_noise_high, kp_noise_low, env_is_source):
         self.dim = 4
         self.init_pos = None
         self.pos = None
         self.kp_noise_high = np.array(kp_noise_high)
         self.kp_noise_low = np.array(kp_noise_low)
+        self.env_is_source = env_is_source
 
     def reset_gt(self, gt_keypoint=None):
         if gt_keypoint is None:
@@ -189,8 +190,11 @@ class KeypointMock:
         return x
 
     def sample_keypoint(self):
-        dist = self.kp_noise_high - self.kp_noise_low
-        shift = (np.random.uniform(0.0, 1.0, [self.init_pos.shape[0]]) * 2.0 - 1.0) * dist
-        shift += self.kp_noise_low * np.sign(shift)
-        # shift = np.random.normal(0.0, self.target_deviation, [self.init_pos.shape[0]])
-        return np.copy(self.init_pos) + shift
+        if self.env_is_source:
+            return np.copy(self.init_pos)
+        else:
+            dist = self.kp_noise_high - self.kp_noise_low
+            shift = (np.random.uniform(0.0, 1.0, [self.init_pos.shape[0]]) * 2.0 - 1.0) * dist
+            shift += self.kp_noise_low * np.sign(shift)
+            # shift = np.random.normal(0.0, self.target_deviation, [self.init_pos.shape[0]])
+            return np.copy(self.init_pos) + shift

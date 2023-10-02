@@ -39,6 +39,8 @@ class CalvinSkillEnv(PlayTableSimEnv):
         super(CalvinSkillEnv, self).__init__(**pt_cfg)
 
         self.init_base_pos, self.init_base_orn = self.p.getBasePositionAndOrientation(self.robot.robot_uid)
+        self.init_gripper_pos = self.robot.target_pos
+        self.init_gripper_orn = self.robot.target_orn
         self.ee_noise = np.array(cfg.ee_noise)
         self.obs_space = cfg.obs_space
 
@@ -167,6 +169,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
         object = self.object_by_name(self.tasks.tasks[task_filter].args[0])
         if object.name == "base__drawer":
             offset = np.array([0.0, -0.17, 0.03])
+
         else:
             raise NotImplementedError
         return self.object_position(object) + offset
@@ -180,9 +183,15 @@ class CalvinSkillEnv(PlayTableSimEnv):
         self.gt_keypoint = self.task_object_position()
 
     def sample_base_shift(self):
-        # TODO: add noise here
+        shift = np.array(self.skill.T_obj_gripper)
+        pos_shift = shift + np.random.normal(0.0, self.ee_noise, 3)
+
+        gripper_pos = self.task_object_position() + pos_shift
+        delta_pos = gripper_pos - self.init_gripper_pos
 
         bp, born = self.init_base_pos, self.init_base_orn
+        bp = bp + delta_pos
+
         return bp, born
 
     def sample_ee_pose(self):
@@ -237,9 +246,6 @@ class CalvinSkillEnv(PlayTableSimEnv):
         self.p.stepSimulation(physicsClientId=self.cid)
 
         self.start_info = self.get_info()
-        ee_ready = False
-        while not ee_ready:
-            ee_ready = self.calibrate_EE_start_state()
 
         self.set_gt_keypoint()
         return self.get_obs()
