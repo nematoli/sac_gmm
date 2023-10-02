@@ -26,7 +26,7 @@ class BayesianGMM(BaseGMM):
         self.random_state = np.random.RandomState(0)
 
         self.max_iter = max_iter
-        self.bgmm = BayesianGaussianMixture(n_components=self.n_components, max_iter=self.max_iter)
+        self.bgmm = BayesianGaussianMixture(n_components=self.n_components, max_iter=self.max_iter, tol=0.05, n_init=20)
         self.gmm = None
         self.logger = None
         self.model_dir = os.path.join(Path(skill.skills_dir).expanduser(), skill.name, skill.state_type, self.name)
