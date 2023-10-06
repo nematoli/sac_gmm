@@ -3,7 +3,7 @@ accelerator: gpu
 devices: 1 #auto
 strategy: auto #"ddp", "ddp_spawn", "deepspeed"
 precision: 32
-max_epochs: 24000 # SACGMM - 24K epochs is 5K episodes, SACNGMM - 24K epochs is 4K episodes so 1K per skill
+max_epochs: 60000 # SACGMM - 24K epochs is 5K episodes, SACNGMM - 24K epochs is 4K episodes so 1K per skill
 max_steps: -1 # 8e4 will get you just over 8.5K episodes
 log_every_n_steps:       1             #help='print/disp/save frequency'
 resume_from_checkpoint:  null            #help='path to latest checkpoint'

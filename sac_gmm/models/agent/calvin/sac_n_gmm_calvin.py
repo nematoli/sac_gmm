@@ -189,7 +189,7 @@ class CALVIN_SACNGMMAgent(Agent):
                 # Recording setup
                 if self.record and (episode == rand_idx):
                     self.env.reset_recording()
-                    self.env.record_frame(size=100)
+                    self.env.record_frame(size=200)
 
                 while episode_env_steps < self.task.max_steps:
                     # Change dynamical system
@@ -213,7 +213,7 @@ class CALVIN_SACNGMMAgent(Agent):
                             if reward > 0:
                                 succesful_skill_ids.append(skill_id)
                         if self.record and (episode == rand_idx):
-                            self.env.record_frame(size=100)
+                            self.env.record_frame(size=200)
                         if self.render:
                             self.env.render()
                         if done:

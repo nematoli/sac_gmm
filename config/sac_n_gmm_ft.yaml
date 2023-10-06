@@ -23,8 +23,8 @@ agent:
 
 # evaluation frequency:
 eval_frequency: 25
-num_init_steps: 250
-num_eval_episodes: 10
+num_init_steps: 1
+num_eval_episodes: 50
 
 # Dataset params:
 train: true # false to load validation dataset
@@ -32,10 +32,10 @@ goal_centered: true # this must be false during evaluation
 
 # Visualization
 render: false
-record: true
+record: false
 
 # Pretrained SAC_N_GMM model
-model_ckpt: "logs/sac-n-gmm-train/2023_10_01/13_40_47/model_weights/last.ckpt"
+model_ckpt: "logs/sac-n-gmm-train/2023_10_04/17_49_52/model_weights/last.ckpt"
 
 
 # Logging

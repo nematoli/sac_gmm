@@ -48,7 +48,7 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         self.skill_starts = {}
         self.skill_goals = {}
         self.skill_oris = {}
-        self.centroid = None
+        self.centroid = np.array([0.036, -0.13, 0.509])
 
     @staticmethod
     def get_action_space():
@@ -213,7 +213,7 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
 
     def get_init_orn(self):
         """Gets the initial orientation of the end effector based on the chosen skill."""
-        return np.array([3.14, 0.0, 1.5])  # Default
+        return np.array([3.14, -0.3, 1.5])  # Default
 
     def sample_ee_pose(self):
         """Samples a random end effector pose within a small range around the initial pose."""
@@ -222,7 +222,8 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         # else:
         #     self.init_gripper_pos = self.init_pos
         # self.init_gripper_pos = self.get_init_pos()
-        self.init_gripper_orn = self.robot.target_orn
+        # self.init_gripper_orn = self.robot.target_orn
+        self.init_gripper_orn = self.get_init_orn()
         offset = [0, 0, 0]
         np.random.seed(np.random.randint(0, 1000))
         offset[0] = np.random.uniform(-self.ee_noise[0], self.ee_noise[0], 1)[0]

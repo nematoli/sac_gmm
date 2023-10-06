@@ -88,7 +88,8 @@ class CALVIN_SACNGMMAgent_FT(Agent):
         self.skill_params_stacked = torch.from_numpy(self.skill_actor.get_all_skill_params(self.initial_gmms))
 
         # Store skill info - starts, goals, fixed_ori, pos_dt, ori_dt
-        self.env.store_skill_info(self.skill_actor.skills)
+        if len(self.task.skills) > 3:
+            self.env.store_skill_info(self.skill_actor.skills)
         # # record setup
         self.video_dir = os.path.join(exp_dir, "videos")
         os.makedirs(self.video_dir, exist_ok=True)
@@ -187,7 +188,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
             self.obs = self.env.reset()
             # log_rank_0(f"Skill: {skill} - Obs: {self.obs['robot_obs']}")
             # Recording setup
-            if self.record and (episode == rand_idx):
+            if self.record:  # and (episode == rand_idx):
                 self.env.reset_recording()
                 self.env.record_frame(size=200)
 
@@ -213,7 +214,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
                         if reward > 0:
                             succesful_skill_ids.append(skill_id)
                             skill_id = (skill_id + 1) % len(self.task.skills)
-                    if self.record and (episode == rand_idx):
+                    if self.record:  # and (episode == rand_idx):
                         self.env.record_frame(size=200)
                     if self.render:
                         self.env.render()
@@ -228,10 +229,10 @@ class CALVIN_SACNGMMAgent_FT(Agent):
             if ("success" in info) and info["success"]:
                 succesful_episodes += 1
             # Recording setup close
-            if self.record and (episode == rand_idx):
+            if self.record:  # and (episode == rand_idx):
                 video_path = self.env.save_recording(
                     outdir=self.video_dir,
-                    fname=f"PlaySteps{self.total_play_steps}_EnvSteps{self.total_env_steps }",
+                    fname=f"PlaySteps{self.total_play_steps}_EnvSteps{self.total_env_steps}_Episode{episode}",
                 )
                 self.env.reset_recording()
                 saved_video_path = video_path

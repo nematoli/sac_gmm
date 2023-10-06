@@ -50,7 +50,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
         self.tasks = hydra.utils.instantiate(cfg.calvin_env.tasks)
         self.frames = []
 
-        self.centroid = np.array([0.036, -0.13, 0.507875])
+        self.centroid = np.array([0.036, -0.13, 0.509])
 
     def set_skill(self, skill):
         """Set skill"""
@@ -165,13 +165,18 @@ class CalvinSkillEnv(PlayTableSimEnv):
         bp, born = self.init_base_pos, self.init_base_orn
         return bp, born
 
+    def get_init_orn(self):
+        """Gets the initial orientation of the end effector based on the chosen skill."""
+        return np.array([3.14, -0.3, 1.5])  # Default
+
     def sample_ee_pose(self):
         if self.init_pos is None:
             self.init_gripper_pos = self.robot.target_pos
         else:
             self.init_gripper_pos = self.init_pos
 
-        self.init_gripper_orn = self.robot.target_orn
+        # self.init_gripper_orn = self.robot.target_orn
+        self.init_gripper_orn = self.get_init_orn()
         offset = [0, 0, 0]
         np.random.seed(np.random.randint(0, 1000))
         offset[0] = np.random.uniform(-self.ee_noise[0], self.ee_noise[0], 1)[0]

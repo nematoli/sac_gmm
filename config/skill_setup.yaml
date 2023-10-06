@@ -1,5 +1,5 @@
 defaults:
-  - gmm: manifold_gmm # manifold_gmm or bayesian_gmm
+  - gmm: bayesian_gmm # manifold_gmm or bayesian_gmm
   - skill: default
   - env: default_skill # open_drawer / close_drawer / ?
 

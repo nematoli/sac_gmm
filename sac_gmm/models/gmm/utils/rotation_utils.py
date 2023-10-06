@@ -2,6 +2,33 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 
+def quaternion_inverse(q):
+    x, y, z, w = q
+    return np.array([-x, -y, -z, w])
+
+
+def multiply_quaternions(q1, q2):
+    x1, y1, z1, w1 = q1
+    x2, y2, z2, w2 = q2
+
+    w = -x1 * x2 - y1 * y2 - z1 * z2 + w1 * w2
+    x = x1 * w2 + y1 * z2 - z1 * y2 + w1 * x2
+    y = -x1 * z2 + y1 * w2 + z1 * x2 + w1 * y2
+    z = x1 * y2 - y1 * x2 + z1 * w2 + w1 * z2
+
+    return np.array([x, y, z, w])
+
+
+def get_relative_quaternion(q_current, q_target):
+    # Calculate the inverse of the current quaternion
+    q_current_inv = quaternion_inverse(q_current)
+
+    # Calculate the relative quaternion
+    q_relative = multiply_quaternions(q_target, q_current_inv)
+
+    return q_relative
+
+
 def compute_euler_difference2(goal_quat, current_euler):
     """
     1. Convert Quaternions to Rotation Matrices

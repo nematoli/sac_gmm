@@ -58,8 +58,9 @@ class CALVINDynSysDataset2(Dataset):
         if self.goal_centered:
             self.X_pos[:, :, :] = self.X_pos[:, :, :] - np.expand_dims(self.X_pos[:, -1, :], axis=1)
 
-        self.dX_pos = self.dX_pos = np.copy(self.X_pos[:, 1:, :])
-        self.X_pos = np.copy(self.X_pos[:, :-1, :])
+        self.dX_pos = np.zeros_like(self.X_pos)
+        self.dX_pos[:, :-1, :] = np.copy(self.X_pos[:, 1:, :])
+        self.dX_pos[:, -1, :] = np.copy(self.X_pos[:, -1, :])
 
         self.X_pos = torch.from_numpy(self.X_pos).type(torch.FloatTensor)
         self.dX_pos = torch.from_numpy(self.dX_pos).type(torch.FloatTensor)

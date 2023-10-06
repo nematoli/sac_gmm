@@ -5,7 +5,7 @@ from pathlib import Path
 import gym
 from sac_gmm.models.gmm.utils.plot_utils import visualize_3d_gmm
 from sac_gmm.utils.posdef import isPD, nearestPD
-from sac_gmm.models.gmm.utils.rotation_utils import compute_euler_difference2
+from sac_gmm.models.gmm.utils.rotation_utils import get_relative_quaternion
 from pytorch_lightning.utilities import rank_zero_only
 import pybullet
 
@@ -119,6 +119,12 @@ class BaseGMM(object):
         raise NotImplementedError
 
     def predict4(self, x):
+        """
+        Predict function for GMM type 4
+        """
+        raise NotImplementedError
+
+    def predict5(self, x):
         """
         Predict function for GMM type 4
         """
@@ -313,6 +319,8 @@ class BaseGMM(object):
         #     self.covariances[dim : 2 * dim, 0:dim] += d_sigma_cc
 
     def plot_gmm(self, obj_type=True):
+        if "Bayesian" in self.name:
+            self.reshape_params(to="gmr-specific")
         points = self.dataset.X_pos.numpy()
         rand_idx = np.random.choice(np.arange(0, len(points)), size=15)
         points = np.vstack(points[rand_idx, :, :])
@@ -376,19 +384,18 @@ class BaseGMM(object):
             if np.isnan(next_pos[0]) or np.isnan(x_ori[0]):
                 return np.zeros(3), np.zeros(3), True
             dx_pos = (next_pos + self.goal - x[:3]) / self.pos_dt
-            # target_ori = pybullet.getEulerFromQuaternion(x_ori)
             target_ori = x_ori
         elif self.gmm_type == 4:
             dx_pos, x_ori = self.predict4(x[:3])
             if np.isnan(dx_pos[0]) or np.isnan(x_ori[0]):
                 return np.zeros(3), np.zeros(3), True
-            target_ori = pybullet.getEulerFromQuaternion(x_ori)
+            target_ori = x_ori
         elif self.gmm_type == 3:
             out = self.predict3(x[:3])
             if np.isnan(out[0]):
                 return np.zeros(3), np.zeros(3), True
             dx_pos = (out[:3] + self.goal - x[:3]) / self.pos_dt
-            target_ori = pybullet.getEulerFromQuaternion(out[3:])
+            target_ori = out[3:]
         elif self.gmm_type == 2:
             next_pos = self.predict2(x[:3])
             dx_pos = (next_pos + self.goal - x[:3]) / self.pos_dt
@@ -396,5 +403,6 @@ class BaseGMM(object):
         elif self.gmm_type == 1:
             dx_pos = self.predict1(x[:3])
             target_ori = self.fixed_ori
-        dx_ori = compute_euler_difference2(target_ori, x[3:6])
-        return dx_pos, dx_ori, False
+        # current_quat = np.array(pybullet.getQuaternionFromEuler(x[3:6]))
+        # dx_ori = get_relative_quaternion(current_quat, target_ori)
+        return dx_pos, np.zeros(3), False

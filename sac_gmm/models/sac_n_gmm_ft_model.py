@@ -228,3 +228,26 @@ class SACNGMM_FT(TaskModel):
             if k.replace("critic_target.", "") in self.critic_target.state_dict()
         }
         self.critic_target.load_state_dict(critic_state_dict)
+
+    def evaluate(self):
+        eval_accuracy, eval_return, eval_length, eval_skill_ids, eval_video_path = self.agent.evaluate(
+            self.actor.cuda(),
+        )
+        if len(eval_skill_ids) > 0:
+            skill_id_counts = Counter(eval_skill_ids)
+            skill_ids = {
+                f"eval/{self.agent.task.skills[k]}": v / self.agent.num_eval_episodes
+                for k, v in skill_id_counts.items()
+            }
+            # Add 0 values for skills that were not used at all
+            unused_skill_ids = set(range(len(self.agent.task.skills))) - set(skill_id_counts.keys())
+            if len(unused_skill_ids) > 0:
+                skill_ids.update({f"eval/{self.agent.task.skills[k]}": 0 for k in list(unused_skill_ids)})
+        else:
+            skill_ids = {f"eval/{k}": 0 for k in self.agent.task.skills}
+
+        log_rank_0(
+            f"Accuracy: {eval_accuracy}, Average Return: {eval_return}, Average Trajectory Length: {eval_length}"
+        )
+        log_rank_0(f"Skill Distribution: {skill_ids}")
+        log_rank_0(f"Saved video at {eval_video_path}")

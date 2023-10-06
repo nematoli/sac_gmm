@@ -1,7 +1,7 @@
 defaults:
   - setup
   - skill_setup
-  - datamodule: calvin_ds5
+  - datamodule: calvin_ds2
   - logger: wandb
 
 logger:
@@ -9,7 +9,7 @@ logger:
 
 show_gui: false
 
-skill_name: null
+skill_name: open_drawer
 skill:
   name: ${skill_name}
 
@@ -18,11 +18,11 @@ train: false # false to load validation dataset
 goal_centered: false # this must be false during evaluation
 
 # GMM Type
-gmm_type: 5
+gmm_type: 2
 
 # Environment params
 render: false
-record: false
+record: true
 
 hydra:
   run:
