@@ -2,7 +2,7 @@ hydra-core
 hydra-colorlog
 torch
 torchvision
-pytorch-lightning
+pytorch-lightning==1.9.5
 gmr
 scikit-learn
 numpy
