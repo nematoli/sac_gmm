@@ -2,7 +2,7 @@ defaults:
   - setup
   - task_setup
   - callbacks: default
-  - datamodule: calvin_ds5
+  - datamodule: calvin_ds2
   - sac: sac_n_gmm_ft_model
   - agent: sac_n_gmm_ft_calvin
   - logger: wandb
@@ -16,7 +16,7 @@ defaults:
 show_gui: false
 
 # GMM params
-gmm_type: 5
+gmm_type: 2
 
 agent: 
   sparse_reward: false
@@ -24,7 +24,7 @@ agent:
 # evaluation frequency:
 eval_frequency: 25
 num_init_steps: 1
-num_eval_episodes: 50
+num_eval_episodes: 5
 
 # Dataset params:
 train: true # false to load validation dataset
@@ -32,10 +32,10 @@ goal_centered: true # this must be false during evaluation
 
 # Visualization
 render: false
-record: false
+record: true
 
 # Pretrained SAC_N_GMM model
-model_ckpt: "logs/sac-n-gmm-train/2023_10_04/17_49_52/model_weights/last.ckpt"
+model_ckpt: "logs/sac-n-gmm-train/2023_10_09/17_56_24/model_weights/last.ckpt"
 
 
 # Logging
