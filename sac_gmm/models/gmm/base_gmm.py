@@ -290,10 +290,16 @@ class BaseGMM(object):
             else:
                 # Only update position and next position means
                 idx = 0
-                for i in range(self.means.shape[0]):
-                    self.means[i, 0] += delta["mu"][idx : idx + 3]
-                    self.means[i, 1] += delta["mu"][idx : idx + 3]
-                    idx += 3
+                if "Bayesian" in self.name:
+                    for i in range(self.means.shape[0]):
+                        self.means[i, :3] += delta["mu"][idx : idx + 3]
+                        self.means[i, 3:] += delta["mu"][idx : idx + 3]
+                        idx += 3
+                else:
+                    for i in range(self.means.shape[0]):
+                        self.means[i, 0] += delta["mu"][idx : idx + 3]
+                        self.means[i, 1] += delta["mu"][idx : idx + 3]
+                        idx += 3
         pass
         # # Covariances
         # if "sigma" in delta:

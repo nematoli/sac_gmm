@@ -64,15 +64,18 @@ class Agent(object):
         if "robot_obs" in keys:
             state_dim += 3
         if "rgb_gripper" in keys:
-            state_dim += feature_size
+            # state_dim += feature_size
+            state_dim = feature_size
         if "obs" in keys:
             state_dim = 21
+        if "state" in keys:
+            state_dim = 33
         return state_dim
 
     def get_action_space(self):
         raise NotImplementedError
 
-    def populate_replay_buffer(self, actor, replay_buffer):
+    def populate_replay_buffer(self, actor, model, replay_buffer):
         """
         Carries out several steps through the environment to initially fill
         up the replay buffer with experiences from the GMM
@@ -82,27 +85,11 @@ class Agent(object):
         """
         log_rank_0("Populating replay buffer with random warm up steps")
         for _ in tqdm(range(self.num_init_steps)):
-            self.play_step(actor, strategy="random", replay_buffer=replay_buffer)
+            self.play_step(actor, model, critic=None, strategy="random", replay_buffer=replay_buffer)
         replay_buffer.save()
 
-    def get_action(self, actor, observation, strategy="stochastic", device="cuda"):
-        """Interface to get action from SAC Actor,
-        ready to be used in the environment"""
-        actor.eval()
-        if strategy == "random":
-            return self.get_action_space().sample()
-        elif strategy == "zeros":
-            return np.zeros(self.get_action_space().shape)
-        elif strategy == "stochastic":
-            deterministic = False
-        elif strategy == "deterministic":
-            deterministic = True
-        else:
-            raise Exception("Strategy not implemented")
-        state = self.get_state_from_observation(actor.encoder, observation, device)
-        action, _ = actor.get_actions(state, deterministic=deterministic, reparameterize=False)
-        actor.train()
-        return action.detach().cpu().numpy()
+    def get_action(self, actor, model, observation, strategy="stochastic", device="cuda"):
+        raise NotImplementedError
 
     def play_step(self, actor, strategy="stochastic", replay_buffer=None):
         """Perform a step in the environment and add the transition

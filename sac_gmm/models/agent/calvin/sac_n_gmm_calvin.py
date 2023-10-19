@@ -100,29 +100,13 @@ class CALVIN_SACNGMMAgent(Agent):
 
         self.nan_counter = 0
 
-    def get_action_space(self):
-        parameter_space = self.get_update_range_parameter_space()
-        mu_high = np.ones(parameter_space["mu"].shape[0])
-        if self.mean_shift:
-            action_high = mu_high
-        else:
-            priors_high = np.ones(parameter_space["priors"].shape[0])
-            action_high = np.concatenate((priors_high, mu_high), axis=-1)
-            if self.adapt_cov:
-                sigma_high = np.ones(parameter_space["sigma"].shape[0])
-                action_high = np.concatenate((action_high, sigma_high), axis=-1)
-
-        action_low = -action_high
-        self.action_space = gym.spaces.Box(action_low, action_high)
-        return self.action_space
-
     @torch.no_grad()
-    def play_step(self, refine_actor, strategy="stochastic", replay_buffer=None, device="cuda"):
+    def play_step(self, refine_actor, model, strategy="stochastic", replay_buffer=None, device="cuda"):
         """Perform a step in the environment and add the transition
         tuple to the replay buffer"""
         # Change dynamical system
         self.skill_actor.copy_model(self.initial_gmms, self.skill_id)
-        gmm_change = self.get_action(refine_actor, self.skill_id, self.obs, strategy, device)
+        gmm_change = self.get_action(refine_actor, model, self.skill_id, self.obs, strategy, device)
         self.update_gaussians(gmm_change, self.skill_id)
 
         # Act with the dynamical system in the environment
@@ -172,7 +156,7 @@ class CALVIN_SACNGMMAgent(Agent):
         return gmm_reward, done
 
     @torch.no_grad()
-    def evaluate(self, refine_actor, device="cuda"):
+    def evaluate(self, refine_actor, model, device="cuda"):
         """Evaluates the actor in the environment"""
         log_rank_0("Evaluation episodes in process")
         succesful_episodes, episodes_returns, episodes_lengths = 0, [], []
@@ -194,7 +178,7 @@ class CALVIN_SACNGMMAgent(Agent):
                 while episode_env_steps < self.task.max_steps:
                     # Change dynamical system
                     self.skill_actor.copy_model(self.initial_gmms, skill_id)
-                    gmm_change = self.get_action(refine_actor, skill_id, self.obs, "deterministic", device)
+                    gmm_change = self.get_action(refine_actor, model, skill_id, self.obs, "deterministic", device)
                     self.update_gaussians(gmm_change, skill_id)
 
                     # Act with the dynamical system in the environment
@@ -245,6 +229,22 @@ class CALVIN_SACNGMMAgent(Agent):
             succesful_skill_ids,
             saved_video_paths,
         )
+
+    def get_action_space(self):
+        parameter_space = self.get_update_range_parameter_space()
+        mu_high = np.ones(parameter_space["mu"].shape[0])
+        if self.mean_shift:
+            action_high = mu_high
+        else:
+            priors_high = np.ones(parameter_space["priors"].shape[0])
+            action_high = np.concatenate((priors_high, mu_high), axis=-1)
+            if self.adapt_cov:
+                sigma_high = np.ones(parameter_space["sigma"].shape[0])
+                action_high = np.concatenate((action_high, sigma_high), axis=-1)
+
+        action_low = -action_high
+        self.action_space = gym.spaces.Box(action_low, action_high)
+        return self.action_space
 
     def get_update_range_parameter_space(self):
         """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
@@ -302,40 +302,45 @@ class CALVIN_SACNGMMAgent(Agent):
     def get_state_from_observation(self, encoder, obs, skill_id, device="cuda"):
         if isinstance(obs, dict):
             # Robot obs
-            if "position" in obs:
-                fc_input = torch.tensor(obs["position"]).to(device)
-            if "orientation" in obs:
-                fc_input = torch.cat((fc_input, obs["orientation"].float()), dim=-1).to(device)
-            if "robot_obs" in obs:
-                if obs["robot_obs"].ndim > 1:  # When obs is of shape (Batch x obs_dim)
-                    fc_input = torch.tensor(obs["robot_obs"][:, :3]).to(device)
-                    # skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()]
-                    skill_vector = self.skill_params_stacked[skill_id[:, 0].cpu().int()].to(device)
-                else:
-                    fc_input = torch.tensor(obs["robot_obs"][:3]).to(device)
-                    # skill_vector = torch.eye(len(self.task.skills))[skill_id]
-                    skill_vector = self.skill_params_stacked[skill_id].squeeze(0).to(device)
+            if "state" in obs:
+                name = "state"
+            elif "robot_obs" in obs:
+                name = "robot_obs"
+
+            if obs[name].ndim > 1:  # When obs is of shape (Batch x obs_dim)
+                fc_input = torch.tensor(obs[name][:, :]).to(device)
+                # skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()]
+                skill_vector = self.skill_params_stacked[skill_id[:, 0].cpu().int()].to(device)
+            else:
+                # fc_input = torch.tensor(obs[name]).to(device)
+                # skill_vector = torch.eye(len(self.task.skills))[skill_id]
+                skill_vector = self.skill_params_stacked[skill_id].squeeze(0).to(device)
+            # RGB obs
             if "rgb_gripper" in obs:
                 x = obs["rgb_gripper"]
                 if not torch.is_tensor(x):
                     x = torch.tensor(x).to(device)
                 if len(x.shape) < 4:
                     x = x.unsqueeze(0)
-                features = encoder(x)
-                if features is not None:
-                    fc_input = torch.cat((fc_input, features.squeeze()), dim=-1).to(device)
-                # fc_input = features.squeeze()
-            # if "obs" in obs:
-            #     fc_input = torch.cat((fc_input, torch.tensor(obs["obs"]).to(device)), dim=-1)
-            fc_input = torch.cat((fc_input, skill_vector), dim=-1).to(device)
+                with torch.no_grad():
+                    features = encoder(x)
+                    # features = encoder({"obs": x.float()})
+                # If position are part of the input state
+                # if features is not None:
+                #     fc_input = torch.cat((fc_input, features.squeeze()), dim=-1).to(device)
+                # Else
+                fc_input = features.squeeze()
+
+            fc_input = torch.cat((fc_input, skill_vector.squeeze()), dim=-1).to(device)
             return fc_input.float()
 
         return obs.float()
 
-    def get_action(self, actor, skill_id, observation, strategy="stochastic", device="cuda"):
+    def get_action(self, actor, model, skill_id, observation, strategy="stochastic", device="cuda"):
         """Interface to get action from SAC Actor,
         ready to be used in the environment"""
         actor.eval()
+        model.eval()
         if strategy == "random":
             return self.get_action_space().sample()
         elif strategy == "zeros":
@@ -346,7 +351,10 @@ class CALVIN_SACNGMMAgent(Agent):
             deterministic = True
         else:
             raise Exception("Strategy not implemented")
-        state = self.get_state_from_observation(actor.encoder, observation, skill_id, device)
-        action, _ = actor.get_actions(state, deterministic=deterministic, reparameterize=False)
+        input_state = self.get_state_from_observation(actor.encoder, observation, skill_id, device)
+        enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
+        # input_state = self.get_state_from_observation(model.encoder, observation, skill_id, device)
+        action, _ = actor.get_actions(enc_state, deterministic=deterministic, reparameterize=False)
         actor.train()
+        model.train()
         return action.detach().cpu().numpy()

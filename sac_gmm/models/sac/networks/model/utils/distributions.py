@@ -6,15 +6,12 @@ import torch.nn.functional as F
 import torch.distributions
 import numpy as np
 
-from .pytorch import symlog, symexp, sum_rightmost
-
 
 # Identity
 class Identity(object):
     def __init__(self, mean):
         self.mean = mean
 
-    @property
     def mode(self):
         return self.mean
 
@@ -29,7 +26,6 @@ class TanhIdentity(object):
     def __init__(self, mean):
         self.mean = mean
 
-    @property
     def mode(self):
         return torch.tanh(self.mean)
 
@@ -51,27 +47,8 @@ class Categorical(torch.distributions.Categorical):
     def entropy(self):
         return super().entropy() * 10.0  # scailing
 
-    @property
     def mode(self):
         return self.probs.argmax(dim=-1, keepdim=True)
-
-
-# One-Hot Categorical
-class OneHot(torch.distributions.Independent):
-    def __init__(self, logits, unimix=0.0, event_dim=0):
-        if unimix:
-            probs = torch.softmax(logits, -1)
-            probs = (1 - unimix) * probs + unimix / probs.shape[-1]
-
-            super().__init__(torch.distributions.OneHotCategorical(probs=probs), event_dim)
-        else:
-            super().__init__(torch.distributions.OneHotCategorical(logits=logits), event_dim)
-
-    def rsample(self):
-        sample = self.sample()
-        probs = self.base_dist.probs
-        sample += probs - probs.detach()
-        return sample
 
 
 # Normal
@@ -79,80 +56,8 @@ class Normal(torch.distributions.Independent):
     def __init__(self, mean, std, event_dim=0):
         super().__init__(torch.distributions.Normal(mean, std), event_dim)
 
-    @property
     def mode(self):
         return self.mean
-
-
-class Bernoulli(torch.distributions.Independent):
-    def __init__(self, probs=None, logits=None, event_dim=0):
-        super().__init__(
-            torch.distributions.bernoulli.Bernoulli(probs=probs, logits=logits),
-            event_dim,
-        )
-
-    @property
-    def mode(self):
-        mode = super().mode
-        # Bernoulli distribution returns `nan` when p=0.5
-        return torch.nan_to_num(mode, nan=1.0)
-
-
-class Symlog(nn.Module):
-    def __init__(self, mean, event_dim=0):
-        super().__init__()
-        self._mean = mean
-        self.event_dim = event_dim
-
-    @property
-    def mean(self):
-        return symexp(self._mean)
-
-    @property
-    def mode(self):
-        return symexp(self._mean)
-
-    def log_prob(self, v):
-        distance = -((self._mean - symlog(v)) ** 2)
-        return sum_rightmost(distance, self.event_dim)
-
-
-class SymlogDiscrete(nn.Module):
-    def __init__(self, logits, event_dim=0):
-        super().__init__()
-        self._logits = logits
-        self._probs = torch.softmax(logits, -1)
-        self._bins = torch.linspace(-20, 20, 255, dtype=logits.dtype, device=logits.device)
-        self._low = -20
-        self._high = 20
-        self.event_dim = event_dim
-
-    @property
-    def mean(self):
-        return symexp((self._probs * self._bins).sum(-1))
-
-    @property
-    def mode(self):
-        return self.mean
-
-    def log_prob(self, v):
-        with torch.no_grad():
-            v = symlog(v)
-            below = (self._bins <= v[..., None]).type(torch.int16).sum(-1) - 1
-            above = 255 - (self._bins > v[..., None]).type(torch.int16).sum(-1)
-            below = torch.clamp(below, 0, 254)
-            above = torch.clamp(above, 0, 254)
-            equal = below == above
-            dist_to_below = torch.where(equal, 1, torch.abs(self._bins[below] - v))
-            dist_to_above = torch.where(equal, 1, torch.abs(self._bins[above] - v))
-            total = dist_to_below + dist_to_above
-            # Small dist_to_above <-> large weight_below, and vice versa.
-            weight_below = dist_to_above / total
-            weight_above = dist_to_below / total
-            target = F.one_hot(below, 255) * weight_below[..., None]
-            target += F.one_hot(above, 255) * weight_above[..., None]
-        log_pred = self._logits - torch.logsumexp(self._logits, -1, keepdim=True)
-        return sum_rightmost((target * log_pred).sum(-1), self.event_dim)
 
 
 class AddBias(nn.Module):
@@ -202,23 +107,17 @@ class TanhNormal_(torch.distributions.transformed_distribution.TransformedDistri
     def mean(self):
         return self.base_dist.mean.tanh()
 
-    def log_prob(self, value):
-        value = torch.clamp(value, -0.99999997, 0.99999997)
-        return super().log_prob(value)
-
 
 class TanhNormal(torch.distributions.Independent):
     def __init__(self, mean, std, event_dim=0):
-        self.event_dim = event_dim
-        super().__init__(TanhNormal_(torch.clamp(mean, -9.0, 9.0), std), event_dim)
+        super().__init__(TanhNormal_(mean, std), event_dim)
 
-    @property
     def mode(self):
         return self.mean
 
     def entropy(self):
         """No analytic form. Instead, use entropy of Normal as proxy."""
-        return sum_rightmost(self.base_dist.base_dist.entropy(), self.event_dim)
+        return self.base_dist.base_dist.entropy()
 
 
 class SampleDist(nn.Module):
@@ -235,7 +134,6 @@ class SampleDist(nn.Module):
         samples = self.base_dist.rsample((self._samples,))
         return torch.mean(samples, 0)
 
-    @property
     def mode(self):
         samples = self.base_dist.rsample((self._samples,))
         log_prob = self.base_dist.log_prob(samples)
@@ -298,9 +196,8 @@ class MixedDistribution(nn.Module):
     def __getitem__(self, key):
         return self.base_dists[key]
 
-    @property
     def mode(self):
-        return OrderedDict([(k, dist.mode) for k, dist in self.base_dists.items()])
+        return OrderedDict([(k, dist.mode()) for k, dist in self.base_dists.items()])
 
     def sample(self):
         return OrderedDict([(k, dist.sample()) for k, dist in self.base_dists.items()])

@@ -10,6 +10,8 @@ from pytorch_lightning.utilities import rank_zero_only
 from sac_gmm.datasets.rl_dataset_task import RLDatasetTask
 from torch.utils.data import DataLoader
 import wandb
+import gym
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +37,15 @@ class TaskModel(pl.LightningModule):
         agent,
         actor: DictConfig,
         critic: DictConfig,
+        model: DictConfig,
         actor_lr: float,
         critic_lr: float,
         critic_tau: float,
         alpha_lr: float,
         init_alpha: float,
         fixed_alpha: bool,
+        model_lr: float,
+        model_tau: float,
         eval_frequency: int,
     ):
         super(TaskModel, self).__init__()
@@ -57,12 +62,28 @@ class TaskModel(pl.LightningModule):
         self.agent = agent
         self.action_space = self.agent.get_action_space()
         self.action_dim = self.action_space.shape[0]
-        self.state_dim = self.agent.get_state_dim(feature_size=self.encoder.feature_size)
+
+        # Model (Input encoder, State decoder, Dynamics and Reward predictor)
+        self.skill_vector_size = self.agent.skill_actor.means_size + self.agent.skill_actor.priors_size
+        # Model input size = RGB Gripper Flattened (512) + Skill Vector (Priors + Means)
+        model.input_dim = (
+            self.agent.get_state_dim(feature_size=self.encoder.feature_size) + self.skill_vector_size
+        )  # State + Skill Vector (Priors + Means)
+        # model.input_dim = 0
+        model.ac_dim = self.action_dim
+        self.model = hydra.utils.instantiate(model)
+        model_ob_space = gym.spaces.Dict({"obs": gym.spaces.Box(low=-1, high=1, shape=(model.input_dim,))})
+        # model_ob_space = gym.spaces.Dict({"obs": self.agent.env.get_observation_space()["rgb_gripper"]})
+        self.model.make_encoder(model_ob_space, model.state_dim)
+        self.model.make_decoder(model.state_dim, model_ob_space)
+
+        self.model_target = hydra.utils.instantiate(model)
+        self.model_target.load_state_dict(self.model.state_dict())
+        self.model_tau = model_tau
+        self.model_lr = model_lr
 
         # Actor
-        skill_vector_size = self.agent.skill_actor.means_size + self.agent.skill_actor.priors_size
-        # actor.input_dim = self.state_dim + len(self.agent.task.skills)  # State + Skill Vector
-        actor.input_dim = self.state_dim + skill_vector_size  # State + Skill Vector (Priors + Means)
+        actor.input_dim = model.state_dim
         actor.action_dim = self.action_dim
         self.actor = hydra.utils.instantiate(actor)  # .to(self.device)
         self.actor.set_action_space(self.action_space)
@@ -70,10 +91,7 @@ class TaskModel(pl.LightningModule):
 
         # Critic
         self.critic_tau = critic_tau
-        # critic.input_dim = self.state_dim + len(self.agent.task.skills) + self.action_dim  # State + Skill Vector + Action
-        critic.input_dim = (
-            self.state_dim + skill_vector_size + self.action_dim
-        )  # State + Skill Vector (Priors + Means) + Action
+        critic.input_dim = model.state_dim + self.action_dim
         self.critic = hydra.utils.instantiate(critic)  # .to(device)
 
         self.critic_target = hydra.utils.instantiate(critic)  # .to(device)
@@ -89,7 +107,7 @@ class TaskModel(pl.LightningModule):
         self.critic_lr, self.actor_lr, self.alpha_lr = critic_lr, actor_lr, alpha_lr
 
         # Populate Replay Buffer with Random Actions
-        self.agent.populate_replay_buffer(self.actor, self.replay_buffer)
+        self.agent.populate_replay_buffer(self.actor, self.model, self.replay_buffer)
 
         # Logic values
         self.episode_idx = 0
@@ -99,7 +117,6 @@ class TaskModel(pl.LightningModule):
 
         # PyTorch Lightning
         self.automatic_optimization = False
-
         self.save_hyperparameters()
 
     def configure_optimizers(self):
@@ -107,7 +124,8 @@ class TaskModel(pl.LightningModule):
         critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.critic_lr)
         actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.actor_lr)
         log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.alpha_lr)
-        optimizers = [critic_optimizer, actor_optimizer, log_alpha_optimizer]
+        model_optimizer = torch.optim.Adam(self.model.parameters(), lr=self.model_lr)
+        optimizers = [critic_optimizer, actor_optimizer, log_alpha_optimizer, model_optimizer]
 
         return optimizers
 
@@ -150,6 +168,10 @@ class TaskModel(pl.LightningModule):
     def log_metrics(self, metrics: Dict[str, torch.Tensor], on_step: bool, on_epoch: bool):
         for key, val in metrics.items():
             self.log(key, val, on_step=on_step, on_epoch=on_epoch)
+
+    def log_image(self, image: torch.Tensor, name: str):
+        pil_image = Image.fromarray(image.permute(1, 2, 0).cpu().numpy().astype(np.uint8))
+        self.logger.experiment.log({name: [wandb.Image(pil_image)]})
 
     def log_video(self, video_path, name: str):
         self.logger.experiment.log({name: wandb.Video(video_path, fps=30, format="gif")})
