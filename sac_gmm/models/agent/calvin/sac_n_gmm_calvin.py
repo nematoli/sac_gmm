@@ -101,7 +101,7 @@ class CALVIN_SACNGMMAgent(Agent):
         self.nan_counter = 0
 
     @torch.no_grad()
-    def play_step(self, refine_actor, model, strategy="stochastic", replay_buffer=None, device="cuda"):
+    def play_step(self, refine_actor, model, strategy="stochastic", replay_buffer=None, device="cuda", critic=None):
         """Perform a step in the environment and add the transition
         tuple to the replay buffer"""
         # Change dynamical system
