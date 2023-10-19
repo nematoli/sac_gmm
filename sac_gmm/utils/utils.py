@@ -116,3 +116,15 @@ def get_last_checkpoint(experiment_folder: Path) -> Union[Path, None]:
     if len(checkpoints):
         return checkpoints[-1]
     return None
+
+
+# Taken directly from https://github.com/youngwoon/robot-learning/
+class LinearDecay(object):
+    def __init__(self, start, end, interval):
+        self._start = start
+        self._end = end
+        self._interval = interval
+
+    def __call__(self, step):
+        mix = np.clip(step / self._interval, 0.0, 1.0)
+        return (1.0 - mix) * self._start + mix * self._end
