@@ -122,7 +122,7 @@ class ManifoldGMM(BaseGMM):
 
     def predict1(self, x):
         dx, _, __ = manifold_gmr(
-            (x - self.goal).reshape(1, -1),
+            x.reshape(1, -1),
             self.manifold,
             self.means,
             self.covariances,
@@ -137,7 +137,7 @@ class ManifoldGMM(BaseGMM):
 
     def predict3(self, x):
         dx, _, __ = manifold_gmr(
-            (x - self.goal).reshape(1, -1),
+            x.reshape(1, -1),
             self.manifold,
             self.means,
             self.covariances,
@@ -149,7 +149,7 @@ class ManifoldGMM(BaseGMM):
 
     def predict4(self, x):
         dx, _, __ = manifold_gmr(
-            (x - self.goal).reshape(1, -1),
+            x.reshape(1, -1),
             self.manifold2,
             self.means2,
             self.covariances2,

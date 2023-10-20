@@ -1,0 +1,4 @@
+_target_:  sac_gmm.models.gmm.riepybdlib_gmm.RiepybdlibGMM
+skill: ${skill}
+plot: true
+gmm_type: ${gmm_type}

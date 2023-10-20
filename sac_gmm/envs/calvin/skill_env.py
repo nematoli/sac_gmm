@@ -167,7 +167,8 @@ class CalvinSkillEnv(PlayTableSimEnv):
 
     def get_init_orn(self):
         """Gets the initial orientation of the end effector based on the chosen skill."""
-        return np.array([3.14, -0.3, 1.5])  # Default
+        # return np.array([3.14, -0.3, 1.5])  # Default
+        return np.array([3.14, 0.0, 1.5])
 
     def sample_ee_pose(self):
         if self.init_pos is None:

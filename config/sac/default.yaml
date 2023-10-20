@@ -23,7 +23,7 @@ fixed_alpha: true
 # fixed_encoder: false
 
 #model
-model_lr: 1e-3
+model_lr: 3e-5
 model_tau: 0.99
 # evaluation frequency:
 eval_frequency: ${eval_frequency}
