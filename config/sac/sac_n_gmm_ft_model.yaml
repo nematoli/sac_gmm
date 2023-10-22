@@ -7,6 +7,7 @@ defaults:
   - replay_buffer: replay_buffer_task
 
 model_ckpt: ${model_ckpt}
+rb_dir: ${rb_dir}
 
 _target_: sac_gmm.models.sac_n_gmm_ft_model.SACNGMM_FT
 _recursive_: false

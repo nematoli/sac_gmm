@@ -308,7 +308,7 @@ class CALVIN_SACNGMMAgent(Agent):
                 name = "robot_obs"
 
             if obs[name].ndim > 1:  # When obs is of shape (Batch x obs_dim)
-                fc_input = torch.tensor(obs[name][:, :]).to(device)
+                # fc_input = torch.tensor(obs[name][:, :]).to(device)
                 # skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()]
                 skill_vector = self.skill_params_stacked[skill_id[:, 0].cpu().int()].to(device)
             else:

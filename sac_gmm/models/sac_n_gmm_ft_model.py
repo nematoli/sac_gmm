@@ -40,6 +40,7 @@ class SACNGMM_FT(TaskModel):
         model_tau: float,
         eval_frequency: int,
         model_ckpt: str,
+        rb_dir: str,
     ):
         super(SACNGMM_FT, self).__init__(
             discount=discount,
@@ -61,6 +62,7 @@ class SACNGMM_FT(TaskModel):
             eval_frequency=eval_frequency,
         )
         self.load_checkpoint(model_ckpt, agent.root_dir)
+        self.load_replay_buffer(rb_dir, agent.root_dir)
 
         self.episode_done = False
         self.save_hyperparameters()
@@ -132,9 +134,12 @@ class SACNGMM_FT(TaskModel):
                     skill_ids = {f"eval/{k}": 0 for k in self.agent.task.skills}
                 metrics.update(skill_ids)
                 # Log the video GIF to wandb if exists
-                if eval_video_paths is not None and len(eval_video_paths.keys()) > 0:
-                    for skill_name, video_path in eval_video_paths.items():
-                        self.log_video(video_path, f"eval/{skill_name}_video")
+                if eval_video_paths is not None:
+                    if eval_video_paths is dict and len(eval_video_paths.keys()) > 0:
+                        for skill_name, video_path in eval_video_paths.items():
+                            self.log_video(video_path, f"eval/{skill_name}_video")
+                    elif eval_video_paths is str:
+                        self.log_video(eval_video_paths, "eval/video")
 
             self.episode_return, self.episode_play_steps = 0, 0
             self.episode_idx += 1
@@ -253,6 +258,7 @@ class SACNGMM_FT(TaskModel):
         """Load pretrained weights of actor and critic"""
 
         ckpt = torch.load(os.path.join(root_dir, model_ckpt))
+        log_rank_0(f"Loading actor, critic and model from {model_ckpt}")
         # Get only actor related state_dict
         actor_state_dict = {
             k.replace("actor.", ""): v
@@ -285,6 +291,14 @@ class SACNGMM_FT(TaskModel):
         }
         self.model.load_state_dict(model_state_dict)
         self.model_target.load_state_dict(model_state_dict)
+
+    def load_replay_buffer(self, replay_buffer_dir, root_dir):
+        # Load replay buffer
+        log_rank_0(f"Loading replay buffer from {replay_buffer_dir}")
+        temp = self.replay_buffer.save_dir
+        self.replay_buffer.save_dir = os.path.join(root_dir, replay_buffer_dir)
+        self.replay_buffer.load()
+        self.replay_buffer.save_dir = temp
 
     def evaluate(self):
         eval_accuracy, eval_return, eval_length, eval_skill_ids, eval_video_path = self.agent.evaluate(

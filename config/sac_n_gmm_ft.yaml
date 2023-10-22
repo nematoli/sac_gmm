@@ -23,8 +23,8 @@ agent:
 
 # evaluation frequency:
 eval_frequency: 25
-num_init_steps: 1
-num_eval_episodes: 5
+num_init_steps: 256
+num_eval_episodes: 10
 
 # Dataset params:
 train: true # false to load validation dataset
@@ -35,7 +35,8 @@ render: false
 record: true
 
 # Pretrained SAC_N_GMM model
-model_ckpt: "logs/sac-n-gmm-train/2023_10_09/17_56_24/model_weights/last.ckpt"
+model_ckpt: "logs/sac-n-gmm-train/2023_10_20/16_17_47/model_weights/last.ckpt"
+rb_dir: "logs/sac-n-gmm-train/2023_10_20/16_17_47/replay_buffer/"
 
 
 # Logging

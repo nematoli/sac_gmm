@@ -103,24 +103,8 @@ class CALVIN_SACNGMMAgent_FT(Agent):
 
         self.nan_counter = 0
 
-    def get_action_space(self):
-        parameter_space = self.get_update_range_parameter_space()
-        mu_high = np.ones(parameter_space["mu"].shape[0])
-        if self.mean_shift:
-            action_high = mu_high
-        else:
-            priors_high = np.ones(parameter_space["priors"].shape[0])
-            action_high = np.concatenate((priors_high, mu_high), axis=-1)
-            if self.adapt_cov:
-                sigma_high = np.ones(parameter_space["sigma"].shape[0])
-                action_high = np.concatenate((action_high, sigma_high), axis=-1)
-
-        action_low = -action_high
-        self.action_space = gym.spaces.Box(action_low, action_high)
-        return self.action_space
-
     @torch.no_grad()
-    def play_step(self, refine_actor, model, strategy="stochastic", replay_buffer=None, device="cuda"):
+    def play_step(self, refine_actor, model, strategy="stochastic", replay_buffer=None, device="cuda", critic=None):
         """Perform a step in the environment and add the transition
         tuple to the replay buffer"""
         # Change dynamical system
@@ -188,7 +172,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
             self.obs = self.env.reset()
             # log_rank_0(f"Skill: {skill} - Obs: {self.obs['robot_obs']}")
             # Recording setup
-            if self.record:  # and (episode == rand_idx):
+            if self.record and (episode == rand_idx):
                 self.env.reset_recording()
                 self.env.record_frame(size=200)
 
@@ -214,7 +198,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
                         if reward > 0:
                             succesful_skill_ids.append(skill_id)
                             skill_id = (skill_id + 1) % len(self.task.skills)
-                    if self.record:  # and (episode == rand_idx):
+                    if self.record and (episode == rand_idx):
                         self.env.record_frame(size=200)
                     if self.render:
                         self.env.render()
@@ -229,7 +213,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
             if ("success" in info) and info["success"]:
                 succesful_episodes += 1
             # Recording setup close
-            if self.record:  # and (episode == rand_idx):
+            if self.record and (episode == rand_idx):
                 video_path = self.env.save_recording(
                     outdir=self.video_dir,
                     fname=f"PlaySteps{self.total_play_steps}_EnvSteps{self.total_env_steps}_Episode{episode}",
@@ -247,6 +231,22 @@ class CALVIN_SACNGMMAgent_FT(Agent):
             succesful_skill_ids,
             saved_video_path,
         )
+
+    def get_action_space(self):
+        parameter_space = self.get_update_range_parameter_space()
+        mu_high = np.ones(parameter_space["mu"].shape[0])
+        if self.mean_shift:
+            action_high = mu_high
+        else:
+            priors_high = np.ones(parameter_space["priors"].shape[0])
+            action_high = np.concatenate((priors_high, mu_high), axis=-1)
+            if self.adapt_cov:
+                sigma_high = np.ones(parameter_space["sigma"].shape[0])
+                action_high = np.concatenate((action_high, sigma_high), axis=-1)
+
+        action_low = -action_high
+        self.action_space = gym.spaces.Box(action_low, action_high)
+        return self.action_space
 
     def get_update_range_parameter_space(self):
         """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
@@ -310,7 +310,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
                 name = "robot_obs"
 
             if obs[name].ndim > 1:  # When obs is of shape (Batch x obs_dim)
-                fc_input = torch.tensor(obs[name][:, :]).to(device)
+                # fc_input = torch.tensor(obs[name][:, :]).to(device)
                 # skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()]
                 skill_vector = self.skill_params_stacked[skill_id[:, 0].cpu().int()].to(device)
             else:
