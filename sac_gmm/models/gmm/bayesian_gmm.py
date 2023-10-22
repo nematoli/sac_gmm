@@ -61,8 +61,18 @@ class BayesianGMM(BaseGMM):
             random_state=self.random_state,
         )
 
+    def update_model(self, delta):
+        super().update_model(delta)
+        self.gmm.means = self.means
+        self.gmm.priors = self.priors
+
+    def copy_model(self, gmm):
+        super().copy_model(gmm)
+        self.gmm.means = self.means
+        self.gmm.priors = self.priors
+
     def predict1(self, x):
-        cgmm = self.gmm.condition([0, 1, 2], (x[:3] - self.goal).reshape(1, -1))
+        cgmm = self.gmm.condition([0, 1, 2], x[:3].reshape(1, -1))
         dx = cgmm.sample_confidence_region(1, alpha=0.7).reshape(-1)
         return dx
 

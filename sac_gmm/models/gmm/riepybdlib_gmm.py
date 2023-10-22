@@ -5,6 +5,7 @@ import wandb
 from pathlib import Path
 from pytorch_lightning.utilities import rank_zero_only
 import time
+import copy
 
 cwd_path = Path(__file__).absolute().parents[0]
 sac_gmm_path = cwd_path.parents[0]
@@ -132,6 +133,49 @@ class RiepybdlibGMM(BaseGMM):
             self.gmm2 = rs.GMM(self.manifold2, self.n_components).load(
                 f"{self.model_dir}/gmm2", self.n_components, self.manifold2
             )
+
+    def update_model(self, delta):
+        # Priors
+        if "priors" in delta:
+            delta_priors = delta["priors"].reshape(self.priors.shape)
+            self.gmm.priors += delta_priors
+            self.gmm.priors[self.priors < 0] = 0
+            self.gmm.priors /= self.priors.sum()
+
+        # Means
+        if "mu" in delta:
+            if self.gmm_type in [1, 4]:
+                idx = 0
+                for i in range(len(self.gmm.gaussians)):
+                    self.gmm.gaussians[i].mu = (
+                        self.gmm.gaussians[i].mu[0] + delta["mu"][idx : idx + 3],
+                        self.gmm.gaussians[i].mu[1] + delta["mu"][idx + 3 : idx + 6],
+                    )
+                    idx += 6
+            else:
+                # Update position and next position means with the same delta
+                idx = 0
+                for i in range(len(self.gmm.gaussians)):
+                    self.gmm.gaussians[i].mu = (
+                        self.gmm.gaussians[i].mu[0] + delta["mu"][idx : idx + 3],
+                        self.gmm.gaussians[i].mu[1] + delta["mu"][idx : idx + 3],
+                    )
+                    idx += 3
+
+    def copy_model(self, gmm):
+        self.gmm = copy.deepcopy(gmm)
+
+    def model_params(self, cov=False):
+        priors = self.gmm.priors
+        means = np.array([x.mu for x in self.gmm.gaussians]).flatten()
+        if self.gmm_type in [1, 2, 4, 5]:
+            params = np.concatenate((priors, means), axis=-1)
+        else:
+            params = priors
+            for x in means:
+                params = np.append(params, x)
+
+        return params
 
     def predict1(self, x):
         return self.gmm.gmr(x[:3], i_in=0, i_out=1)[0].mu
