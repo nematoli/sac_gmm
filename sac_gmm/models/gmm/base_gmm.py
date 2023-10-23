@@ -228,7 +228,7 @@ class BaseGMM(object):
             self.means2 = np.array(gmm["mu"])
             self.covariances2 = np.array(gmm["sigma"])
 
-    def copy_model(self, gmm):
+    def copy_model(self, gmm_obj):
         """Copies GMM params to self from the input GMM class object
 
         Args:
@@ -237,14 +237,14 @@ class BaseGMM(object):
         Returns:
             None
         """
-        self.priors = np.copy(gmm.priors)
-        self.means = np.copy(gmm.means)
-        self.covariances = np.copy(gmm.covariances)
+        self.priors = np.copy(gmm_obj.priors)
+        self.means = np.copy(gmm_obj.means)
+        self.covariances = np.copy(gmm_obj.covariances)
 
         # if gmm.gmm_type == 4:
-        #     self.priors2 = np.copy(gmm.priors2)
-        #     self.means2 = np.copy(gmm.means2)
-        #     self.covariances2 = np.copy(gmm.covariances2)
+        #     self.priors2 = np.copy(gmm_obj.priors2)
+        #     self.means2 = np.copy(gmm_obj.means2)
+        #     self.covariances2 = np.copy(gmm_obj.covariances2)
 
     def model_params(self, cov=False):
         """Returns GMM priors and means as a flattened vector
@@ -323,6 +323,9 @@ class BaseGMM(object):
         #     d_sigma_cc = np.array(d_sigma[half_mat_size * num_gaussians :])
         #     d_sigma_cc = d_sigma_cc.reshape((dim, dim, num_gaussians))
         #     self.covariances[dim : 2 * dim, 0:dim] += d_sigma_cc
+
+    def get_params_size(self):
+        return self.priors.size, self.means.size, self.covariances.size
 
     def plot_gmm(self, obj_type=True):
         if "Bayesian" in self.name:

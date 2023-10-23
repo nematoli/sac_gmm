@@ -137,10 +137,10 @@ class RiepybdlibGMM(BaseGMM):
     def update_model(self, delta):
         # Priors
         if "priors" in delta:
-            delta_priors = delta["priors"].reshape(self.priors.shape)
+            delta_priors = delta["priors"].reshape(self.gmm.priors.shape)
             self.gmm.priors += delta_priors
-            self.gmm.priors[self.priors < 0] = 0
-            self.gmm.priors /= self.priors.sum()
+            self.gmm.priors[self.gmm.priors < 0] = 0
+            self.gmm.priors /= self.gmm.priors.sum()
 
         # Means
         if "mu" in delta:
@@ -162,8 +162,8 @@ class RiepybdlibGMM(BaseGMM):
                     )
                     idx += 3
 
-    def copy_model(self, gmm):
-        self.gmm = copy.deepcopy(gmm)
+    def copy_model(self, gmm_obj):
+        self.gmm = copy.deepcopy(gmm_obj.gmm)
 
     def model_params(self, cov=False):
         priors = self.gmm.priors
@@ -176,6 +176,11 @@ class RiepybdlibGMM(BaseGMM):
                 params = np.append(params, x)
 
         return params
+
+    def get_params_size(self):
+        means_size = np.array([x.mu for x in self.gmm.gaussians]).flatten().size
+        cov_size = np.array([x.sigma for x in self.gmm.gaussians]).flatten().size
+        return self.gmm.priors.size, means_size, cov_size
 
     def predict1(self, x):
         return self.gmm.gmr(x[:3], i_in=0, i_out=1)[0].mu

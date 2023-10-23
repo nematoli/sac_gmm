@@ -43,9 +43,7 @@ class SkillActor:
     def load_models(self):
         for _, ds in enumerate(self.skills):
             ds.load_model()
-        self.priors_size = self.skills[0].priors.size
-        self.means_size = self.skills[0].means.size
-        self.cov_size = self.skills[0].covariances.size
+        self.priors_size, self.means_size, self.cov_size = self.skills[0].get_params_size()
 
     def copy_model(self, initial_gmms, skill_id):
         self.skills[skill_id].copy_model(initial_gmms[skill_id])
