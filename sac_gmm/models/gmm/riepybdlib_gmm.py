@@ -155,7 +155,7 @@ class RiepybdlibGMM(BaseGMM):
 
         # Means
         if "mu" in delta:
-            if self.gmm_type in [1, 3, 4]:
+            if self.gmm_type in [1, 4]:
                 idx = 0
                 for i in range(len(self.gmm.gaussians)):
                     self.gmm.gaussians[i].mu = (
@@ -163,7 +163,7 @@ class RiepybdlibGMM(BaseGMM):
                         self.gmm.gaussians[i].mu[1] + delta["mu"][idx + 3 : idx + 6],
                     )
                     idx += 6
-            else:
+            elif self.gmm_type in [2, 5]:
                 # Update position and next position means with the same delta
                 idx = 0
                 for i in range(len(self.gmm.gaussians)):
@@ -172,24 +172,45 @@ class RiepybdlibGMM(BaseGMM):
                         self.gmm.gaussians[i].mu[1] + delta["mu"][idx : idx + 3],
                     )
                     idx += 3
+            else:
+                idx = 0
+                for i in range(len(self.gmm.gaussians)):
+                    self.gmm.gaussians[i].mu = (
+                        self.gmm.gaussians[i].mu[0] + delta["mu"][idx : idx + 3],
+                        self.gmm.gaussians[i].mu[1] + delta["mu"][idx : idx + 3],
+                        self.gmm.gaussians[i].mu[2],
+                    )
+                    idx += 3
 
     def copy_model(self, gmm_obj):
         self.gmm = copy.deepcopy(gmm_obj.gmm)
 
     def model_params(self, cov=False):
         priors = self.gmm.priors
-        means = np.array([x.mu for x in self.gmm.gaussians]).flatten()
-        if self.gmm_type in [1, 2, 3, 4, 5]:
+        if self.gmm_type in [1, 2, 4, 5]:
+            means = np.array([x.mu for x in self.gmm.gaussians]).flatten()
             params = np.concatenate((priors, means), axis=-1)
         else:
-            params = priors
-            for x in means:
-                params = np.append(params, x)
-
+            means_pos = np.array([x.mu[:2] for x in self.gmm.gaussians]).flatten()
+            means_ori = np.array([x.mu[2].to_nparray() for x in self.gmm.gaussians]).flatten()
+            params = np.concatenate((priors, means_pos, means_ori), axis=-1)
+        # else:
+        #     params = priors
+        #     for x in means:
+        #         params = np.append(params, x)
         return params
 
     def get_params_size(self):
-        means_size = np.array([x.mu for x in self.gmm.gaussians]).flatten().size
+        """
+        This function is used to set the refine actor's input size
+        """
+        if self.gmm_type == 3:
+            # Only update position means for now
+            means_pos_size = np.array([x.mu[:2] for x in self.gmm.gaussians]).flatten().size
+            means_ori_size = np.array([x.mu[2].to_nparray() for x in self.gmm.gaussians]).flatten().size
+            means_size = means_pos_size + means_ori_size
+        else:
+            means_size = np.array([x.mu for x in self.gmm.gaussians]).flatten().size
         cov_size = np.array([x.sigma for x in self.gmm.gaussians]).flatten().size
         return self.gmm.priors.size, means_size, cov_size
 

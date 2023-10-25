@@ -145,7 +145,7 @@ class ManifoldGMM(BaseGMM):
             in_manifold_idx=[0],
             out_manifold_idx=[1, 2],
         )
-        return dx[0]
+        return dx[0][:3], dx[0][3:]
 
     def predict4(self, x):
         dx, _, __ = manifold_gmr(

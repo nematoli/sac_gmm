@@ -271,6 +271,15 @@ class CALVIN_SACNGMMAgent(Agent):
                 high=self.mu_change_range,
                 shape=(self.skill_actor.means_size // 2,),
             )
+        else:
+            # Only update position means for now
+            total_size = self.skill_actor.means_size
+            just_positions_size = total_size - self.skill_actor.priors_size * 4
+            param_space["mu"] = gym.spaces.Box(
+                low=-self.mu_change_range,
+                high=self.mu_change_range,
+                shape=(just_positions_size,),
+            )
 
         # dim = self.gmm.means.shape[1] // 2
         # num_gaussians = self.gmm.means.shape[0]

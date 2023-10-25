@@ -400,11 +400,11 @@ class BaseGMM(object):
                 return np.zeros(3), np.zeros(3), True
             target_ori = x_ori
         elif self.gmm_type == 3:
-            out = self.predict3(x[:3] - self.goal)
-            if np.isnan(out[0]):
+            next_pos, next_ori = self.predict3(x[:3] - self.goal)
+            if np.isnan(next_pos[0]) or np.isnan(next_ori[0]):
                 return np.zeros(3), np.zeros(3), True
-            dx_pos = (out[:3] + self.goal - x[:3]) / self.pos_dt
-            target_ori = out[3:]
+            dx_pos = (next_pos + self.goal - x[:3]) / self.pos_dt
+            target_ori = next_ori
         elif self.gmm_type == 2:
             next_pos = self.predict2(x[:3] - self.goal)
             dx_pos = (next_pos + self.goal - x[:3]) / self.pos_dt
@@ -412,7 +412,7 @@ class BaseGMM(object):
         elif self.gmm_type == 1:
             dx_pos = self.predict1(x[:3] - self.goal)
             target_ori = self.fixed_ori
-        # current_quat = np.array(pybullet.getQuaternionFromEuler(x[3:6]))
-        # dx_ori = get_relative_quaternion(current_quat, target_ori)
-        dx_ori = np.zeros(3)
+        current_quat = np.array(pybullet.getQuaternionFromEuler(x[3:6]))
+        dx_ori = get_relative_quaternion(current_quat, target_ori)
+        # dx_ori = np.zeros(3)
         return dx_pos, dx_ori, False
