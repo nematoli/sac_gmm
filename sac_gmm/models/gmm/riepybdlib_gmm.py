@@ -40,8 +40,8 @@ class RiepybdlibGMM(BaseGMM):
             n_components=skill.n_components, plot=plot, model_dir=skill.skills_dir, gmm_type=gmm_type
         )
 
-        if gmm_type not in [1, 2, 4, 5]:
-            raise ValueError(f"RiepybdlibGMM only supports gmm_type 1 and 2, 4 and 5 not {gmm_type}")
+        if gmm_type not in [1, 2, 3, 4, 5]:
+            raise ValueError(f"RiepybdlibGMM only supports gmm_type 1 and 2, 3, 4 and 5 not {gmm_type}")
 
         self.name = "RiepybdlibGMM"
         self.skill = skill.skill
@@ -78,6 +78,13 @@ class RiepybdlibGMM(BaseGMM):
             data2 = [
                 (data_X_pos[i], Quaternion(data_X_ori[i, 3], data_X_ori[i, :3])) for i in range(data_X_pos.shape[0])
             ]
+        elif self.gmm_type == 3:
+            data_X_ori = dataset.X_ori.numpy().reshape(-1, 4)
+            data = [
+                (data_X_pos[i], data_dX_pos[i], Quaternion(data_X_ori[i, 3], data_X_ori[i, :3]))
+                for i in range(data_X_pos.shape[0])
+            ]
+            data2 = None
         else:
             data2 = None
         return data, data2
@@ -121,15 +128,19 @@ class RiepybdlibGMM(BaseGMM):
 
     def save_model(self):
         self.gmm.save(f"{self.model_dir}/gmm")
+        log_rank_0(f"Saved GMM params at {self.model_dir}/gmm")
         if self.gmm_type in [4, 5]:
+            log_rank_0(f"Saved GMM params at {self.model_dir}/gmm2")
             self.gmm2.save(f"{self.model_dir}/gmm2")
 
     def load_model(self):
         self.manifold, self.manifold2 = self.make_manifold()
+        log_rank_0(f"Loading GMM params from {self.model_dir}/gmm")
         self.gmm = rs.GMM(self.manifold, self.n_components).load(
             f"{self.model_dir}/gmm", self.n_components, self.manifold
         )
         if self.gmm_type in [4, 5]:
+            log_rank_0(f"Loading second GMM params from {self.model_dir}/gmm2")
             self.gmm2 = rs.GMM(self.manifold2, self.n_components).load(
                 f"{self.model_dir}/gmm2", self.n_components, self.manifold2
             )
@@ -144,7 +155,7 @@ class RiepybdlibGMM(BaseGMM):
 
         # Means
         if "mu" in delta:
-            if self.gmm_type in [1, 4]:
+            if self.gmm_type in [1, 3, 4]:
                 idx = 0
                 for i in range(len(self.gmm.gaussians)):
                     self.gmm.gaussians[i].mu = (
@@ -168,7 +179,7 @@ class RiepybdlibGMM(BaseGMM):
     def model_params(self, cov=False):
         priors = self.gmm.priors
         means = np.array([x.mu for x in self.gmm.gaussians]).flatten()
-        if self.gmm_type in [1, 2, 4, 5]:
+        if self.gmm_type in [1, 2, 3, 4, 5]:
             params = np.concatenate((priors, means), axis=-1)
         else:
             params = priors
@@ -189,7 +200,10 @@ class RiepybdlibGMM(BaseGMM):
         return self.predict1(x)
 
     def predict3(self, x):
-        return None
+        out = self.gmm.gmr(x[:3], i_in=0, i_out=[1, 2])[0].mu
+        dx_ori = out[1].to_nparray()
+        dx_ori = np.concatenate([dx_ori[1:], [dx_ori[0]]])
+        return out[0], dx_ori
 
     def predict4(self, x):
         dx_ori = self.gmm2.gmr(x[:3], i_in=0, i_out=1)[0].mu.to_nparray()

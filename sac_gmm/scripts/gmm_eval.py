@@ -13,6 +13,7 @@ from pytorch_lightning.utilities import rank_zero_only
 from pytorch_lightning import seed_everything
 from sac_gmm.utils.utils import print_system_env_info, setup_logger
 from sac_gmm.utils.env_maker import make_env
+from sac_gmm.models.gmm.utils.rotation_utils import get_relative_quaternion
 
 cwd_path = Path(__file__).absolute().parents[0]
 sac_gmm_path = cwd_path.parents[0]
@@ -26,6 +27,8 @@ sys.path.insert(0, root.as_posix())  # root
 
 logger = logging.getLogger(__name__)
 
+import pybullet as p
+
 
 @rank_zero_only
 def log_rank_0(*args, **kwargs):
@@ -37,17 +40,34 @@ def evaluate(env, gmm, target, max_steps, render=False, record=False, out_dir=No
     succesful_rollouts, rollout_returns, rollout_lengths = 0, [], []
     # for idx, (xi, d_xi) in enumerate(dataloader):
     val_rollouts = 50
+
     for idx in range(val_rollouts):
         if (idx % 5 == 0) or (idx == val_rollouts):
             log_rank_0(f"Test Trajectory {idx+1}/{val_rollouts}")
         # x0 = xi.squeeze()[0, :].numpy()
         rollout_return = 0
         observation = env.reset()
-
         x = observation["robot_obs"]
         for step in range(max_steps):
-            dx_pos, dx_ori, is_nan = gmm.predict(x)
+            # next_pos, next_ori = gmm.predict5(x[:3])
+            # action = np.array([next_pos + gmm.goal, next_ori, [-1]], dtype=object)
+
+            # ManifoldGMM
+            # out = gmm.predict3(x[:3] - gmm.goal)
+            # dx_pos = (out[:3] + gmm.goal - x[:3]) / gmm.pos_dt
+            # next_ori = out[3:]
+
+            # Riepybdlib
+            next_pos, next_ori = gmm.predict3(x[:3] - gmm.goal)
+            dx_pos = (next_pos + gmm.goal - x[:3]) / gmm.pos_dt
+
+            current_quat = np.array(p.getQuaternionFromEuler(x[3:6]))
+            dx_ori = get_relative_quaternion(current_quat, next_ori)
+            # dx_pos, dx_ori, is_nan = gmm.predict(x)
+            # dx_ori = np.zeros(3)
             action = np.append(dx_pos, np.append(dx_ori, -1))
+            # action = np.append(dx_pos, np.append(np.zeros(3), -1))
+            # action = np.append(dx_pos, np.append(rel_orn, -1))
             # log_rank_0(f"Step: {step} Observation: {observation['robot_obs'][:3]}")
             observation, reward, done, info = env.step(action)
             x = observation["robot_obs"]
@@ -111,6 +131,23 @@ def eval_gmm(cfg: DictConfig) -> None:
     logger_name = f"{cfg.skill.name}_type{cfg.gmm.gmm_type}_{gmm.name}_{gmm.n_components}"
     gmm.logger = setup_logger(cfg, name=logger_name)
 
+    # Batch GMM Check
+    # batch_size = 512
+    # batch_means = np.tile(gmm.means, (batch_size, 1)).reshape(batch_size, 3, 6)
+    # batch_covariances = np.tile(gmm.covariances, (batch_size, 1, 1)).reshape(batch_size, 3, 6, 6)
+    # batch_priors = np.tile(gmm.priors, batch_size)
+
+    # batch_x = np.tile(train_dataset.start, batch_size).reshape(batch_size, 3)
+    # window = 16
+    # import time
+
+    # start = time.time()
+    # for i in range(window):
+    #     batch_x = gmm.batch_predict(batch_means, batch_covariances, batch_priors, batch_x)
+    # print(f"Batch Predict Time for Size {batch_size}: {time.time() - start}")
+
+    # print(batch_x.shape)
+
     # Evaluate by simulating in the CALVIN environment
     env = make_env(cfg.env)
     env.set_skill(cfg.skill)
@@ -128,6 +165,8 @@ def eval_gmm(cfg: DictConfig) -> None:
 
     # Log evaluation output
     log_rank_0(f"{cfg.skill.name} Skill Accuracy: {round(acc, 2)}")
+    log_rank_0(f"{cfg.skill.name} Skill Average Return: {round(avg_return, 2)}")
+    log_rank_0(f"{cfg.skill.name} Skill Average Trajectory Length: {round(avg_len, 2)}")
 
 
 if __name__ == "__main__":
