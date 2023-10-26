@@ -194,10 +194,6 @@ class RiepybdlibGMM(BaseGMM):
             means_pos = np.array([x.mu[:2] for x in self.gmm.gaussians]).flatten()
             means_ori = np.array([x.mu[2].to_nparray() for x in self.gmm.gaussians]).flatten()
             params = np.concatenate((priors, means_pos, means_ori), axis=-1)
-        # else:
-        #     params = priors
-        #     for x in means:
-        #         params = np.append(params, x)
         return params
 
     def get_params_size(self):

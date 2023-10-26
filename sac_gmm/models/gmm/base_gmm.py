@@ -325,7 +325,10 @@ class BaseGMM(object):
         #     self.covariances[dim : 2 * dim, 0:dim] += d_sigma_cc
 
     def get_params_size(self):
-        return self.priors.size, self.means.size, self.covariances.size
+        if self.gmm_type != 3:
+            return self.priors.size, self.means.size, self.covariances.size
+        else:
+            return self.priors.size, self.n_components * 10, self.covariances.size
 
     def plot_gmm(self, obj_type=True):
         if "Bayesian" in self.name:

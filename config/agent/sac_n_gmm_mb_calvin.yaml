@@ -33,8 +33,8 @@ cem_cfg:
   num_policy_traj: 25
   cem_momentum: 0.1
   cem_temperature: 0.5
-  max_std: 0.05
-  min_std: 0.01
+  max_std: 0.5
+  min_std: 0.05
   std_step: 25000
   horizon_step: 25000
   cem_discount: 0.99

@@ -167,6 +167,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
         # Choose a random episode to record
         rand_idx = np.random.randint(1, self.num_eval_episodes + 1)
         for episode in tqdm(range(1, self.num_eval_episodes + 1)):
+            rand_idx = episode
             skill_id = 0
             episode_return, episode_env_steps = 0, 0
             self.obs = self.env.reset()
@@ -272,6 +273,15 @@ class CALVIN_SACNGMMAgent_FT(Agent):
                 low=-self.mu_change_range,
                 high=self.mu_change_range,
                 shape=(self.skill_actor.means_size // 2,),
+            )
+        else:
+            # Only update position means for now
+            total_size = self.skill_actor.means_size
+            just_positions_size = total_size - self.skill_actor.priors_size * 4
+            param_space["mu"] = gym.spaces.Box(
+                low=-self.mu_change_range,
+                high=self.mu_change_range,
+                shape=(just_positions_size // 2,),
             )
 
         # dim = self.gmm.means.shape[1] // 2

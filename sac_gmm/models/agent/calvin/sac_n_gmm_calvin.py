@@ -278,7 +278,7 @@ class CALVIN_SACNGMMAgent(Agent):
             param_space["mu"] = gym.spaces.Box(
                 low=-self.mu_change_range,
                 high=self.mu_change_range,
-                shape=(just_positions_size,),
+                shape=(just_positions_size // 2,),
             )
 
         # dim = self.gmm.means.shape[1] // 2

@@ -62,7 +62,8 @@ class SACNGMM_FT(TaskModel):
             eval_frequency=eval_frequency,
         )
         self.load_checkpoint(model_ckpt, agent.root_dir)
-        self.load_replay_buffer(rb_dir, agent.root_dir)
+        if rb_dir is not None:
+            self.load_replay_buffer(rb_dir, agent.root_dir)
 
         self.episode_done = False
         self.save_hyperparameters()
@@ -135,10 +136,10 @@ class SACNGMM_FT(TaskModel):
                 metrics.update(skill_ids)
                 # Log the video GIF to wandb if exists
                 if eval_video_paths is not None:
-                    if eval_video_paths is dict and len(eval_video_paths.keys()) > 0:
+                    if type(eval_video_paths) is dict and len(eval_video_paths.keys()) > 0:
                         for skill_name, video_path in eval_video_paths.items():
                             self.log_video(video_path, f"eval/{skill_name}_video")
-                    elif eval_video_paths is str:
+                    elif type(eval_video_paths) is str:
                         self.log_video(eval_video_paths, "eval/video")
 
             self.episode_return, self.episode_play_steps = 0, 0

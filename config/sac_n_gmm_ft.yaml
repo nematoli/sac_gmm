@@ -2,7 +2,7 @@ defaults:
   - setup
   - task_setup
   - callbacks: default
-  - datamodule: calvin_ds2
+  - datamodule: calvin_ds3
   - sac: sac_n_gmm_ft_model
   - agent: sac_n_gmm_ft_calvin
   - logger: wandb
@@ -16,7 +16,9 @@ defaults:
 show_gui: false
 
 # GMM params
-gmm_type: 2
+gmm_type: 3
+skill:
+  n_components: 4
 
 agent: 
   sparse_reward: false
@@ -35,9 +37,11 @@ render: false
 record: true
 
 # Pretrained SAC_N_GMM model
-model_ckpt: "logs/sac-n-gmm-train/2023_10_20/16_17_47/model_weights/last.ckpt"
-rb_dir: "logs/sac-n-gmm-train/2023_10_20/16_17_47/replay_buffer/"
+# model_ckpt: "logs/sac-n-gmm-train/2023_10_20/16_17_47/model_weights/last.ckpt"
+# rb_dir: "logs/sac-n-gmm-train/2023_10_20/16_17_47/replay_buffer/"
 
+model_ckpt: "logs/sac-n-gmm-train/2023_10_25/19_08_59/model_weights/last.ckpt"
+rb_dir: null
 
 # Logging
 logger:

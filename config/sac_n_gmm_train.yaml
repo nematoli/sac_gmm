@@ -2,7 +2,7 @@ defaults:
   - setup
   - rand_skill_setup
   - callbacks: default
-  - datamodule: calvin_ds2
+  - datamodule: calvin_ds3
   - sac: sac_n_gmm_model
   - agent: sac_n_gmm_calvin
   - logger: wandb
@@ -16,7 +16,7 @@ defaults:
 show_gui: false
 
 # GMM params
-gmm_type: 2
+gmm_type: 3
 
 agent: 
   sparse_reward: false
@@ -33,6 +33,9 @@ goal_centered: true # this must be false during evaluation
 # Visualization
 render: false
 record: true
+
+skill:
+  n_components: 3
 
 # Logging
 logger:
