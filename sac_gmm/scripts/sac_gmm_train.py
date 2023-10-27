@@ -39,6 +39,7 @@ def train(cfg: DictConfig) -> None:
         import numpy as np
 
         cfg.seed = np.random.randint(0, 10000)
+        cfg.comment = f"{cfg.comment}.{cfg.seed}"
     seed_everything(cfg.seed, workers=True)
 
     log_rank_0(f"Training a SAC-GMM skill with the following config:\n{OmegaConf.to_yaml(cfg)}")

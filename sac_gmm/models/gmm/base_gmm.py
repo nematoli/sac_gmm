@@ -412,10 +412,11 @@ class BaseGMM(object):
             next_pos = self.predict2(x[:3] - self.goal)
             dx_pos = (next_pos + self.goal - x[:3]) / self.pos_dt
             target_ori = self.fixed_ori
+            return dx_pos, np.zeros(3), False
         elif self.gmm_type == 1:
             dx_pos = self.predict1(x[:3] - self.goal)
             target_ori = self.fixed_ori
+            return dx_pos, np.zeros(3), False
         current_quat = np.array(pybullet.getQuaternionFromEuler(x[3:6]))
         dx_ori = get_relative_quaternion(current_quat, target_ori)
-        # dx_ori = np.zeros(3)
         return dx_pos, dx_ori, False

@@ -1,4 +1,4 @@
-seed: 42
+seed: null
 slurm: false
 device: cuda
 

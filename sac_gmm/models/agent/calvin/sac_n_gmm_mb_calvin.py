@@ -262,6 +262,7 @@ class CALVIN_SACNGMM_MB_Agent(Agent):
         cfg = self.cem_cfg
         step = self.total_env_steps
         horizon = int(self._horizon_decay(step))
+        clamp_max = self.mu_change_range
 
         input_state = self.get_state_from_observation(refine_actor.encoder, ob, self.skill_id, device)
         enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
@@ -278,7 +279,7 @@ class CALVIN_SACNGMM_MB_Agent(Agent):
         # CEM optimization.
         z = enc_state.repeat(cfg.num_policy_traj + cfg.num_sample_traj, 1)
         mean = torch.zeros(horizon, policy_ac.shape[-1], device=device)
-        std = 0.05 * torch.ones(horizon, policy_ac.shape[-1], device=device)
+        std = 0.0166 * torch.ones(horizon, policy_ac.shape[-1], device=device)
         if prev_mean is not None and horizon > 1 and prev_mean.shape[0] == horizon:
             mean[:-1] = prev_mean[1:]
 
@@ -286,7 +287,7 @@ class CALVIN_SACNGMM_MB_Agent(Agent):
             sample_ac = mean.unsqueeze(1) + std.unsqueeze(1) * torch.randn(
                 horizon, cfg.num_sample_traj, policy_ac.shape[-1], device=device
             )
-            sample_ac = torch.clamp(sample_ac, -0.05, 0.05)
+            sample_ac = torch.clamp(sample_ac, -clamp_max, clamp_max)
 
             ac = torch.cat([sample_ac, policy_ac], dim=1)
 
@@ -310,7 +311,7 @@ class CALVIN_SACNGMM_MB_Agent(Agent):
         ac = elite_action[0, np.random.choice(np.arange(cfg.num_elites), p=score)]
         if is_train:
             ac += std[0] * torch.randn_like(std[0])
-        return torch.clamp(ac, -0.05, 0.05), mean
+        return torch.clamp(ac, -clamp_max, clamp_max), mean
 
     def get_action_space(self):
         parameter_space = self.get_update_range_parameter_space()
