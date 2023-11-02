@@ -5,8 +5,8 @@ import torch.nn.functional as F
 from pytorch_lightning.utilities import rank_zero_only
 from sac_gmm.models.task_model import TaskModel
 import wandb
-import os
 from collections import Counter
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-class SACNGMM_FT(TaskModel):
+class SACNGMM_MB_FT(TaskModel):
     """Basic SAC-GMM implementation using PyTorch Lightning"""
 
     def __init__(
@@ -42,7 +42,7 @@ class SACNGMM_FT(TaskModel):
         model_ckpt: str,
         rb_dir: str,
     ):
-        super(SACNGMM_FT, self).__init__(
+        super(SACNGMM_MB_FT, self).__init__(
             discount=discount,
             batch_size=batch_size,
             replay_buffer=replay_buffer,
@@ -77,7 +77,7 @@ class SACNGMM_FT(TaskModel):
             nb_batch: batch number
         """
         reward, self.episode_done = self.agent.play_step(
-            self.actor, self.model, "stochastic", self.replay_buffer, self.device
+            self.actor, self.model, self.critic, "cem", self.replay_buffer, self.device
         )
         self.episode_return += reward
         self.episode_play_steps += 1
@@ -159,7 +159,10 @@ class SACNGMM_FT(TaskModel):
             "losses/actor": actor_loss,
             "losses/alpha": alpha_loss,
             "losses/alpha_value": self.alpha,
+            "losses/model": model_loss["model_loss"],
             "losses/reconstruction": model_loss["recon_loss"],
+            "losses/consistency": model_loss["consistency_loss"],
+            "losses/reward": model_loss["reward_loss"],
         }
         return losses
 
@@ -228,8 +231,15 @@ class SACNGMM_FT(TaskModel):
         return actor_loss, alpha_loss
 
     def compute_model_loss(self, batch, model_optimizer):
-        batch_obs = batch[0]
-        batch_skill_ids = batch[1]
+        (
+            batch_obs,
+            batch_skill_ids,
+            batch_actions,
+            batch_rewards,
+            batch_next_obs,
+            batch_next_skill_ids,
+            batch_dones,
+        ) = batch
 
         # Reconstruction Loss
         input_state = self.agent.get_state_from_observation(self.encoder, batch_obs, batch_skill_ids, "cuda")
@@ -237,12 +247,37 @@ class SACNGMM_FT(TaskModel):
         recon_obs = self.model.decoder(enc_state)
         recon_loss = -recon_obs["obs"].log_prob(input_state).mean()
 
+        # enc_state = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()})
+        # recon_loss = -recon_obs["obs"].log_prob(batch_obs["rgb_gripper"]).mean()
+
+        # Cosistency Loss
+        next_enc_state_pred, batch_reward_pred = self.model.imagine_step(enc_state, batch_actions.float())
+        with torch.no_grad():
+            next_state = self.agent.get_state_from_observation(
+                self.encoder, batch_next_obs, batch_next_skill_ids, "cuda"
+            )
+            next_enc_state = self.model.encoder({"obs": next_state.float()})
+        consistency_loss = torch.nn.MSELoss(reduction="none")(next_enc_state_pred, next_enc_state).mean()
+
+        # # Reward Loss
+        reward_loss = torch.nn.MSELoss(reduction="none")(batch_reward_pred, batch_rewards.squeeze()).mean()
+
+        # Total Loss
+        model_loss = (
+            self.model.cfg.model * recon_loss
+            + self.model.cfg.cosistency * consistency_loss.clamp(max=1e5)
+            + self.model.cfg.reward * reward_loss.clamp(max=1e5) * 0.5
+        )
+
         model_optimizer.zero_grad()
-        self.manual_backward(recon_loss)
+        self.manual_backward(model_loss)
         model_optimizer.step()
 
         model_loss_dict = {}
+        model_loss_dict["model_loss"] = model_loss
         model_loss_dict["recon_loss"] = recon_loss
+        model_loss_dict["consistency_loss"] = consistency_loss
+        model_loss_dict["reward_loss"] = reward_loss
 
         # Visualize Decoded Images
         # if self.episode_done:
@@ -254,6 +289,38 @@ class SACNGMM_FT(TaskModel):
         #         self.log_image(image, "train/image")
         #         self.log_image(decoded_image, "train/decoded_image")
         return model_loss_dict
+
+    def load_checkpoint(self):
+        import os
+
+        model_ckpt = "logs/sac-n-gmm-train/2023_10_16/17_43_29/model_weights/last.ckpt"
+        root_dir = "/home/lagandua/projects/sac_gmm/"
+        ckpt = torch.load(os.path.join(root_dir, model_ckpt))
+
+        # Get only critic related state_dict
+        critic_state_dict = {
+            k.replace("critic.", ""): v
+            for k, v in ckpt["state_dict"].items()
+            if k.replace("critic.", "") in self.critic.state_dict()
+        }
+        self.critic.load_state_dict(critic_state_dict)
+
+        # Get only critic_target related state_dict
+        critic_state_dict = {
+            k.replace("critic_target.", ""): v
+            for k, v in ckpt["state_dict"].items()
+            if k.replace("critic_target.", "") in self.critic_target.state_dict()
+        }
+        self.critic_target.load_state_dict(critic_state_dict)
+
+        # Get only model related state_dict
+        model_state_dict = {
+            k.replace("model.", ""): v
+            for k, v in ckpt["state_dict"].items()
+            if k.replace("model.", "") in self.model.state_dict()
+        }
+        self.model.load_state_dict(model_state_dict)
+        self.model_target.load_state_dict(model_state_dict)
 
     def load_checkpoint(self, model_ckpt, root_dir):
         """Load pretrained weights of actor and critic"""

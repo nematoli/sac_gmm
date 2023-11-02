@@ -72,7 +72,7 @@ class SACNGMM_MB(TaskModel):
             nb_batch: batch number
         """
         reward, self.episode_done = self.agent.play_step(
-            self.actor, self.model, self.critic, "cem", self.replay_buffer, self.device
+            self.actor, self.model, self.critic, "stochastic", self.replay_buffer, self.device
         )
         self.episode_return += reward
         self.episode_play_steps += 1
@@ -252,7 +252,7 @@ class SACNGMM_MB(TaskModel):
         consistency_loss = torch.nn.MSELoss(reduction="none")(next_enc_state_pred, next_enc_state).mean()
 
         # # Reward Loss
-        reward_loss = torch.nn.MSELoss(reduction="none")(batch_reward_pred, batch_rewards).mean()
+        reward_loss = torch.nn.MSELoss(reduction="none")(batch_reward_pred, batch_rewards.squeeze()).mean()
 
         # Total Loss
         model_loss = (

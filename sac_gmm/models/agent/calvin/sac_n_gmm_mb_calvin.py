@@ -354,6 +354,15 @@ class CALVIN_SACNGMM_MB_Agent(Agent):
                 high=self.mu_change_range,
                 shape=(self.skill_actor.means_size // 2,),
             )
+        else:
+            # Only update position means for now
+            total_size = self.skill_actor.means_size
+            just_positions_size = total_size - self.skill_actor.priors_size * 4
+            param_space["mu"] = gym.spaces.Box(
+                low=-self.mu_change_range,
+                high=self.mu_change_range,
+                shape=(just_positions_size // 2,),
+            )
 
         # dim = self.gmm.means.shape[1] // 2
         # num_gaussians = self.gmm.means.shape[0]
@@ -391,7 +400,7 @@ class CALVIN_SACNGMM_MB_Agent(Agent):
                 name = "robot_obs"
 
             if obs[name].ndim > 1:  # When obs is of shape (Batch x obs_dim)
-                fc_input = torch.tensor(obs[name][:, :]).to(device)
+                # fc_input = torch.tensor(obs[name][:, :]).to(device)
                 # skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()]
                 skill_vector = self.skill_params_stacked[skill_id[:, 0].cpu().int()].to(device)
             else:

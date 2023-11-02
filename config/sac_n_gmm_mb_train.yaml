@@ -36,13 +36,13 @@ record: true
 
 # Logging
 logger:
-  group: sac_n_gmm
+  group: sac_n_gmm_mb
 
 hydra:
   run:
-    dir: ${log_dir}/sac-n-gmm-train/${now:%Y_%m_%d}/${now:%H_%M_%S}
+    dir: ${log_dir}/sac-n-gmm-mb-train/${now:%Y_%m_%d}/${now:%H_%M_%S}
   sweep:
-    dir: ${log_dir}/sac-n-gmm-train/${now:%Y_%m_%d}/${now:%H_%M_%S}
+    dir: ${log_dir}/sac-n-gmm-mb-train/${now:%Y_%m_%d}/${now:%H_%M_%S}
     subdir: ${hydra.job.override_dirname}
   job:
     config:

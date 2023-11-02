@@ -1,5 +1,5 @@
 defaults:
-  - gmm: bayesian_gmm # manifold_gmm or bayesian_gmm
+  - gmm: bayesian_gmm # manifold_gmm or bayesian_gmm or riepybdlib_gmm
   - skill: ABCD # open_drawer / close_drawer /  
   - env: default_rand_skill # open_drawer / close_drawer / ?
 

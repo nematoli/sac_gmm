@@ -3,8 +3,8 @@ defaults:
   - task_setup
   - callbacks: default
   - datamodule: calvin_ds2
-  - sac: sac_n_gmm_ft_model
-  - agent: sac_n_gmm_ft_calvin
+  - sac: sac_n_gmm_mb_ft_model
+  - agent: sac_n_gmm_mb_ft_calvin
   - logger: wandb
   - trainer: default
 
@@ -17,8 +17,6 @@ show_gui: false
 
 # GMM params
 gmm_type: 2
-skill:
-  n_components: 3
 
 agent: 
   sparse_reward: false
@@ -36,22 +34,19 @@ goal_centered: true # this must be false during evaluation
 render: false
 record: true
 
-# Pretrained SAC_N_GMM model
-model_ckpt: "logs/sac-n-gmm-train/2023_10_20/16_17_47/model_weights/last.ckpt"
-# rb_dir: "logs/sac-n-gmm-train/2023_10_20/16_17_47/replay_buffer/"
-
-# model_ckpt: "logs/sac-n-gmm-train/2023_10_25/19_08_59/model_weights/last.ckpt"
-rb_dir: null
-
 # Logging
 logger:
-  group: sac_n_gmm_ft
+  group: sac_n_gmm_mb_ft
+
+# Pretrained model
+model_ckpt: "logs/sac-n-gmm-train/2023_10_31/13_15_47/model_weights/last.ckpt"
+rb_dir: "logs/sac-n-gmm-train/2023_10_31/13_15_47/replay_buffer/"
 
 hydra:
   run:
-    dir: ${log_dir}/sac-n-gmm-ft/${now:%Y_%m_%d}/${now:%H_%M_%S}
+    dir: ${log_dir}/sac-n-gmm-mb-ft/${now:%Y_%m_%d}/${now:%H_%M_%S}
   sweep:
-    dir: ${log_dir}/sac-n-gmm-ft/${now:%Y_%m_%d}/${now:%H_%M_%S}
+    dir: ${log_dir}/sac-n-gmm-mb-ft/${now:%Y_%m_%d}/${now:%H_%M_%S}
     subdir: ${hydra.job.override_dirname}
   job:
     config:

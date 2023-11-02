@@ -11,6 +11,7 @@ import copy
 from pytorch_lightning.utilities import rank_zero_only
 from sac_gmm.models.agent.agent import Agent
 from sac_gmm.models.skill_actor import SkillActor
+from sac_gmm.utils.utils import LinearDecay
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class SKILLS(Enum):
     turn_on_led = 3
 
 
-class CALVIN_SACNGMMAgent_FT(Agent):
+class CALVIN_SACNGMM_MB_FT_Agent(Agent):
     def __init__(
         self,
         calvin_env: DictConfig,
@@ -49,6 +50,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
         sac: DictConfig,
         device: str,
         sparse_reward: bool,
+        cem_cfg: DictConfig,
     ) -> None:
         super().__init__(
             env=calvin_env,
@@ -88,6 +90,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
         self.skill_params_stacked = torch.from_numpy(self.skill_actor.get_all_skill_params(self.initial_gmms))
 
         # Store skill info - starts, goals, fixed_ori, pos_dt, ori_dt
+        # Store skill info - starts, goals, fixed_ori, pos_dt, ori_dt
         if len(self.task.skills) > 3:
             self.env.store_skill_info(self.skill_actor.skills)
         # Record setup
@@ -95,6 +98,11 @@ class CALVIN_SACNGMMAgent_FT(Agent):
         os.makedirs(self.video_dir, exist_ok=True)
         self.render = render
         self.record = record
+
+        # CEM
+        self.cem_cfg = cem_cfg
+        self._std_decay = LinearDecay(cem_cfg.max_std, cem_cfg.min_std, cem_cfg.std_step)
+        self._horizon_decay = LinearDecay(1, 1, cem_cfg.horizon_step)
 
         self.reset()
         self.skill_id = 0
@@ -104,12 +112,12 @@ class CALVIN_SACNGMMAgent_FT(Agent):
         self.nan_counter = 0
 
     @torch.no_grad()
-    def play_step(self, refine_actor, model, strategy="stochastic", replay_buffer=None, device="cuda", critic=None):
+    def play_step(self, refine_actor, model, critic, strategy="stochastic", replay_buffer=None, device="cuda"):
         """Perform a step in the environment and add the transition
         tuple to the replay buffer"""
         # Change dynamical system
         self.skill_actor.copy_model(self.initial_gmms, self.skill_id)
-        gmm_change = self.get_action(refine_actor, model, self.skill_id, self.obs, strategy, device)
+        gmm_change = self.get_action(refine_actor, model, critic, self.skill_id, self.obs, strategy, device)
         self.update_gaussians(gmm_change, self.skill_id)
 
         # Act with the dynamical system in the environment
@@ -136,7 +144,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
             if done:
                 break
 
-        if self.episode_env_steps >= self.task.max_steps:
+        if self.episode_env_steps >= self.task.skill_max_steps:
             done = True
 
         if done and (self.episode_env_steps < self.task.max_steps):
@@ -162,15 +170,14 @@ class CALVIN_SACNGMMAgent_FT(Agent):
         """Evaluates the actor in the environment"""
         log_rank_0("Evaluation episodes in process")
         succesful_episodes, episodes_returns, episodes_lengths = 0, [], []
-        saved_video_path = None
+        saved_video_paths = None
         succesful_skill_ids = []
         # Choose a random episode to record
         rand_idx = np.random.randint(1, self.num_eval_episodes + 1)
         for episode in tqdm(range(1, self.num_eval_episodes + 1)):
-            rand_idx = episode
-            skill_id = 0
             episode_return, episode_env_steps = 0, 0
             self.obs = self.env.reset()
+            skill_id = 0
             # log_rank_0(f"Skill: {skill} - Obs: {self.obs['robot_obs']}")
             # Recording setup
             if self.record and (episode == rand_idx):
@@ -180,7 +187,15 @@ class CALVIN_SACNGMMAgent_FT(Agent):
             while episode_env_steps < self.task.max_steps:
                 # Change dynamical system
                 self.skill_actor.copy_model(self.initial_gmms, skill_id)
-                gmm_change = self.get_action(refine_actor, model, skill_id, self.obs, "deterministic", device)
+                gmm_change = self.get_action(
+                    refine_actor,
+                    model,
+                    critic=None,
+                    skill_id=skill_id,
+                    observation=self.obs,
+                    strategy="deterministic",
+                    device=device,
+                )
                 self.update_gaussians(gmm_change, skill_id)
 
                 # Act with the dynamical system in the environment
@@ -217,21 +232,89 @@ class CALVIN_SACNGMMAgent_FT(Agent):
             if self.record and (episode == rand_idx):
                 video_path = self.env.save_recording(
                     outdir=self.video_dir,
-                    fname=f"PlaySteps{self.total_play_steps}_EnvSteps{self.total_env_steps}_Episode{episode}",
+                    fname=f"PlaySteps{self.total_play_steps}_EnvSteps{self.total_env_steps }",
                 )
                 self.env.reset_recording()
-                saved_video_path = video_path
+                saved_video_paths = video_path
 
             episodes_returns.append(episode_return)
             episodes_lengths.append(episode_env_steps)
-        accuracy = succesful_episodes / (self.num_eval_episodes)
+        accuracy = succesful_episodes / (self.num_eval_episodes * len(self.task.skills))
         return (
             accuracy,
             np.mean(episodes_returns),
             np.mean(episodes_lengths),
             succesful_skill_ids,
-            saved_video_path,
+            saved_video_paths,
         )
+
+    @torch.no_grad()
+    def estimate_value(self, refine_actor, model, critic, state, ac, horizon):
+        """Imagine a trajectory for `horizon` steps, and estimate the value."""
+        value, discount = 0, 1
+        for t in range(horizon):
+            state, reward = model.imagine_step(state, ac[t])
+            value += discount * reward
+            discount *= self.cem_cfg.cem_discount
+        action, _ = refine_actor.get_actions(state, deterministic=False, reparameterize=False)
+        value += discount * torch.min(*[*critic(state, action)]).squeeze()
+        return value
+
+    @torch.no_grad()
+    def plan(self, refine_actor, model, critic, ob, prev_mean=None, is_train=True, device="cuda"):
+        cfg = self.cem_cfg
+        step = self.total_env_steps
+        horizon = int(self._horizon_decay(step))
+        clamp_max = self.mu_change_range
+
+        input_state = self.get_state_from_observation(refine_actor.encoder, ob, self.skill_id, device)
+        enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
+
+        # Sample policy trajectories.
+        z = enc_state.repeat(cfg.num_policy_traj, 1)
+        policy_ac = []
+        for t in range(horizon):
+            actions, _ = refine_actor.get_actions(z)
+            policy_ac.append(actions)
+            z, _ = model.imagine_step(z, policy_ac[t])
+        policy_ac = torch.stack(policy_ac, dim=0)
+
+        # CEM optimization.
+        z = enc_state.repeat(cfg.num_policy_traj + cfg.num_sample_traj, 1)
+        mean = torch.zeros(horizon, policy_ac.shape[-1], device=device)
+        std = 0.0166 * torch.ones(horizon, policy_ac.shape[-1], device=device)
+        if prev_mean is not None and horizon > 1 and prev_mean.shape[0] == horizon:
+            mean[:-1] = prev_mean[1:]
+
+        for _ in range(cfg.cem_iter):
+            sample_ac = mean.unsqueeze(1) + std.unsqueeze(1) * torch.randn(
+                horizon, cfg.num_sample_traj, policy_ac.shape[-1], device=device
+            )
+            sample_ac = torch.clamp(sample_ac, -clamp_max, clamp_max)
+
+            ac = torch.cat([sample_ac, policy_ac], dim=1)
+
+            imagine_return = self.estimate_value(refine_actor, model, critic, z, ac, horizon).squeeze(-1)
+            _, idxs = imagine_return.sort(dim=0)
+            idxs = idxs[-cfg.num_elites :]
+            elite_value = imagine_return[idxs]
+            elite_action = ac[:, idxs]
+
+            # Weighted aggregation of elite plans.
+            score = torch.exp(cfg.cem_temperature * (elite_value - elite_value.max()))
+            score = (score / score.sum()).view(1, -1, 1)
+            new_mean = (score * elite_action).sum(dim=1)
+            new_std = torch.sqrt(torch.sum(score * (elite_action - new_mean.unsqueeze(1)) ** 2, dim=1))
+
+            mean = cfg.cem_momentum * mean + (1 - cfg.cem_momentum) * new_mean
+            std = torch.clamp(new_std, self._std_decay(step), 2)
+
+        # Sample action for MPC.
+        score = score.squeeze().cpu().numpy()
+        ac = elite_action[0, np.random.choice(np.arange(cfg.num_elites), p=score)]
+        if is_train:
+            ac += std[0] * torch.randn_like(std[0])
+        return torch.clamp(ac, -clamp_max, clamp_max), mean
 
     def get_action_space(self):
         parameter_space = self.get_update_range_parameter_space()
@@ -348,7 +431,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
 
         return obs.float()
 
-    def get_action(self, actor, model, skill_id, observation, strategy="stochastic", device="cuda"):
+    def get_action(self, actor, model, critic, skill_id, observation, strategy="stochastic", device="cuda"):
         """Interface to get action from SAC Actor,
         ready to be used in the environment"""
         actor.eval()
@@ -361,8 +444,16 @@ class CALVIN_SACNGMMAgent_FT(Agent):
             deterministic = False
         elif strategy == "deterministic":
             deterministic = True
+        elif strategy == "cem":
+            critic.eval()
+            action, _ = self.plan(actor, model, critic, observation, device=device)
+            actor.train()
+            model.train()
+            critic.train()
+            return action.detach().cpu().numpy()
         else:
             raise Exception("Strategy not implemented")
+
         input_state = self.get_state_from_observation(actor.encoder, observation, skill_id, device)
         enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
         # input_state = self.get_state_from_observation(model.encoder, observation, skill_id, device)
