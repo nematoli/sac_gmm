@@ -239,7 +239,7 @@ class CALVIN_SACNGMM_MB_FT_Agent(Agent):
 
             episodes_returns.append(episode_return)
             episodes_lengths.append(episode_env_steps)
-        accuracy = succesful_episodes / (self.num_eval_episodes * len(self.task.skills))
+        accuracy = succesful_episodes / self.num_eval_episodes
         return (
             accuracy,
             np.mean(episodes_returns),
