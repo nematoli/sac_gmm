@@ -3,7 +3,8 @@ defaults:
 
 # Dataset params:
 name: ABCD
-skills: ['open_drawer', 'turn_on_lightbulb', 'move_slider_left', 'turn_on_led']
+skills: ['open_drawer', 'turn_on_lightbulb', 'move_slider_left', 'turn_on_led'] 
+order: ${task_order}
 
 # GMM params
 n_components: 3

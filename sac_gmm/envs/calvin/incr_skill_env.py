@@ -21,7 +21,7 @@ GYM_POSITION_INDICES = np.array([0, 1, 2])
 GYM_ORIENTATION_INDICES = np.array([3, 4, 5])
 
 
-class CalvinRandSkillEnv(PlayTableSimEnv):
+class CalvinIncrSkillEnv(PlayTableSimEnv):
     def __init__(self, cfg):
         pt_cfg = {**cfg.calvin_env.env}
         pt_cfg.pop("_target_", None)
@@ -36,9 +36,13 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
 
         self.tasks = hydra.utils.instantiate(cfg.calvin_env.tasks)
         self.target_tasks = list(self.tasks.tasks.keys())
-        self.target_skill = np.random.choice(self.target_tasks)
+        self.tasks_to_complete = copy.deepcopy(self.target_tasks)
+        self.completed_tasks = []
+        self.solved_subtasks = defaultdict(lambda: 0)
         self._t = 0
+        self.sequential = True
         self.reward_scale = 10
+        self.sparse_reward = False
 
         self.init_base_pos, self.init_base_orn = self.p.getBasePositionAndOrientation(self.robot.robot_uid)
         self.ee_noise = np.array([0.4, 0.3, 0.1])  # Units: meters
@@ -49,6 +53,7 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         self.skill_goals = {}
         self.skill_oris = {}
         self.centroid = np.array([0.036, -0.13, 0.509])
+        self.start_skill = 0
 
     @staticmethod
     def get_action_space():
@@ -135,9 +140,12 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
 
     def set_task(self, task):
         self.target_tasks = task
-        self.target_skill = np.random.choice(self.target_tasks)
+        self.tasks_to_complete = copy.deepcopy(self.target_tasks)
+        self.completed_tasks = []
+        self.solved_subtasks = defaultdict(lambda: 0)
+        self.start_skill = 1
 
-    def reset(self, robot_obs=None, scene_obs=None, target_skill=None):
+    def reset(self, robot_obs=None, scene_obs=None, start_skill=None):
         if not self.isConnected():
             h, w = self.rhw
             self.initialize_bullet(self.bts, w, h)
@@ -149,14 +157,15 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         self.robot.reset(robot_obs)
         self.p.stepSimulation(physicsClientId=self.cid)
 
-        self.start_info = self.get_info()
-        if target_skill is None:
-            self.target_skill = np.random.choice(self.target_tasks)
+        if start_skill is None:
+            self.start_skill = np.random.randint(0, len(self.target_tasks) - 1)
         else:
-            self.target_skill = target_skill
+            self.start_skill = start_skill
+        self.start_info = self.get_info()
         obs = self.calibrate_EE_start_state(self.get_state_obs()["robot_obs"])
         self.start_info = self.get_info()
         self._t = 0
+        self.tasks_to_complete = copy.deepcopy(self.target_tasks)[self.start_skill :]
         self.completed_tasks = []
         self.solved_subtasks = defaultdict(lambda: 0)
         return self.get_obs()
@@ -164,25 +173,40 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
     def reset_to_state(self, state):
         return super().reset(robot_obs=state[:15], scene_obs=state[15:])
 
-    def _success(self):
-        """Returns a boolean indicating if the task was performed correctly"""
-        current_info = self.get_info()
-        task_filter = [self.target_skill]
-        task_info = self.tasks.get_task_info_for_set(self.start_info, current_info, task_filter)
-        return self.target_skill in task_info
-
     def _reward(self):
-        """Returns the reward function that will be used
-        for the RL algorithm"""
-        reward = int(self._success()) * self.reward_scale
+        current_info = self.get_info()
+        completed_tasks = self.tasks.get_task_info_for_set(self.start_info, current_info, self.target_tasks)
+        next_task = self.tasks_to_complete[0]
+
+        reward = 0
+        for task in list(completed_tasks):
+            if self.sequential:
+                if task == next_task:
+                    reward += 1
+                    self.tasks_to_complete.pop(0)
+                    self.completed_tasks.append(task)
+            else:
+                if task in self.tasks_to_complete:
+                    reward += 1
+                    self.tasks_to_complete.remove(task)
+                    self.completed_tasks.append(task)
+        if self.sparse_reward:
+            reward = int(len(self.tasks_to_complete) == 0)
+        reward *= self.reward_scale
         r_info = {"reward": reward}
         return reward, r_info
 
     def _termination(self):
-        """Indicates if the robot has reached a terminal state"""
-        done = self._success()
+        """Indicates if the robot has completed all tasks. Should be called after _reward()."""
+        done = len(self.tasks_to_complete) == 0
         d_info = {"success": done}
         return done, d_info
+
+    def _postprocess_info(self, info):
+        """Sorts solved subtasks into separately logged elements."""
+        for task in self.target_tasks:
+            self.solved_subtasks[task] = 1 if task in self.completed_tasks or self.solved_subtasks[task] else 0
+        return info
 
     def step(self, action):
         """Performing a relative action in the environment
@@ -216,7 +240,7 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         self._t += 1
         if self._t >= self.max_episode_steps:
             done = True
-        return obs, reward, done, info
+        return obs, reward, done, self._postprocess_info(info)
 
     def get_episode_info(self):
         completed_tasks = self.completed_tasks if len(self.completed_tasks) > 0 else [None]
@@ -256,20 +280,6 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         self.centroid = np.concatenate([list(self.skill_goals.values()) + list(self.skill_starts.values())])
         self.centroid = np.mean(self.centroid, axis=0)
 
-    def get_init_pos(self, strategy="starts"):
-        """Gets the initial position of the end effector based on the chosen skill.
-        When strategy is "starts", the initial position is the skill's start.
-        When strategy is "goals", the initial position is a random goal of the other skills
-        or the skills's own start.
-        """
-        if strategy == "starts":
-            return self.skill_starts[self.target_skill]
-        elif strategy == "goals":
-            goals = [v for k, v in self.skill_goals.items() if k != self.target_skill]
-            # Add chosen skill's start to the list of other skills' goals
-            goals.append(self.skill_starts[self.target_skill])
-            return goals[np.random.choice(range(len(goals)))]
-
     def get_init_orn(self):
         """Gets the initial orientation of the end effector based on the chosen skill."""
         return np.array([3.14, -0.3, 1.5])  # Default
@@ -280,15 +290,20 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         #     self.init_gripper_pos = self.robot.target_pos
         # else:
         #     self.init_gripper_pos = self.init_pos
-        # self.init_gripper_pos = self.get_init_pos()
         # self.init_gripper_orn = self.robot.target_orn
         self.init_gripper_orn = self.get_init_orn()
-        offset = [0, 0, 0]
-        np.random.seed(np.random.randint(0, 1000))
-        offset[0] = np.random.uniform(-self.ee_noise[0], self.ee_noise[0], 1)[0]
-        offset[1] = np.random.uniform(-self.ee_noise[1], self.ee_noise[1] / 2, 1)[0]
-        offset[2] = np.random.uniform(-self.ee_noise[2] / 2, self.ee_noise[2], 1)[0]
-        gripper_pos = self.centroid + offset
+        if self.start_skill == 0:
+            offset = [0, 0, 0]
+            np.random.seed(np.random.randint(0, 1000))
+            offset[0] = np.random.uniform(-self.ee_noise[0], self.ee_noise[0], 1)[0]
+            offset[1] = np.random.uniform(-self.ee_noise[1], self.ee_noise[1] / 2, 1)[0]
+            offset[2] = np.random.uniform(-self.ee_noise[2] / 2, self.ee_noise[2], 1)[0]
+            gripper_pos = self.centroid + offset
+        else:
+            goal_noise = 0.05
+            offset = np.random.uniform(-goal_noise, goal_noise, 3)
+            gripper_pos = self.skill_goals[self.target_tasks[self.start_skill - 1]] + offset
+
         gripper_orn = self.init_gripper_orn
         return gripper_pos, gripper_orn
 

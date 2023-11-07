@@ -152,14 +152,14 @@ class SACNGMM_FT(TaskModel):
         critic_optimizer, actor_optimizer, alpha_optimizer, model_optimizer = self.optimizers()
         critic_loss = self.compute_critic_loss(batch, critic_optimizer)
         actor_loss, alpha_loss = self.compute_actor_and_alpha_loss(batch, actor_optimizer, alpha_optimizer)
-        model_loss = self.compute_model_loss(batch, model_optimizer)
+        # model_loss = self.compute_model_loss(batch, model_optimizer)
 
         losses = {
             "losses/critic": critic_loss,
             "losses/actor": actor_loss,
             "losses/alpha": alpha_loss,
             "losses/alpha_value": self.alpha,
-            "losses/reconstruction": model_loss["recon_loss"],
+            # "losses/reconstruction": model_loss["recon_loss"],
         }
         return losses
 

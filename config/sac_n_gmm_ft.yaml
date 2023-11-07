@@ -1,6 +1,6 @@
 defaults:
   - setup
-  - task_setup
+  - incr_skill_setup
   - callbacks: default
   - datamodule: calvin_ds2
   - sac: sac_n_gmm_ft_model
@@ -18,7 +18,9 @@ show_gui: false
 # GMM params
 gmm_type: 2
 skill:
-  n_components: 3
+  n_components: 3 # components change for RiepybdlibGMM
+
+task_order: "ABCD"
 
 agent: 
   sparse_reward: false
@@ -37,10 +39,13 @@ render: false
 record: true
 
 # Pretrained SAC_N_GMM model
-model_ckpt: "logs/sac-n-gmm-train/2023_10_20/16_17_47/model_weights/last.ckpt"
+# model_ckpt: "logs/sac-n-gmm-train/2023_10_20/16_17_47/model_weights/last.ckpt"
 # rb_dir: "logs/sac-n-gmm-train/2023_10_20/16_17_47/replay_buffer/"
 
-# model_ckpt: "logs/sac-n-gmm-train/2023_10_25/19_08_59/model_weights/last.ckpt"
+# model_ckpt: "logs/sac-n-gmm-train/2023_11_03/16_40_49/model_weights/last.ckpt"
+# rb_dir: "logs/sac-n-gmm-train/2023_11_03/16_40_49/replay_buffer/"
+
+model_ckpt: "logs/sac-n-gmm-train/2023_11_06/18_23_55/model_weights/last.ckpt"
 rb_dir: null
 
 # Logging

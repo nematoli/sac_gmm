@@ -1,13 +1,12 @@
 defaults:
   - gmm: bayesian_gmm # manifold_gmm or bayesian_gmm or riepybdlib_gmm
-  - skill: default
-  - env: default_skill # open_drawer / close_drawer / ?
-
+  - skill: ABCD # open_drawer / close_drawer /  
+  - env: default_incr_skill 
   - _self_
 
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 
 skill:
-  name: move_slider_left
+  state_type: 'pos_ori'
   max_steps: 128

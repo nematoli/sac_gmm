@@ -21,6 +21,9 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
+LETTERS_TO_SKILLS = {"A": "open_drawer", "B": "turn_on_lightbulb", "C": "move_slider_left", "D": "turn_on_led"}
+
+
 class SKILLS(Enum):
     open_drawer = 0
     turn_on_lightbulb = 1
@@ -57,6 +60,8 @@ class CALVIN_SACNGMMAgent_FT(Agent):
         )
 
         self.task = task
+        task_order = [*task.order]
+        self.task.skills = [LETTERS_TO_SKILLS[skill] for skill in task_order]
         self.task.max_steps = self.task.skill_max_steps * len(self.task.skills)
 
         # Environment
@@ -97,7 +102,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
         self.record = record
 
         self.reset()
-        self.skill_id = 0
+        self.skill_id = self.env.start_skill
 
         self.root_dir = root_dir
 
@@ -136,10 +141,12 @@ class CALVIN_SACNGMMAgent_FT(Agent):
             if done:
                 break
 
-        if self.episode_env_steps >= self.task.max_steps:
+        if self.episode_env_steps >= (self.task.skill_max_steps * (len(self.task.skills) - self.env.start_skill)):
             done = True
 
-        if done and (self.episode_env_steps < self.task.max_steps):
+        if done and (
+            self.episode_env_steps < (self.task.skill_max_steps * (len(self.task.skills) - self.env.start_skill))
+        ):
             # If the episode is done, the self.skill_counter rotates back to 0
             # but this is not the true next skill, so we need to set it to the actual last skill of the task
             next_skill_id = len(self.task.skills) - 1
@@ -154,7 +161,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
 
         if done or not conn:
             self.reset()
-            self.skill_id = 0
+            self.skill_id = self.env.start_skill
         return gmm_reward, done
 
     @torch.no_grad()
@@ -167,10 +174,9 @@ class CALVIN_SACNGMMAgent_FT(Agent):
         # Choose a random episode to record
         rand_idx = np.random.randint(1, self.num_eval_episodes + 1)
         for episode in tqdm(range(1, self.num_eval_episodes + 1)):
-            rand_idx = episode
             skill_id = 0
             episode_return, episode_env_steps = 0, 0
-            self.obs = self.env.reset()
+            self.obs = self.env.reset(start_skill=0)
             # log_rank_0(f"Skill: {skill} - Obs: {self.obs['robot_obs']}")
             # Recording setup
             if self.record and (episode == rand_idx):

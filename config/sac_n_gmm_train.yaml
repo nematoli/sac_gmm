@@ -17,6 +17,10 @@ show_gui: false
 
 # GMM params
 gmm_type: 3
+skill:
+  n_components: 4 # components change for RiepybdlibGMM
+
+task_order: null
 
 agent: 
   sparse_reward: false
@@ -34,8 +38,7 @@ goal_centered: true # this must be false during evaluation
 render: false
 record: true
 
-skill:
-  n_components: 3
+
 
 # Logging
 logger:

@@ -144,7 +144,7 @@ class CALVIN_SACNGMM_MB_FT_Agent(Agent):
             if done:
                 break
 
-        if self.episode_env_steps >= self.task.skill_max_steps:
+        if self.episode_env_steps >= self.task.max_steps:
             done = True
 
         if done and (self.episode_env_steps < self.task.max_steps):

@@ -37,8 +37,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
         super(CalvinSkillEnv, self).__init__(**pt_cfg)
 
         self.init_base_pos, self.init_base_orn = self.p.getBasePositionAndOrientation(self.robot.robot_uid)
-        self.ee_noise = np.array([0.3, 0.2, 0.1])
-        # self.ee_noise = np.array([0.0, 0.0, 0.0])
+        self.ee_noise = np.array([0.4, 0.3, 0.1])
 
         self.init_pos = None
 
