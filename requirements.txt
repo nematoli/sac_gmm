@@ -15,3 +15,4 @@ pymanopt
 mayavi
 wandb
 lightning-bolts
+# riepybdlib (install from https://gitlab.martijnzeestraten.nl/martijn/riepybdlib.git)
