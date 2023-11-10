@@ -45,8 +45,8 @@ record: true
 # model_ckpt: "logs/sac-n-gmm-train/2023_11_03/16_40_49/model_weights/last.ckpt"
 # rb_dir: "logs/sac-n-gmm-train/2023_11_03/16_40_49/replay_buffer/"
 
-model_ckpt: "logs/sac-n-gmm-train/2023_11_06/18_23_55/model_weights/last.ckpt"
-rb_dir: null
+model_ckpt: "logs/sac-n-gmm-train/2023_11_09/17_46_03/model_weights/last.ckpt"
+rb_dir: "logs/sac-n-gmm-train/2023_11_09/17_46_03/replay_buffer/"
 
 # Logging
 logger:

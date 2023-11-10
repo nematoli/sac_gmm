@@ -36,14 +36,13 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-def evaluate(env, gmm, target, max_steps, render=False, record=False, out_dir=None):
+def evaluate(env, gmm, target, max_steps, render=False, record=False, out_dir=None, num_rollouts=50):
     succesful_rollouts, rollout_returns, rollout_lengths = 0, [], []
     # for idx, (xi, d_xi) in enumerate(dataloader):
-    val_rollouts = 50
 
-    for idx in range(val_rollouts):
-        if (idx % 5 == 0) or (idx == val_rollouts):
-            log_rank_0(f"Test Trajectory {idx+1}/{val_rollouts}")
+    for idx in range(num_rollouts):
+        if (idx % 5 == 0) or (idx == num_rollouts):
+            log_rank_0(f"Test Trajectory {idx+1}/{num_rollouts}")
         # x0 = xi.squeeze()[0, :].numpy()
         rollout_return = 0
         observation = env.reset()
@@ -80,7 +79,7 @@ def evaluate(env, gmm, target, max_steps, render=False, record=False, out_dir=No
 
         rollout_returns.append(rollout_return)
         rollout_lengths.append(step)
-    acc = succesful_rollouts / val_rollouts
+    acc = succesful_rollouts / num_rollouts
     gmm.logger.log_table(
         key="stats",
         columns=["skill", "accuracy", "average_return", "average_traj_len"],
@@ -129,6 +128,7 @@ def eval_gmm(cfg: DictConfig) -> None:
         render=cfg.render,
         record=cfg.record,
         out_dir=cfg.exp_dir,
+        num_rollouts=cfg.num_rollouts,
     )
 
     # Log evaluation output

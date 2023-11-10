@@ -2,7 +2,7 @@ defaults:
   - setup
   - rand_skill_setup
   - callbacks: default
-  - datamodule: calvin_ds3
+  - datamodule: calvin_ds2
   - sac: sac_n_gmm_model
   - agent: sac_n_gmm_calvin
   - logger: wandb
@@ -16,9 +16,9 @@ defaults:
 show_gui: false
 
 # GMM params
-gmm_type: 3
+gmm_type: 2
 skill:
-  n_components: 4 # components change for RiepybdlibGMM
+  n_components: 3 # components change for RiepybdlibGMM
 
 task_order: null
 

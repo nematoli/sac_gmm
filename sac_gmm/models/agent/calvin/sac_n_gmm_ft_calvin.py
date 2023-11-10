@@ -213,7 +213,7 @@ class CALVIN_SACNGMMAgent_FT(Agent):
                         break
 
                 if done:
-                    self.reset()
+                    self.reset(start_skill=0)
                     skill_id = 0
                     break
 

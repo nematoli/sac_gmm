@@ -10,4 +10,4 @@ defaults:
 
 skill:
   name: move_slider_left
-  max_steps: 128
+  max_steps: 96

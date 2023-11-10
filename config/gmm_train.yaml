@@ -1,7 +1,7 @@
 defaults:
   - setup
   - skill_setup
-  - datamodule: calvin_ds5
+  - datamodule: calvin_ds2
   - logger: wandb
 
 logger:
@@ -11,11 +11,12 @@ show_gui: false
 
 
 # GMM Type
-gmm_type: 5
+gmm_type: 2
 
-skill_name: null
+skill_name: open_drawer
 skill:
   name: ${skill_name}
+  n_components: 3 # components change for RiepybdlibGMM
 
 # Dataset params:
 train: true # false to load validation dataset

@@ -4,6 +4,10 @@ defaults:
   - datamodule: default
   - _self_
 
+skill_name: close_drawer
+skill:
+  name: ${skill_name}
+
 hydra:
   run:
     dir: ${log_dir}/extract-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}

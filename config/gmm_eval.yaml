@@ -12,6 +12,7 @@ show_gui: false
 skill_name: open_drawer
 skill:
   name: ${skill_name}
+  n_components: 3 # components change for RiepybdlibGMM
 
 # Dataset params:
 train: false # false to load validation dataset
@@ -19,6 +20,8 @@ goal_centered: false # this must be false during evaluation
 
 # GMM Type
 gmm_type: 2
+
+num_rollouts: 50
 
 # Environment params
 render: false

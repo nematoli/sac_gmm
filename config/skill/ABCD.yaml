@@ -9,7 +9,7 @@ order: ${task_order}
 # GMM params
 n_components: 3
 max_steps: 0
-skill_max_steps: 128
+skill_max_steps: 96
 
 
 # ABCD: ['open_drawer', 'turn_on_lightbulb', 'move_slider_left', 'turn_on_led'] 
