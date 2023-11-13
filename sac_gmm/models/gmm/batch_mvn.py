@@ -141,6 +141,94 @@ class BatchMVN(object):
 
         return self.norm.squeeze(), exponent.squeeze()
 
+    def sample(self):
+        """Sample from multivariate normal distribution.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+
+        Returns
+        -------
+        X : array, shape (n_samples, n_features)
+            Samples from the MVN.
+        """
+        # MAKE THIS BATCH FRIENDLY
+        self._check_initialized()
+        return torch.from_numpy(
+            np.array([rand_mvn(self.mean[i], self.covariance[i]) for i in range(self.mean.shape[0])])
+        ).float()
+
+    def _one_sample_confidence_region(self, alpha):
+        x = self.sample()
+        while not self.is_in_confidence_region(x, alpha):
+            x = self.sample()
+        return x
+
+    def is_in_confidence_region(self, x, alpha):
+        """Check if sample is in alpha confidence region.
+
+        Parameters
+        ----------
+        x : array, shape (n_features,)
+            Sample
+
+        alpha : float
+            Value between 0 and 1 that defines the probability of the
+            confidence region, e.g., 0.6827 for the 1-sigma confidence
+            region or 0.9545 for the 2-sigma confidence region.
+
+        Returns
+        -------
+        is_in_confidence_region : bool
+            Is the sample in the alpha confidence region?
+        """
+        self._check_initialized()
+        # we have one degree of freedom less than number of dimensions
+        n_dof = x.shape[1] - 1
+        if n_dof >= 1:
+            return self.squared_mahalanobis_distance(x) <= chi2(n_dof).ppf(alpha)
+        else:  # 1D
+            lo, hi = norm.interval(alpha, loc=self.mean[0], scale=self.covariance[0, 0])
+            return lo <= x[0] <= hi
+
+    def squared_mahalanobis_distance(self, x):
+        """Squared Mahalanobis distance between point and this MVN.
+
+        Parameters
+        ----------
+        x : array, shape (n_features,)
+
+        Returns
+        -------
+        d : float
+            Squared Mahalanobis distance
+        """
+        self._check_initialized()
+        return batch_mahalanobis(x, self.mean, torch.linalg.inv(self.covariance)) ** 2
+
+
+def rand_mvn(mean, covariance):
+    return np.random.mtrand._rand.multivariate_normal(mean, covariance, size=1).reshape(-1)
+
+
+def _batch_validate_tensor(u, dtype=None):
+    # XXX Is order='c' really necessary?
+    u = torch.asarray(u)
+    if u.ndim == 2:
+        return u
+    raise ValueError("Input vector should be Batch_Size x 1-D.")
+
+
+def batch_mahalanobis(u, v, VI):
+    u = _batch_validate_tensor(u)
+    v = _batch_validate_tensor(v)
+    VI = torch.atleast_3d(VI)
+    delta = u - v
+    m = torch.bmm(torch.bmm(delta.unsqueeze(1), torch.transpose(VI, 2, 1)), delta.unsqueeze(-1)).squeeze()
+    return torch.sqrt(m).reshape(-1, 1)
+
 
 def batch_regression_coefficients(batch_covariance, i_out, i_in, batch_cov_12=None):
     """Compute regression coefficients to predict conditional distribution.

@@ -56,7 +56,7 @@ class BatchGMM(object):
         self._check_initialized()
 
         batch_size = batch_x.shape[0]
-        indices = torch.asarray(indices, dtype=int)
+        indices = np.asarray(indices, dtype=int)
         batch_x = torch.atleast_2d(torch.from_numpy(batch_x))
         n_features = self.means.shape[2] - len(indices)
         means = torch.empty((batch_size, self.n_components, n_features))
@@ -75,7 +75,7 @@ class BatchGMM(object):
                 indices
             ).to_norm_factor_and_exponents(batch_x)
 
-        priors = _safe_probability_density(self.priors * marginal_norm_factors, marginal_prior_exponents)[0]
+        priors = _safe_probability_density(self.priors * marginal_norm_factors, marginal_prior_exponents)
 
         return BatchGMM(
             n_components=self.n_components,
@@ -84,6 +84,19 @@ class BatchGMM(object):
             covariances=covariances,
             random_state=self.random_state,
         )
+
+    def random_sample_once(self, prior):
+        return self.random_state.choice(self.n_components, size=1, p=prior)
+
+    def one_sample_confidence_region(self, alpha):
+        self._check_initialized()
+        batch_size = self.means.shape[0]
+        mvn_indices = np.apply_along_axis(self.random_sample_once, axis=1, arr=self.priors).squeeze()
+        return BatchMVN(
+            mean=self.means[range(batch_size), mvn_indices],
+            covariance=self.covariances[range(batch_size), mvn_indices],
+            random_state=self.random_state,
+        )._one_sample_confidence_region(alpha=alpha)
 
 
 def _safe_probability_density(norm_factors, exponents):
@@ -114,7 +127,7 @@ def _safe_probability_density(norm_factors, exponents):
     p : array, shape (batch_size, n_components)
         Probability density of each sample
     """
-    m = torch.max(exponents, axis=1)[0]
-    p = norm_factors * np.exp(exponents - m)
-    p /= torch.sum(p, axis=1)
+    m = torch.max(exponents, axis=1)[0].unsqueeze(-1)
+    p = norm_factors * torch.exp(exponents - m)
+    p /= torch.sum(p, axis=1).unsqueeze(-1)
     return p

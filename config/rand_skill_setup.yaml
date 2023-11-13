@@ -10,4 +10,4 @@ defaults:
 
 skill:
   state_type: 'pos_ori'
-  max_steps: 96
+  max_steps: 128
