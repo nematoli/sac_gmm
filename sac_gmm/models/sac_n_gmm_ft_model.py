@@ -85,7 +85,7 @@ class SACNGMM_FT(TaskModel):
         losses = self.loss(self.check_batch(batch))
         self.log_loss(losses)
         self.soft_update(self.critic_target, self.critic, self.critic_tau)
-        self.soft_update(self.model_target, self.model, self.model_tau)
+        # self.soft_update(self.model_target, self.model, self.model_tau)
 
     def on_train_epoch_end(self):
         if self.episode_done:
@@ -179,9 +179,9 @@ class SACNGMM_FT(TaskModel):
             # input_state = self.agent.get_state_from_observation(
             # self.model.encoder, batch_next_obs, batch_next_skill_ids
             # )
-            enc_state = self.model.encoder({"obs": input_state.float()})
-            policy_actions, log_pi = self.actor.get_actions(enc_state, deterministic=False, reparameterize=False)
-            q1_next_target, q2_next_target = self.critic_target(enc_state, policy_actions)
+            # enc_state = self.model.encoder({"obs": input_state.float()})
+            policy_actions, log_pi = self.actor.get_actions(input_state, deterministic=False, reparameterize=False)
+            q1_next_target, q2_next_target = self.critic_target(input_state, policy_actions)
 
             q_next_target = torch.min(q1_next_target, q2_next_target)
             q_target = batch_rewards + (1 - batch_dones) * self.discount * (q_next_target - self.alpha * log_pi)
@@ -189,8 +189,8 @@ class SACNGMM_FT(TaskModel):
         # Bellman loss
         input_state = self.agent.get_state_from_observation(self.encoder, batch_obs, batch_skill_ids)
         # input_state = self.agent.get_state_from_observation(self.model.encoder, batch_obs, batch_skill_ids)
-        enc_state = self.model.encoder({"obs": input_state.float()})
-        q1_pred, q2_pred = self.critic(enc_state, batch_actions.float())
+        # enc_state = self.model.encoder({"obs": input_state.float()})
+        q1_pred, q2_pred = self.critic(input_state, batch_actions.float())
         bellman_loss = F.mse_loss(q1_pred, q_target) + F.mse_loss(q2_pred, q_target)
 
         critic_optimizer.zero_grad()
@@ -204,9 +204,9 @@ class SACNGMM_FT(TaskModel):
         batch_skill_ids = batch[1]
         input_state = self.agent.get_state_from_observation(self.encoder, batch_obs, batch_skill_ids)
         # input_state = self.agent.get_state_from_observation(self.model.encoder, batch_obs, batch_skill_ids)
-        enc_state = self.model.encoder({"obs": input_state.float()})
-        policy_actions, log_pi = self.actor.get_actions(enc_state, deterministic=False, reparameterize=True)
-        q1, q2 = self.critic(enc_state, policy_actions)
+        # enc_state = self.model.encoder({"obs": input_state.float()})
+        policy_actions, log_pi = self.actor.get_actions(input_state, deterministic=False, reparameterize=True)
+        q1, q2 = self.critic(input_state, policy_actions)
         Q_value = torch.min(q1, q2)
         actor_loss = (self.alpha * log_pi - Q_value).mean()
 
@@ -227,33 +227,33 @@ class SACNGMM_FT(TaskModel):
 
         return actor_loss, alpha_loss
 
-    def compute_model_loss(self, batch, model_optimizer):
-        batch_obs = batch[0]
-        batch_skill_ids = batch[1]
+    # def compute_model_loss(self, batch, model_optimizer):
+    #     batch_obs = batch[0]
+    #     batch_skill_ids = batch[1]
 
-        # Reconstruction Loss
-        input_state = self.agent.get_state_from_observation(self.encoder, batch_obs, batch_skill_ids, "cuda")
-        enc_state = self.model.encoder({"obs": input_state.float()})
-        recon_obs = self.model.decoder(enc_state)
-        recon_loss = -recon_obs["obs"].log_prob(input_state).mean()
+    #     # Reconstruction Loss
+    #     input_state = self.agent.get_state_from_observation(self.encoder, batch_obs, batch_skill_ids, "cuda")
+    #     enc_state = self.model.encoder({"obs": input_state.float()})
+    #     recon_obs = self.model.decoder(enc_state)
+    #     recon_loss = -recon_obs["obs"].log_prob(input_state).mean()
 
-        model_optimizer.zero_grad()
-        self.manual_backward(recon_loss)
-        model_optimizer.step()
+    #     model_optimizer.zero_grad()
+    #     self.manual_backward(recon_loss)
+    #     model_optimizer.step()
 
-        model_loss_dict = {}
-        model_loss_dict["recon_loss"] = recon_loss
+    #     model_loss_dict = {}
+    #     model_loss_dict["recon_loss"] = recon_loss
 
-        # Visualize Decoded Images
-        # if self.episode_done:
-        #     if self.episode_idx % self.eval_frequency == 0:
-        #         # Log image and decoded image
-        #         rand_idx = torch.randint(0, batch_obs["rgb_gripper"].shape[0], (1,)).item()
-        #         image = batch_obs["rgb_gripper"][rand_idx].detach()
-        #         decoded_image = recon_obs["obs"].mean[rand_idx].detach()
-        #         self.log_image(image, "train/image")
-        #         self.log_image(decoded_image, "train/decoded_image")
-        return model_loss_dict
+    #     # Visualize Decoded Images
+    #     # if self.episode_done:
+    #     #     if self.episode_idx % self.eval_frequency == 0:
+    #     #         # Log image and decoded image
+    #     #         rand_idx = torch.randint(0, batch_obs["rgb_gripper"].shape[0], (1,)).item()
+    #     #         image = batch_obs["rgb_gripper"][rand_idx].detach()
+    #     #         decoded_image = recon_obs["obs"].mean[rand_idx].detach()
+    #     #         self.log_image(image, "train/image")
+    #     #         self.log_image(decoded_image, "train/decoded_image")
+    #     return model_loss_dict
 
     def load_checkpoint(self, model_ckpt, root_dir):
         """Load pretrained weights of actor and critic"""
@@ -286,13 +286,13 @@ class SACNGMM_FT(TaskModel):
         self.critic_target.load_state_dict(critic_state_dict)
 
         # Get only model related state_dict
-        model_state_dict = {
-            k.replace("model.", ""): v
-            for k, v in ckpt["state_dict"].items()
-            if k.replace("model.", "") in self.model.state_dict()
-        }
-        self.model.load_state_dict(model_state_dict)
-        self.model_target.load_state_dict(model_state_dict)
+        # model_state_dict = {
+        #     k.replace("model.", ""): v
+        #     for k, v in ckpt["state_dict"].items()
+        #     if k.replace("model.", "") in self.model.state_dict()
+        # }
+        # self.model.load_state_dict(model_state_dict)
+        # self.model_target.load_state_dict(model_state_dict)
 
     def load_replay_buffer(self, replay_buffer_dir, root_dir):
         # Load replay buffer

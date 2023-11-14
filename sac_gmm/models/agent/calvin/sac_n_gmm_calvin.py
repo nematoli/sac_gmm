@@ -233,14 +233,11 @@ class CALVIN_SACNGMMAgent(Agent):
     def get_action_space(self):
         parameter_space = self.get_update_range_parameter_space()
         mu_high = np.ones(parameter_space["mu"].shape[0])
-        if self.mean_shift:
-            action_high = mu_high
-        else:
-            priors_high = np.ones(parameter_space["priors"].shape[0])
-            action_high = np.concatenate((priors_high, mu_high), axis=-1)
-            if self.adapt_cov:
-                sigma_high = np.ones(parameter_space["sigma"].shape[0])
-                action_high = np.concatenate((action_high, sigma_high), axis=-1)
+        priors_high = np.ones(parameter_space["priors"].shape[0])
+        action_high = np.concatenate((priors_high, mu_high), axis=-1)
+        if self.adapt_cov:
+            sigma_high = np.ones(parameter_space["sigma"].shape[0])
+            action_high = np.concatenate((action_high, sigma_high), axis=-1)
 
         action_low = -action_high
         self.action_space = gym.spaces.Box(action_low, action_high)
@@ -296,17 +293,10 @@ class CALVIN_SACNGMMAgent(Agent):
         mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
 
         change_dict = {"mu": mu, "priors": priors}
+
         # if self.adapt_cov:
         #     change_dict["sigma"] = gmm_change[size_priors + size_mu :] * parameter_space["sigma"].high
         self.skill_actor.update_model(change_dict, skill_id)
-
-        # if self.mean_shift:
-        #     # TODO: check low and high here
-        #     mu = np.hstack([gmm_change.reshape((size_mu, 1)) * parameter_space["mu"].high] * self.gmm.means.shape[1])
-
-        #     change_dict = {"mu": mu}
-        #     self.gmm.update_model(change_dict)
-        # else:
 
     def get_state_from_observation(self, encoder, obs, skill_id, device="cuda"):
         if isinstance(obs, dict):
@@ -361,9 +351,9 @@ class CALVIN_SACNGMMAgent(Agent):
         else:
             raise Exception("Strategy not implemented")
         input_state = self.get_state_from_observation(actor.encoder, observation, skill_id, device)
-        enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
+        # enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
         # input_state = self.get_state_from_observation(model.encoder, observation, skill_id, device)
-        action, _ = actor.get_actions(enc_state, deterministic=deterministic, reparameterize=False)
+        action, _ = actor.get_actions(input_state, deterministic=deterministic, reparameterize=False)
         actor.train()
         model.train()
         return action.detach().cpu().numpy()

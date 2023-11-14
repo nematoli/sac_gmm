@@ -66,16 +66,16 @@ class TaskModel(pl.LightningModule):
         # Model (Input encoder, State decoder, Dynamics and Reward predictor)
         self.skill_vector_size = self.agent.skill_actor.means_size + self.agent.skill_actor.priors_size
         # Model input size = RGB Gripper Flattened (512) + Skill Vector (Priors + Means)
-        model.input_dim = (
+        model.state_dim = (
             self.agent.get_state_dim(feature_size=self.encoder.feature_size) + self.skill_vector_size
         )  # State + Skill Vector (Priors + Means)
         # model.input_dim = 0
         model.ac_dim = self.action_dim
         self.model = hydra.utils.instantiate(model)
-        model_ob_space = gym.spaces.Dict({"obs": gym.spaces.Box(low=-1, high=1, shape=(model.input_dim,))})
+        # model_ob_space = gym.spaces.Dict({"obs": gym.spaces.Box(low=-1, high=1, shape=(model.input_dim,))})
         # model_ob_space = gym.spaces.Dict({"obs": self.agent.env.get_observation_space()["rgb_gripper"]})
-        self.model.make_encoder(model_ob_space, model.state_dim)
-        self.model.make_decoder(model.state_dim, model_ob_space)
+        # self.model.make_encoder(model_ob_space, model.state_dim)
+        # self.model.make_decoder(model.state_dim, model_ob_space)
 
         self.model_target = hydra.utils.instantiate(model)
         self.model_target.load_state_dict(self.model.state_dict())
