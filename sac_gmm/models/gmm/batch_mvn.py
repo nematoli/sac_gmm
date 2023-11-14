@@ -141,7 +141,7 @@ class BatchMVN(object):
 
         return self.norm.squeeze(), exponent.squeeze()
 
-    def sample(self):
+    def sample(self, mask):
         """Sample from multivariate normal distribution.
 
         Parameters
@@ -155,15 +155,16 @@ class BatchMVN(object):
             Samples from the MVN.
         """
         # MAKE THIS BATCH FRIENDLY
-        self._check_initialized()
-        return torch.from_numpy(
-            np.array([rand_mvn(self.mean[i], self.covariance[i]) for i in range(self.mean.shape[0])])
-        ).float()
+        # self._check_initialized()
+        batch_indices = np.arange(self.mean.shape[0])[mask]
+        return torch.from_numpy(np.array([rand_mvn(self.mean[i], self.covariance[i]) for i in batch_indices])).float()
 
     def _one_sample_confidence_region(self, alpha):
-        x = self.sample()
-        while not self.is_in_confidence_region(x, alpha):
-            x = self.sample()
+        x = self.sample(np.ones(self.mean.shape[0], dtype=bool))
+        conf_mask = self.is_in_confidence_region(x, alpha)
+        while conf_mask.sum() != self.mean.shape[0]:
+            x[~conf_mask] = self.sample(~conf_mask)
+            conf_mask = self.is_in_confidence_region(x, alpha)
         return x
 
     def is_in_confidence_region(self, x, alpha):
@@ -188,10 +189,9 @@ class BatchMVN(object):
         # we have one degree of freedom less than number of dimensions
         n_dof = x.shape[1] - 1
         if n_dof >= 1:
-            return self.squared_mahalanobis_distance(x) <= chi2(n_dof).ppf(alpha)
+            return (self.squared_mahalanobis_distance(x) <= chi2(n_dof).ppf(alpha)).squeeze()
         else:  # 1D
-            lo, hi = norm.interval(alpha, loc=self.mean[0], scale=self.covariance[0, 0])
-            return lo <= x[0] <= hi
+            raise NotImplementedError("1D not implemented")
 
     def squared_mahalanobis_distance(self, x):
         """Squared Mahalanobis distance between point and this MVN.
