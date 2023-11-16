@@ -50,6 +50,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
         self.frames = []
 
         self.centroid = np.array([0.036, -0.13, 0.509])
+        self._t = 0
 
     def set_skill(self, skill):
         """Set skill"""
@@ -203,9 +204,9 @@ class CalvinSkillEnv(PlayTableSimEnv):
         action = {}
         action["type"] = "cartesian_abs"
         action["action"] = np.concatenate([ee_pos, ee_orn, [-1]], axis=0)
-        obs = self.get_obs()
+        obs = self.get_state_obs()
         while np.linalg.norm(obs["robot_obs"][:3] - ee_pos) > error_margin:
-            obs, _, _, _ = self.step(action)
+            obs = self.custom_step(action)
             if count >= max_checks:
                 logger.info("CALVIN is struggling to place the EE at the right initial pose.")
                 if desired_pos is not None:
@@ -216,6 +217,17 @@ class CalvinSkillEnv(PlayTableSimEnv):
             count += 1
         self.robot.update_target_pose()
         return True
+
+    def custom_step(self, action):
+        """Called only by calibrate_EE_start_state to perform a absolute steps in the environment."""
+        # Transform gripper action to discrete space
+        env_action = action.copy()
+        self.robot.apply_action(env_action)
+        for _ in range(self.action_repeat):
+            self.p.stepSimulation(physicsClientId=self.cid)
+        self.scene.step()
+        obs = self.get_state_obs()  # Cheaper than get_obs()
+        return obs
 
     def reset(self, robot_obs=None, scene_obs=None):
         if not self.isConnected():
@@ -229,8 +241,11 @@ class CalvinSkillEnv(PlayTableSimEnv):
         self.robot.reset(robot_obs)
         self.p.stepSimulation(physicsClientId=self.cid)
 
-        self.start_info = self.get_info()
+        self.calibrate_scene(self.skill.skill)
         self.calibrate_EE_start_state()
+        self.start_info = self.get_info()
+
+        self._t = 0
         return self.get_obs()
 
     @staticmethod
@@ -240,30 +255,12 @@ class CalvinSkillEnv(PlayTableSimEnv):
 
     def get_observation_space(self):
         """Return only position and gripper_width by default"""
-        # return self.get_custom_obs_space2()
-        return self.get_default_obs_space()
-
-    def get_default_obs_space(self):
         observation_space = {}
         observation_space["robot_obs"] = gym.spaces.Box(low=-1, high=1, shape=(7,))
         observation_space["rgb_gripper"] = gym.spaces.Box(low=-1, high=1, shape=(3, 84, 84))
         return gym.spaces.Dict(observation_space)
 
-    def get_custom_obs_space(self):
-        observation_space = {}
-        observation_space["state"] = gym.spaces.Box(low=-1, high=1, shape=(25,))
-        return gym.spaces.Dict(observation_space)
-
-    def get_custom_obs_space2(self):
-        observation_space = {}
-        observation_space["state"] = gym.spaces.Box(low=-1, high=1, shape=(33,))
-        return gym.spaces.Dict(observation_space)
-
     def get_obs(self):
-        # return self.get_custom_obs2()
-        return self.get_default_obs()
-
-    def get_default_obs(self):
         obs = super().get_obs()
 
         nobs = {}
@@ -271,50 +268,78 @@ class CalvinSkillEnv(PlayTableSimEnv):
         nobs["rgb_gripper"] = np.moveaxis(obs["rgb_obs"]["rgb_gripper"], 2, 0)
         return nobs
 
-    def get_custom_obs(self):
-        obs = self.get_state_obs()
+    def calibrate_scene_for_close_drawer(self):
+        """Calibrate the scene for the close_drawer skill"""
+        self.scene.doors[1].reset(0.2)
+        self.scene.doors[1].initial_state = 0.2
 
-        nobs = {}
-        nobs["robot_obs"] = obs["robot_obs"][:7]
+    def calibrate_scene_for_turn_off_lightbulb(self):
+        """Calibrate the scene for the turn_off_lightbulb skill"""
+        self.scene.lights[0].reset(1)
+        self.scene.switches[0].reset(0.08)
 
-        robot_ee_pos = obs["robot_obs"][:3]
-        dist_to_button = np.linalg.norm(robot_ee_pos - self.object_position(self.scene.buttons[0]))
-        dist_to_switch = np.linalg.norm(robot_ee_pos - self.object_position(self.scene.switches[0]))
-        dist_to_slider = np.linalg.norm(robot_ee_pos - self.object_position(self.scene.doors[0]))
-        dist_to_drawer = np.linalg.norm(robot_ee_pos - self.object_position(self.scene.doors[1]))
-        nobs["state"] = np.concatenate(
-            [
-                obs["robot_obs"],
-                obs["scene_obs"],
-                np.array([dist_to_button, dist_to_switch, dist_to_slider, dist_to_drawer]),
-            ]
-        )
-        return nobs
+    def calibrate_scene_for_move_slider_right(self):
+        """Calibrate the scene for the move_slider_right skill"""
+        self.scene.doors[0].reset(0.2)
+        self.scene.doors[0].initial_state = 0.2
 
-    def get_custom_obs2(self):
-        obs = self.get_state_obs()
+    def calibrate_scene_for_turn_off_led(self):
+        """Calibrate the scene for the turn_off_led skill"""
+        self.scene.lights[1].reset(1)
+        self.scene.buttons[0].reset(0)
 
-        nobs = {}
-        nobs["robot_obs"] = obs["robot_obs"][:7]
+    def reset_close_drawer_scene(self):
+        """Reset the scene for the close_drawer skill"""
+        self.scene.doors[1].reset(0)
+        self.scene.doors[1].initial_state = 0
 
-        robot_ee_pos = obs["robot_obs"][:3]
-        button_pos = self.object_position(self.scene.buttons[0])
-        switch_pos = self.object_position(self.scene.switches[0])
-        slider_pos = self.object_position(self.scene.doors[0])
-        drawer_pos = self.object_position(self.scene.doors[1])
-        nobs["state"] = np.concatenate(
-            [
-                obs["robot_obs"],
-                obs["scene_obs"],
-                np.concatenate([button_pos, switch_pos, slider_pos, drawer_pos]),
-            ]
-        )
-        return nobs
+    def reset_turn_off_lightbulb_scene(self):
+        """Reset the scene for the turn_off_lightbulb skill"""
+        self.scene.lights[0].reset(0)
+        self.scene.switches[0].reset(0)
 
-    def object_position(self, obj):
-        base = self.scene.fixed_objects[0]
-        ln = self.p.getJointInfo(base.uid, obj.joint_index, physicsClientId=self.cid)[12].decode()
-        return np.array(self.p.getLinkState(base.uid, base.get_info()["links"][ln], physicsClientId=self.cid)[0])
+    def reset_move_slider_right_scene(self):
+        """Reset the scene for the move_slider_right skill"""
+        self.scene.doors[0].reset(0)
+        self.scene.doors[0].initial_state = 0
+
+    def reset_turn_off_led_scene(self):
+        """Reset the scene for the turn_off_led skill"""
+        self.scene.lights[1].reset(0)
+        self.scene.buttons[0].reset(0)
+
+    def calibrate_scene(self, skill):
+        """
+        Change scene based on the skill to be performed.
+
+        Logic: Set scene for one scene but reset others
+        """
+        if skill == "close_drawer":
+            self.calibrate_scene_for_close_drawer()
+            self.reset_turn_off_lightbulb_scene()
+            self.reset_move_slider_right_scene()
+            self.reset_turn_off_led_scene()
+        elif skill == "turn_off_lightbulb":
+            self.calibrate_scene_for_turn_off_lightbulb()
+            self.reset_close_drawer_scene()
+            self.reset_move_slider_right_scene()
+            self.reset_turn_off_led_scene()
+        elif skill == "move_slider_right":
+            self.calibrate_scene_for_move_slider_right()
+            self.reset_close_drawer_scene()
+            self.reset_turn_off_lightbulb_scene()
+            self.reset_turn_off_led_scene()
+        elif skill == "turn_off_led":
+            self.calibrate_scene_for_turn_off_led()
+            self.reset_close_drawer_scene()
+            self.reset_turn_off_lightbulb_scene()
+            self.reset_move_slider_right_scene()
+        else:
+            # reset all
+            self.reset_close_drawer_scene()
+            self.reset_turn_off_lightbulb_scene()
+            self.reset_move_slider_right_scene()
+            self.reset_turn_off_led_scene()
 
     def _success(self):
         """Returns a boolean indicating if the task was performed correctly"""
@@ -330,9 +355,9 @@ class CalvinSkillEnv(PlayTableSimEnv):
         r_info = {"reward": reward}
         return reward, r_info
 
-    def _termination(self):
+    def _termination(self, reward):
         """Indicates if the robot has reached a terminal state"""
-        success = self._success()
+        success = reward > 0
         done = success
         d_info = {"success": success}
         return done, d_info
@@ -358,7 +383,8 @@ class CalvinSkillEnv(PlayTableSimEnv):
         obs = self.get_obs()
         info = self.get_info()
         reward, r_info = self._reward()
-        done, d_info = self._termination()
+        self._t += 1
+        done, d_info = self._termination(reward)
         info.update(r_info)
         info.update(d_info)
         return obs, reward, done, info

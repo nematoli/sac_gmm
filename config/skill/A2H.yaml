@@ -1,0 +1,20 @@
+defaults:
+  - setup
+
+# Dataset params:
+name: A2H
+skills: ['open_drawer', 'turn_on_lightbulb', 'move_slider_left', 'turn_on_led', 'close_drawer', 'turn_off_lightbulb', 'move_slider_right', 'turn_off_led'] 
+order: ${task_order}
+
+# GMM params
+n_components: 3
+max_steps: 0
+skill_max_steps: 128
+
+
+# ABCD: ['open_drawer', 'turn_on_lightbulb', 'move_slider_left', 'turn_on_led'] 
+# DCBA: ['turn_on_led', 'move_slider_left', 'turn_on_lightbulb', 'open_drawer']
+# BCDA: ['turn_on_lightbulb', 'move_slider_left', 'turn_on_led', 'open_drawer']
+# CABD: ['move_slider_left', 'open_drawer', 'turn_on_lightbulb', 'turn_on_led']
+# BADC: ['turn_on_lightbulb', 'open_drawer', 'turn_on_led', 'move_slider_left']
+# DACB: ['turn_on_led', 'open_drawer', 'move_slider_left', 'turn_on_lightbulb']

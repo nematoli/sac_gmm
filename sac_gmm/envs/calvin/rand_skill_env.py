@@ -149,17 +149,91 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         self.robot.reset(robot_obs)
         self.p.stepSimulation(physicsClientId=self.cid)
 
-        self.start_info = self.get_info()
         if target_skill is None:
             self.target_skill = np.random.choice(self.target_tasks)
         else:
             self.target_skill = target_skill
-        obs = self.calibrate_EE_start_state(self.get_state_obs()["robot_obs"])
+
+        self.calibrate_scene(self.target_skill)
+        self.calibrate_EE_start_state(self.get_state_obs()["robot_obs"])
         self.start_info = self.get_info()
         self._t = 0
         self.completed_tasks = []
         self.solved_subtasks = defaultdict(lambda: 0)
         return self.get_obs()
+
+    def calibrate_scene_for_close_drawer(self):
+        """Calibrate the scene for the close_drawer skill"""
+        self.scene.doors[1].reset(0.2)
+        self.scene.doors[1].initial_state = 0.2
+
+    def calibrate_scene_for_turn_off_lightbulb(self):
+        """Calibrate the scene for the turn_off_lightbulb skill"""
+        self.scene.lights[0].reset(1)
+        self.scene.switches[0].reset(0.08)
+
+    def calibrate_scene_for_move_slider_right(self):
+        """Calibrate the scene for the move_slider_right skill"""
+        self.scene.doors[0].reset(0.2)
+        self.scene.doors[0].initial_state = 0.2
+
+    def calibrate_scene_for_turn_off_led(self):
+        """Calibrate the scene for the turn_off_led skill"""
+        self.scene.lights[1].reset(1)
+        self.scene.buttons[0].reset(0)
+
+    def reset_close_drawer_scene(self):
+        """Reset the scene for the close_drawer skill"""
+        self.scene.doors[1].reset(0)
+        self.scene.doors[1].initial_state = 0
+
+    def reset_turn_off_lightbulb_scene(self):
+        """Reset the scene for the turn_off_lightbulb skill"""
+        self.scene.lights[0].reset(0)
+        self.scene.switches[0].reset(0)
+
+    def reset_move_slider_right_scene(self):
+        """Reset the scene for the move_slider_right skill"""
+        self.scene.doors[0].reset(0)
+        self.scene.doors[0].initial_state = 0
+
+    def reset_turn_off_led_scene(self):
+        """Reset the scene for the turn_off_led skill"""
+        self.scene.lights[1].reset(0)
+        self.scene.buttons[0].reset(0)
+
+    def calibrate_scene(self, skill):
+        """
+        Change scene based on the skill to be performed.
+
+        Logic: Set scene for one scene but reset others
+        """
+        if skill == "close_drawer":
+            self.calibrate_scene_for_close_drawer()
+            self.reset_turn_off_lightbulb_scene()
+            self.reset_move_slider_right_scene()
+            self.reset_turn_off_led_scene()
+        elif skill == "turn_off_lightbulb":
+            self.calibrate_scene_for_turn_off_lightbulb()
+            self.reset_close_drawer_scene()
+            self.reset_move_slider_right_scene()
+            self.reset_turn_off_led_scene()
+        elif skill == "move_slider_right":
+            self.calibrate_scene_for_move_slider_right()
+            self.reset_close_drawer_scene()
+            self.reset_turn_off_lightbulb_scene()
+            self.reset_turn_off_led_scene()
+        elif skill == "turn_off_led":
+            self.calibrate_scene_for_turn_off_led()
+            self.reset_close_drawer_scene()
+            self.reset_turn_off_lightbulb_scene()
+            self.reset_move_slider_right_scene()
+        else:
+            # reset all
+            self.reset_close_drawer_scene()
+            self.reset_turn_off_lightbulb_scene()
+            self.reset_move_slider_right_scene()
+            self.reset_turn_off_led_scene()
 
     def reset_to_state(self, state):
         return super().reset(robot_obs=state[:15], scene_obs=state[15:])
@@ -178,9 +252,9 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         r_info = {"reward": reward}
         return reward, r_info
 
-    def _termination(self):
+    def _termination(self, reward):
         """Indicates if the robot has reached a terminal state"""
-        done = self._success()
+        done = reward > 0 or self._t >= self.max_episode_steps
         d_info = {"success": done}
         return done, d_info
 
@@ -210,12 +284,10 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         obs = self.get_obs()
         info = self.get_info()
         reward, r_info = self._reward()
-        done, d_info = self._termination()
+        self._t += 1
+        done, d_info = self._termination(reward)
         info.update(r_info)
         info.update(d_info)
-        self._t += 1
-        if self._t >= self.max_episode_steps:
-            done = True
         return obs, reward, done, info
 
     def get_episode_info(self):

@@ -97,3 +97,8 @@ class CALVINDynSysDataset5(Dataset):
 
     def __getitem__(self, idx):
         return self.X_pos[idx], self.dX_pos[idx], self.X_ori[idx]
+
+    def rm_rw_data(self, list_indicis):
+        self.X = np.load(self.data_file)
+        new_X = np.delete(self.X, list_indicis, axis=0)
+        np.save(self.data_file, new_X)

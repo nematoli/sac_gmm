@@ -308,11 +308,11 @@ class CALVIN_SACNGMMAgent(Agent):
 
             if obs[name].ndim > 1:  # When obs is of shape (Batch x obs_dim)
                 # fc_input = torch.tensor(obs[name][:, :]).to(device)
-                # skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()]
+                # skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()].to(device)
                 skill_vector = self.skill_params_stacked[skill_id[:, 0].cpu().int()].to(device)
             else:
                 # fc_input = torch.tensor(obs[name]).to(device)
-                # skill_vector = torch.eye(len(self.task.skills))[skill_id]
+                # skill_vector = torch.eye(len(self.task.skills))[skill_id].to(device)
                 skill_vector = self.skill_params_stacked[skill_id].squeeze(0).to(device)
             # RGB obs
             if "rgb_gripper" in obs:

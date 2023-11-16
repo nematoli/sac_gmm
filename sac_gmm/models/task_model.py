@@ -65,6 +65,7 @@ class TaskModel(pl.LightningModule):
 
         # Model (Input encoder, State decoder, Dynamics and Reward predictor)
         self.skill_vector_size = self.agent.skill_actor.means_size + self.agent.skill_actor.priors_size
+        # self.skill_vector_size = len(self.agent.task.skills)
         # Model input size = RGB Gripper Flattened (512) + Skill Vector (Priors + Means)
         model.state_dim = (
             self.agent.get_state_dim(feature_size=self.encoder.feature_size) + self.skill_vector_size

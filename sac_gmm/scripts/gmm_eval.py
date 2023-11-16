@@ -72,19 +72,19 @@ def evaluate(env, gmm, target, max_steps, render=False, record=False, out_dir=No
         log_rank_0(f"{idx+1}: {status}!")
         if record:
             log_rank_0("Saving Robot Camera Obs")
-            video_path = env.save_recording(outdir=out_dir, fname=idx)
+            video_path = env.save_recording(outdir=out_dir, fname=idx + 1)
             env.reset_recording()
             status = None
-            gmm.logger.log_table(key="eval", columns=["GMM"], data=[[wandb.Video(video_path, fps=30, format="gif")]])
+            # gmm.logger.log_table(key="eval", columns=["GMM"], data=[[wandb.Video(video_path, fps=30, format="gif")]])
 
         rollout_returns.append(rollout_return)
         rollout_lengths.append(step)
     acc = succesful_rollouts / num_rollouts
-    gmm.logger.log_table(
-        key="stats",
-        columns=["skill", "accuracy", "average_return", "average_traj_len"],
-        data=[[env.skill.name, acc * 100, np.mean(rollout_returns), np.mean(rollout_lengths)]],
-    )
+    # gmm.logger.log_table(
+    #     key="stats",
+    #     columns=["skill", "accuracy", "average_return", "average_traj_len"],
+    #     data=[[env.skill.name, acc * 100, np.mean(rollout_returns), np.mean(rollout_lengths)]],
+    # )
 
     return acc, np.mean(rollout_returns), np.mean(rollout_lengths)
 
@@ -114,7 +114,7 @@ def eval_gmm(cfg: DictConfig) -> None:
 
     # Setup logger
     logger_name = f"{cfg.skill.name}_type{cfg.gmm.gmm_type}_{gmm.name}_{gmm.n_components}"
-    gmm.logger = setup_logger(cfg, name=logger_name)
+    # gmm.logger = setup_logger(cfg, name=logger_name)
 
     # Evaluate by simulating in the CALVIN environment
     env = make_env(cfg.env)
