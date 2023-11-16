@@ -358,7 +358,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
     def _termination(self, reward):
         """Indicates if the robot has reached a terminal state"""
         success = reward > 0
-        done = success
+        done = success or self._t >= self.max_episode_steps
         d_info = {"success": success}
         return done, d_info
 

@@ -29,7 +29,7 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         self.robot_cfg = pt_cfg["robot_cfg"]
         self.scene_cfg = pt_cfg["scene_cfg"]
         self.cameras_c = pt_cfg["cameras"]
-        super().__init__(**pt_cfg)
+        super(CalvinRandSkillEnv, self).__init__(**pt_cfg)
 
         self.action_space = self.get_action_space()
         self.observation_space = self.get_observation_space()
@@ -38,6 +38,7 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         self.target_tasks = list(self.tasks.tasks.keys())
         self.target_skill = np.random.choice(self.target_tasks)
         self._t = 0
+        self.max_episode_steps = 0
         self.reward_scale = 10
 
         self.init_base_pos, self.init_base_orn = self.p.getBasePositionAndOrientation(self.robot.robot_uid)
@@ -254,7 +255,8 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
 
     def _termination(self, reward):
         """Indicates if the robot has reached a terminal state"""
-        done = reward > 0 or self._t >= self.max_episode_steps
+        success = reward > 0
+        done = success or self._t >= self.max_episode_steps
         d_info = {"success": done}
         return done, d_info
 
@@ -392,7 +394,6 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
                 count = 0
             count += 1
         self.robot.update_target_pose()
-        self.scene.reset()
 
     def record_frame(self, obs_type="rgb", cam_type="static", size=200):
         """Record RGB obsservations"""
