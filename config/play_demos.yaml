@@ -1,9 +1,14 @@
 defaults:
   - setup
   - skill_setup
-  - datamodule: calvin_ds
+  - datamodule: calvin_ds5
 
-remove_failures: true
+
+skill_name: turn_off_led
+skill:
+  name: ${skill_name}
+
+remove_failures: false
 
 # Dataset params:
 train: true # false to load validation dataset
