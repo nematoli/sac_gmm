@@ -21,7 +21,16 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-LETTERS_TO_SKILLS = {"A": "open_drawer", "B": "turn_on_lightbulb", "C": "move_slider_left", "D": "turn_on_led"}
+LETTERS_TO_SKILLS = {
+    "A": "open_drawer",
+    "B": "turn_on_lightbulb",
+    "C": "move_slider_left",
+    "D": "turn_on_led",
+    "E": "close_drawer",
+    "F": "turn_off_lightbulb",
+    "G": "move_slider_right",
+    "H": "turn_off_led",
+}
 
 
 class SKILLS(Enum):

@@ -95,7 +95,8 @@ class ReplayBufferTask:
                         data["done"].item(),
                     )
                     self.replay_buffer.append(transition)
-                log_rank_0("Replay buffer loaded successfully")
+                log_rank_0(f"Replay buffer of size {len(files)} loaded successfully")
+                self.last_saved_idx += len(files)
             else:
                 log_rank_0("No files were found in path %s" % (self.save_dir))
         else:

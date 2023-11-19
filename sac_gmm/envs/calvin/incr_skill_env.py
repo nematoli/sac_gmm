@@ -190,6 +190,8 @@ class CalvinIncrSkillEnv(PlayTableSimEnv):
                     reward += 1
                     self.tasks_to_complete.remove(task)
                     self.completed_tasks.append(task)
+            if reward > 0:
+                self.start_info = self.get_info()
         if self.sparse_reward:
             reward = int(len(self.tasks_to_complete) == 0)
         reward *= self.reward_scale

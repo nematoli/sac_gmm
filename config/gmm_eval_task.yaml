@@ -1,0 +1,40 @@
+defaults:
+  - setup
+  - incr_skill_setup
+  - datamodule: calvin_ds2
+  - logger: wandb
+
+logger:
+  group: gmm-eval
+
+show_gui: false
+
+# GMM params
+gmm_type: 2
+skill:
+  n_components: 3 # components change for RiepybdlibGMM
+
+task: ${skill}
+task_order: "ABCD"
+
+# Dataset params:
+train: false # false to load validation dataset
+goal_centered: false # this must be false during evaluation
+
+num_rollouts: 50
+
+# Environment params
+render: false
+record: true
+
+hydra:
+  run:
+    dir: ${log_dir}/gmm-eval-task-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/gmm-eval-task-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir
