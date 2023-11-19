@@ -60,6 +60,7 @@ class SACNGMM(TaskModel):
         )
         self.episode_done = False
         self.save_hyperparameters()
+        self.max_env_steps = None
 
     def training_step(self, batch, batch_idx):
         """
@@ -137,6 +138,8 @@ class SACNGMM(TaskModel):
 
             self.replay_buffer.save()
             self.log_metrics(metrics, on_step=False, on_epoch=True)
+            if self.agent.total_env_steps > self.max_env_steps:
+                raise KeyboardInterrupt
 
     def loss(self, batch):
         critic_optimizer, actor_optimizer, alpha_optimizer, model_optimizer = self.optimizers()

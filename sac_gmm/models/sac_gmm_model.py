@@ -73,9 +73,6 @@ class SACGMM(SkillModel):
         self.log_loss(losses)
         self.soft_update(self.critic_target, self.critic, self.critic_tau)
 
-        if self.agent.total_env_steps > self.max_env_steps:
-            raise KeyboardInterrupt
-
     def on_train_epoch_end(self):
         if self.episode_done:
             metrics = {"eval/episode-avg-return": float("-inf")}
@@ -114,6 +111,8 @@ class SACGMM(SkillModel):
 
             self.replay_buffer.save()
             self.log_metrics(metrics, on_step=False, on_epoch=True)
+            if self.agent.total_env_steps > self.max_env_steps:
+                raise KeyboardInterrupt
 
     def loss(self, batch):
         critic_optimizer, actor_optimizer, alpha_optimizer = self.optimizers()

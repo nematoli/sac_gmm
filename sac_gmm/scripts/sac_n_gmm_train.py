@@ -53,6 +53,8 @@ def train(cfg: DictConfig) -> None:
         agent = hydra.utils.instantiate(cfg.agent)
         model = hydra.utils.instantiate(cfg.sac, agent=agent)
 
+    model.max_env_steps = cfg.max_env_steps
+
     train_logger = setup_logger(cfg)
     callbacks = setup_callbacks(cfg.callbacks)
 

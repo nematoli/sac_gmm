@@ -293,9 +293,6 @@ class CALVIN_SACNGMMAgent(Agent):
         mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
 
         change_dict = {"mu": mu, "priors": priors}
-
-        # if self.adapt_cov:
-        #     change_dict["sigma"] = gmm_change[size_priors + size_mu :] * parameter_space["sigma"].high
         self.skill_actor.update_model(change_dict, skill_id)
 
     def get_state_from_observation(self, encoder, obs, skill_id, device="cuda"):

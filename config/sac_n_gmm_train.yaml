@@ -25,6 +25,9 @@ task_order: null
 agent: 
   sparse_reward: false
 
+# Experiment length
+max_env_steps: 1e6
+
 # evaluation frequency:
 eval_frequency: 160
 num_init_steps: 256
