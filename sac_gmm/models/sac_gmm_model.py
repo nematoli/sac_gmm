@@ -34,6 +34,8 @@ class SACGMM(SkillModel):
         init_alpha: float,
         fixed_alpha: bool,
         eval_frequency: int,
+        model_lr: float,
+        model_tau: float,
     ):
         super(SACGMM, self).__init__(
             discount=discount,
@@ -53,6 +55,7 @@ class SACGMM(SkillModel):
         )
         self.episode_done = False
         self.save_hyperparameters()
+        self.max_env_steps = None
 
     def training_step(self, batch, batch_idx):
         """
@@ -70,6 +73,9 @@ class SACGMM(SkillModel):
         self.log_loss(losses)
         self.soft_update(self.critic_target, self.critic, self.critic_tau)
 
+        if self.agent.total_env_steps > self.max_env_steps:
+            raise KeyboardInterrupt
+
     def on_train_epoch_end(self):
         if self.episode_done:
             metrics = {"eval/episode-avg-return": float("-inf")}
@@ -80,6 +86,7 @@ class SACGMM(SkillModel):
                 "train/episode-length": self.episode_play_steps * self.agent.gmm_window,
                 "train/episode-number": self.episode_idx,
                 "train/nan-counter": self.agent.nan_counter,
+                "train/total-env-steps": self.agent.total_env_steps,
             }
             metrics.update(train_metrics)
             eval_return = float("-inf")

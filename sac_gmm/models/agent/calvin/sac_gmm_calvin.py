@@ -81,22 +81,6 @@ class CALVINSACGMMAgent(Agent):
         # NaN counter
         self.nan_counter = 0
 
-    def get_action_space(self):
-        parameter_space = self.get_update_range_parameter_space()
-        mu_high = np.ones(parameter_space["mu"].shape[0])
-        if self.mean_shift:
-            action_high = mu_high
-        else:
-            priors_high = np.ones(parameter_space["priors"].shape[0])
-            action_high = np.concatenate((priors_high, mu_high), axis=-1)
-            if self.adapt_cov:
-                sigma_high = np.ones(parameter_space["sigma"].shape[0])
-                action_high = np.concatenate((action_high, sigma_high), axis=-1)
-
-        action_low = -action_high
-        self.action_space = gym.spaces.Box(action_low, action_high)
-        return self.action_space
-
     @torch.no_grad()
     def play_step(self, actor, strategy="stochastic", replay_buffer=None, device="cuda"):
         """Perform a step in the environment and add the transition
@@ -209,6 +193,19 @@ class CALVINSACGMMAgent(Agent):
             saved_video_path,
         )
 
+    def get_action_space(self):
+        parameter_space = self.get_update_range_parameter_space()
+        mu_high = np.ones(parameter_space["mu"].shape[0])
+        priors_high = np.ones(parameter_space["priors"].shape[0])
+        action_high = np.concatenate((priors_high, mu_high), axis=-1)
+        if self.adapt_cov:
+            sigma_high = np.ones(parameter_space["sigma"].shape[0])
+            action_high = np.concatenate((action_high, sigma_high), axis=-1)
+
+        action_low = -action_high
+        self.action_space = gym.spaces.Box(action_low, action_high)
+        return self.action_space
+
     def get_update_range_parameter_space(self):
         """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
 
@@ -219,7 +216,9 @@ class CALVINSACGMMAgent(Agent):
         # TODO: make low and high config variables
         param_space = {}
         param_space["priors"] = gym.spaces.Box(
-            low=-self.priors_change_range, high=self.priors_change_range, shape=(self.gmm.priors.size,)
+            low=-self.priors_change_range,
+            high=self.priors_change_range,
+            shape=(self.gmm.priors.size,),
         )
 
         if self.gmm.gmm_type in [1, 4]:
@@ -228,13 +227,20 @@ class CALVINSACGMMAgent(Agent):
             )
         elif self.gmm.gmm_type in [2, 5]:
             param_space["mu"] = gym.spaces.Box(
-                low=-self.mu_change_range, high=self.mu_change_range, shape=(self.gmm.means.size // 2,)
+                low=-self.mu_change_range,
+                high=self.mu_change_range,
+                shape=(self.gmm.means.size // 2,),
+            )
+        else:
+            # Only update position means for now
+            total_size = self.gmm.means.size
+            just_positions_size = total_size - self.gmm.priors.size * 4
+            param_space["mu"] = gym.spaces.Box(
+                low=-self.mu_change_range,
+                high=self.mu_change_range,
+                shape=(just_positions_size // 2,),
             )
 
-        # dim = self.gmm.means.shape[1] // 2
-        # num_gaussians = self.gmm.means.shape[0]
-        # sigma_change_size = int(num_gaussians * dim * (dim + 1) / 2 + dim * dim * num_gaussians)
-        # param_space["sigma"] = gym.spaces.Box(low=-1e-6, high=1e-6, shape=(sigma_change_size,))
         return gym.spaces.Dict(param_space)
 
     def update_gaussians(self, gmm_change):
@@ -246,42 +252,38 @@ class CALVINSACGMMAgent(Agent):
         mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
 
         change_dict = {"mu": mu, "priors": priors}
-        # if self.adapt_cov:
-        #     change_dict["sigma"] = gmm_change[size_priors + size_mu :] * parameter_space["sigma"].high
         self.gmm.update_model(change_dict)
-
-        # if self.mean_shift:
-        #     # TODO: check low and high here
-        #     mu = np.hstack([gmm_change.reshape((size_mu, 1)) * parameter_space["mu"].high] * self.gmm.means.shape[1])
-
-        #     change_dict = {"mu": mu}
-        #     self.gmm.update_model(change_dict)
-        # else:
 
     def get_state_from_observation(self, encoder, obs, device="cuda"):
         if isinstance(obs, dict):
-            # Robot obs
-            if "position" in obs:
-                fc_input = torch.tensor(obs["position"]).to(device)
-            if "orientation" in obs:
-                fc_input = torch.cat((fc_input, obs["orientation"].float()), dim=-1).to(device)
-            if "robot_obs" in obs:
-                if obs["robot_obs"].ndim > 1:
-                    fc_input = torch.tensor(obs["robot_obs"][:, :3]).to(device)
-                else:
-                    fc_input = torch.tensor(obs["robot_obs"][:3]).to(device)
             if "rgb_gripper" in obs:
                 x = obs["rgb_gripper"]
                 if not torch.is_tensor(x):
                     x = torch.tensor(x).to(device)
                 if len(x.shape) < 4:
                     x = x.unsqueeze(0)
-                features = encoder(x)
-                if features is not None:
-                    fc_input = torch.cat((fc_input, features.squeeze()), dim=-1)
-                # fc_input = features.squeeze()
-            # if "obs" in obs:
-            #     fc_input = torch.cat((fc_input, torch.tensor(obs["obs"]).to(device)), dim=-1)
+                with torch.no_grad():
+                    features = encoder(x)
+            fc_input = features.squeeze()
             return fc_input.float()
 
-        return obs.float()
+    def get_action(self, actor, observation, strategy="stochastic", device="cuda"):
+        """Interface to get action from SAC Actor,
+        ready to be used in the environment"""
+        actor.eval()
+        if strategy == "random":
+            return self.get_action_space().sample()
+        elif strategy == "zeros":
+            return np.zeros(self.get_action_space().shape)
+        elif strategy == "stochastic":
+            deterministic = False
+        elif strategy == "deterministic":
+            deterministic = True
+        else:
+            raise Exception("Strategy not implemented")
+        input_state = self.get_state_from_observation(actor.encoder, observation, device)
+        # enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
+        # input_state = self.get_state_from_observation(model.encoder, observation, skill_id, device)
+        action, _ = actor.get_actions(input_state, deterministic=deterministic, reparameterize=False)
+        actor.train()
+        return action.detach().cpu().numpy()

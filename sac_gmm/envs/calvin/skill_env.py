@@ -241,7 +241,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
         self.robot.reset(robot_obs)
         self.p.stepSimulation(physicsClientId=self.cid)
 
-        self.calibrate_scene(self.skill.skill)
+        self.calibrate_scene(self.skill.name)
         self.calibrate_EE_start_state()
         self.start_info = self.get_info()
 

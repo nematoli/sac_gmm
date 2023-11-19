@@ -86,8 +86,13 @@ class Agent(object):
             strategy: strategy to follow to select actions to fill the replay buffer
         """
         log_rank_0("Populating replay buffer with random warm up steps")
-        for _ in tqdm(range(self.num_init_steps)):
-            self.play_step(actor, model, critic=None, strategy="random", replay_buffer=replay_buffer)
+        if model is not None:
+            for _ in tqdm(range(self.num_init_steps)):
+                self.play_step(actor, model, critic=None, strategy="random", replay_buffer=replay_buffer)
+        else:
+            # SACGMM
+            for _ in tqdm(range(self.num_init_steps)):
+                self.play_step(actor, strategy="random", replay_buffer=replay_buffer)
         replay_buffer.save()
 
     def get_action(self, actor, model, observation, strategy="stochastic", device="cuda"):

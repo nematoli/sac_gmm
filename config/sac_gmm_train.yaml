@@ -2,7 +2,7 @@ defaults:
   - setup
   - skill_setup
   - callbacks: default
-  - datamodule: calvin_ds3
+  - datamodule: calvin_ds2
   - sac: sac_gmm_model
   - agent: sac_gmm_calvin
   - logger: wandb
@@ -15,13 +15,17 @@ defaults:
 show_gui: false
 
 # GMM params
-gmm_type: 3
+gmm_type: 2
 
 # Skill
+skill_name: move_slider_left
 skill:
-  name: move_slider_left
+  name: ${skill_name}
   max_steps: 128
-  n_components: 4 # components change for RiepybdlibGMM
+  n_components: 3 # components change for RiepybdlibGMM
+
+# Experiment length
+max_env_steps: 1e6
 
 # evaluation frequency:
 eval_frequency: 50

@@ -86,7 +86,7 @@ class SkillModel(pl.LightningModule):
         self.critic_lr, self.actor_lr, self.alpha_lr = critic_lr, actor_lr, alpha_lr
 
         # Populate Replay Buffer with Random Actions
-        self.agent.populate_replay_buffer(self.actor, self.replay_buffer)
+        self.agent.populate_replay_buffer(self.actor, None, self.replay_buffer)
 
         # Logic values
         self.episode_idx = 0
