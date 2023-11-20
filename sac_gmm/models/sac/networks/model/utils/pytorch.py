@@ -17,7 +17,7 @@ import PIL.Image
 import gymnasium as gym
 from mpi4py import MPI
 
-from . import rmap
+from .utils import rmap
 
 
 def sum_rightmost(value, dim):

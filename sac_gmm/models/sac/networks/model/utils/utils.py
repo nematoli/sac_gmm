@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from collections import OrderedDict
 
 activation_map = {
     "relu": nn.ReLU,
@@ -20,6 +20,15 @@ def get_activation(activation):
     elif isinstance(activation, str):
         activation = activation_map[activation.lower()]()
     return activation
+
+
+def rmap(func, x):
+    """Recursively applies `func` to list or dictionary `x`."""
+    if isinstance(x, dict):
+        return OrderedDict([(k, rmap(func, v)) for k, v in x.items()])
+    if isinstance(x, list):
+        return [rmap(func, v) for v in x]
+    return func(x)
 
 
 # from https://github.com/denisyarats/drq/blob/master/utils.py#L62
