@@ -21,13 +21,16 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-# This helps load each skill's model checkpoints in an set order
-# irrespective of the skill order given in the config file
-class SKILLS(Enum):
-    open_drawer = 0
-    turn_on_lightbulb = 1
-    move_slider_left = 2
-    turn_on_led = 3
+LETTERS_TO_SKILLS = {
+    "A": "open_drawer",
+    "B": "turn_on_lightbulb",
+    "C": "move_slider_left",
+    "D": "turn_on_led",
+    "E": "close_drawer",
+    "F": "turn_off_lightbulb",
+    "G": "move_slider_right",
+    "H": "turn_off_led",
+}
 
 
 class CALVIN_NSACGMMAgent(Agent):
@@ -59,6 +62,9 @@ class CALVIN_NSACGMMAgent(Agent):
         )
 
         self.task = task
+        task_order = [*task.order]
+        self.task.skills = [LETTERS_TO_SKILLS[skill] for skill in task_order]
+        self.task.max_steps = self.task.skill_max_steps * len(self.task.skills)
 
         # Environment
         self.env.set_task(self.task.skills)
@@ -75,7 +81,7 @@ class CALVIN_NSACGMMAgent(Agent):
         # One SkillActorWithNSACGMM per set of skills
         self.actor = SkillActorWithNSACGMM(self.task)
         # The order of skills inside actor should always be the same as the order of skills in the SKILLS enum
-        self.actor.skill_names = [e.name for e in SKILLS]
+        self.actor.skill_names = self.task.skills
         # GMM
         self.actor.make_skills(gmm)
         # Load GMM weights of each skill
@@ -136,7 +142,7 @@ class CALVIN_NSACGMMAgent(Agent):
 
             while episode_env_steps < self.task.max_steps:
                 # Change dynamical system
-                skill_id = SKILLS[self.task.skills[skill_count]].value
+                skill_id = 0
                 self.actor.copy_model(self.initial_gmms, skill_id)
                 gmm_change = self.get_action(self.sacgmms[skill_id], self.obs, "deterministic", device)
                 self.update_gaussians(gmm_change, skill_id)
@@ -145,7 +151,7 @@ class CALVIN_NSACGMMAgent(Agent):
                 # x = self.obs["position"]
 
                 for _ in range(self.gmm_window):
-                    env_action = self.actor.act(self.obs["robot_obs"], skill_id)
+                    env_action, _ = self.actor.act(self.obs["robot_obs"], skill_id)
                     self.obs, reward, done, info = self.env.step(env_action)
                     episode_return += reward
                     episode_env_steps += 1
@@ -194,18 +200,36 @@ class CALVIN_NSACGMMAgent(Agent):
                 Range of GMM parameters parameters
         """
         # TODO: make low and high config variables
+        means_size = self.actor.skills[0].means.size
+        priors_size = self.actor.skills[0].priors.size
+
         param_space = {}
         param_space["priors"] = gym.spaces.Box(
-            low=-self.priors_change_range, high=self.priors_change_range, shape=(self.actor.skills[0].priors.size,)
-        )
-        param_space["mu"] = gym.spaces.Box(
-            low=-self.mu_change_range, high=self.mu_change_range, shape=(self.actor.skills[0].means.size,)
+            low=-self.priors_change_range,
+            high=self.priors_change_range,
+            shape=(priors_size,),
         )
 
-        # dim = self.gmm.means.shape[1] // 2
-        # num_gaussians = self.gmm.means.shape[0]
-        # sigma_change_size = int(num_gaussians * dim * (dim + 1) / 2 + dim * dim * num_gaussians)
-        # param_space["sigma"] = gym.spaces.Box(low=-1e-6, high=1e-6, shape=(sigma_change_size,))
+        if self.actor.skills[0].gmm_type in [1, 4]:
+            param_space["mu"] = gym.spaces.Box(
+                low=-self.mu_change_range, high=self.mu_change_range, shape=(means_size,)
+            )
+        elif self.actor.skills[0].gmm_type in [2, 5]:
+            param_space["mu"] = gym.spaces.Box(
+                low=-self.mu_change_range,
+                high=self.mu_change_range,
+                shape=(means_size // 2,),
+            )
+        else:
+            # Only update position means for now
+            total_size = means_size
+            just_positions_size = total_size - priors_size * 4
+            param_space["mu"] = gym.spaces.Box(
+                low=-self.mu_change_range,
+                high=self.mu_change_range,
+                shape=(just_positions_size // 2,),
+            )
+
         return gym.spaces.Dict(param_space)
 
     def update_gaussians(self, gmm_change, skill_id):
@@ -217,45 +241,41 @@ class CALVIN_NSACGMMAgent(Agent):
         mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
 
         change_dict = {"mu": mu, "priors": priors}
-        # if self.adapt_cov:
-        #     change_dict["sigma"] = gmm_change[size_priors + size_mu :] * parameter_space["sigma"].high
         self.actor.update_model(change_dict, skill_id)
-
-        # if self.mean_shift:
-        #     # TODO: check low and high here
-        #     mu = np.hstack([gmm_change.reshape((size_mu, 1)) * parameter_space["mu"].high] * self.gmm.means.shape[1])
-
-        #     change_dict = {"mu": mu}
-        #     self.gmm.update_model(change_dict)
-        # else:
 
     def get_state_from_observation(self, encoder, obs, device="cuda"):
         if isinstance(obs, dict):
-            # Robot obs
-            if "position" in obs:
-                fc_input = torch.tensor(obs["position"]).to(device)
-            if "orientation" in obs:
-                fc_input = torch.cat((fc_input, obs["orientation"].float()), dim=-1).to(device)
-            if "robot_obs" in obs:
-                if obs["robot_obs"].ndim > 1:
-                    fc_input = torch.tensor(obs["robot_obs"][:, :3]).to(device)
-                else:
-                    fc_input = torch.tensor(obs["robot_obs"][:3]).to(device)
             if "rgb_gripper" in obs:
                 x = obs["rgb_gripper"]
                 if not torch.is_tensor(x):
                     x = torch.tensor(x).to(device)
                 if len(x.shape) < 4:
                     x = x.unsqueeze(0)
-                features = encoder(x)
-                if features is not None:
-                    fc_input = torch.cat((fc_input, features.squeeze()), dim=-1)
-                # fc_input = features.squeeze()
-            # if "obs" in obs:
-            #     fc_input = torch.cat((fc_input, torch.tensor(obs["obs"]).to(device)), dim=-1)
+                with torch.no_grad():
+                    features = encoder(x)
+            fc_input = features.squeeze()
             return fc_input.float()
 
-        return obs.float()
+    def get_action(self, actor, observation, strategy="stochastic", device="cuda"):
+        """Interface to get action from SAC Actor,
+        ready to be used in the environment"""
+        actor.eval()
+        if strategy == "random":
+            return self.get_action_space().sample()
+        elif strategy == "zeros":
+            return np.zeros(self.get_action_space().shape)
+        elif strategy == "stochastic":
+            deterministic = False
+        elif strategy == "deterministic":
+            deterministic = True
+        else:
+            raise Exception("Strategy not implemented")
+        input_state = self.get_state_from_observation(actor.encoder, observation, device)
+        # enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
+        # input_state = self.get_state_from_observation(model.encoder, observation, skill_id, device)
+        action, _ = actor.get_actions(input_state, deterministic=deterministic, reparameterize=False)
+        actor.train()
+        return action.detach().cpu().numpy()
 
 
 @hydra.main(config_path="../../../../config", config_name="n_sac_gmm_run")

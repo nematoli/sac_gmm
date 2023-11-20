@@ -68,5 +68,5 @@ class SkillActorWithNSACGMM:
         self.skills[skill_id].update_model(delta)
 
     def act(self, x, skill_id):
-        dx_pos, dx_ori = self.skills[skill_id].predict(x)
-        return np.append(dx_pos, np.append(dx_ori, -1))
+        dx_pos, dx_ori, is_nan = self.skills[skill_id].predict(x)
+        return np.append(dx_pos, np.append(dx_ori, -1)), is_nan

@@ -140,7 +140,7 @@ class CALVINSACGMMAgent(Agent):
             # Recording setup
             if self.record and (episode == rand_idx):
                 self.env.reset_recording()
-                self.env.record_frame(size=64)
+                self.env.record_frame(size=200)
 
             while episode_env_steps < self.skill.max_steps:
                 # Change dynamical system
@@ -161,7 +161,7 @@ class CALVINSACGMMAgent(Agent):
                         episode_env_steps += 1
 
                     if self.record and (episode == rand_idx):
-                        self.env.record_frame(size=64)
+                        self.env.record_frame(size=200)
                     if self.render:
                         self.env.render()
                     if done:

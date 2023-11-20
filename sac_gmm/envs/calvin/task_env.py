@@ -45,7 +45,7 @@ class CalvinTaskEnv(PlayTableSimEnv):
         self.sparse_reward = False
 
         self.init_base_pos, self.init_base_orn = self.p.getBasePositionAndOrientation(self.robot.robot_uid)
-        self.ee_noise = np.array([0.4, 0.3, 0.1])  # Units: meters
+        self.ee_noise = np.array([0.05, 0.05, 0.05])  # Units: meters
         self.init_pos = None
         self.eval_mode = False
 
@@ -184,6 +184,8 @@ class CalvinTaskEnv(PlayTableSimEnv):
                     reward += 1
                     self.tasks_to_complete.remove(task)
                     self.completed_tasks.append(task)
+            if reward > 0:
+                self.start_info = self.get_info()
         if self.sparse_reward:
             reward = int(len(self.tasks_to_complete) == 0)
         reward *= self.reward_scale
@@ -289,8 +291,8 @@ class CalvinTaskEnv(PlayTableSimEnv):
         offset = [0, 0, 0]
         np.random.seed(np.random.randint(0, 1000))
         offset[0] = np.random.uniform(-self.ee_noise[0], self.ee_noise[0], 1)[0]
-        offset[1] = np.random.uniform(-self.ee_noise[1] / 1.5, self.ee_noise[1] / 2, 1)[0]
-        offset[2] = np.random.uniform(-self.ee_noise[2] / 2, self.ee_noise[2], 1)[0]
+        offset[1] = np.random.uniform(-self.ee_noise[1], self.ee_noise[1], 1)[0]
+        offset[2] = np.random.uniform(-self.ee_noise[2], self.ee_noise[2], 1)[0]
         gripper_pos = self.robot.target_pos + offset
         gripper_orn = self.init_gripper_orn
         return gripper_pos, gripper_orn
