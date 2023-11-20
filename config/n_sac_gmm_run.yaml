@@ -27,7 +27,7 @@ goal_centered: false # this must be false during evaluation
 
 # Visualization
 render: false
-record: false
+record: true
 
 task_order: "ABCD"
 

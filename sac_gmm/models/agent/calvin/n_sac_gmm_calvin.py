@@ -134,15 +134,14 @@ class CALVIN_NSACGMMAgent(Agent):
         for episode in tqdm(range(1, self.num_eval_episodes + 1)):
             episode_return, episode_env_steps = 0, 0
             self.obs = self.env.reset()
-            skill_count = 0
+            skill_id = 0
             # Recording setup
             if self.record:  # and (episode == rand_idx):
                 self.env.reset_recording()
-                self.env.record_frame(size=100)
+                self.env.record_frame(size=200)
 
             while episode_env_steps < self.task.max_steps:
                 # Change dynamical system
-                skill_id = 0
                 self.actor.copy_model(self.initial_gmms, skill_id)
                 gmm_change = self.get_action(self.sacgmms[skill_id], self.obs, "deterministic", device)
                 self.update_gaussians(gmm_change, skill_id)
@@ -156,24 +155,24 @@ class CALVIN_NSACGMMAgent(Agent):
                     episode_return += reward
                     episode_env_steps += 1
 
-                    if self.record:  # and (episode == rand_idx):
-                        self.env.record_frame(size=100)
+                    if self.record and (episode == rand_idx):
+                        self.env.record_frame(size=200)
                     if self.render:
                         self.env.render()
                     if reward > 0:
-                        skill_count = (skill_count + 1) % len(self.task.skills)
+                        skill_id = (skill_id + 1) % len(self.task.skills)
                     if done:
                         break
 
                 if done:
                     self.reset()
-                    skill_count = 0
+                    skill_id = 0
                     break
 
             if ("success" in info) and info["success"]:
                 succesful_episodes += 1
             # Recording setup close
-            if self.record:  # and (episode == rand_idx):
+            if self.record and (episode == rand_idx):
                 video_path = self.env.save_recording(
                     outdir=self.video_dir,
                     fname=f"{self.total_play_steps}_{self.total_env_steps }_{episode}",
