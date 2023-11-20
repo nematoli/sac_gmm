@@ -145,14 +145,14 @@ class SACNGMM(TaskModel):
         critic_optimizer, actor_optimizer, alpha_optimizer, model_optimizer = self.optimizers()
         critic_loss = self.compute_critic_loss(batch, critic_optimizer)
         actor_loss, alpha_loss = self.compute_actor_and_alpha_loss(batch, actor_optimizer, alpha_optimizer)
-        # model_loss = self.compute_model_loss(batch, model_optimizer)
+        model_loss = self.compute_model_loss(batch, model_optimizer)
 
         losses = {
             "losses/critic": critic_loss,
             "losses/actor": actor_loss,
             "losses/alpha": alpha_loss,
             "losses/alpha_value": self.alpha,
-            # "losses/reconstruction": model_loss["recon_loss"],
+            "losses/reconstruction": model_loss["recon_loss"],
         }
         return losses
 
@@ -168,22 +168,21 @@ class SACNGMM(TaskModel):
         ) = batch
 
         with torch.no_grad():
-            input_state = self.agent.get_state_from_observation(self.encoder, batch_next_obs, batch_next_skill_ids)
-            # input_state = self.agent.get_state_from_observation(
-            # self.model.encoder, batch_next_obs, batch_next_skill_ids
-            # )
-            # enc_state = self.model.encoder({"obs": input_state.float()})
-            policy_actions, log_pi = self.actor.get_actions(input_state, deterministic=False, reparameterize=False)
-            q1_next_target, q2_next_target = self.critic_target(input_state, policy_actions)
+            skill_vector = self.agent.get_skill_vector(batch_next_skill_ids)
+            enc_ob = self.model.encoder({"obs": batch_next_obs["rgb_gripper"].float()}).squeeze(0)
+            actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
+
+            policy_actions, log_pi = self.actor.get_actions(actor_input, deterministic=False, reparameterize=False)
+            q1_next_target, q2_next_target = self.critic_target(actor_input, policy_actions)
 
             q_next_target = torch.min(q1_next_target, q2_next_target)
             q_target = batch_rewards + (1 - batch_dones) * self.discount * (q_next_target - self.alpha * log_pi)
 
         # Bellman loss
-        input_state = self.agent.get_state_from_observation(self.encoder, batch_obs, batch_skill_ids)
-        # input_state = self.agent.get_state_from_observation(self.model.encoder, batch_obs, batch_skill_ids)
-        # enc_state = self.model.encoder({"obs": input_state.float()})
-        q1_pred, q2_pred = self.critic(input_state, batch_actions.float())
+        skill_vector = self.agent.get_skill_vector(batch_skill_ids)
+        enc_ob = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()}).squeeze(0)
+        actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
+        q1_pred, q2_pred = self.critic(actor_input, batch_actions.float())
         bellman_loss = F.mse_loss(q1_pred, q_target) + F.mse_loss(q2_pred, q_target)
 
         critic_optimizer.zero_grad()
@@ -195,11 +194,11 @@ class SACNGMM(TaskModel):
     def compute_actor_and_alpha_loss(self, batch, actor_optimizer, alpha_optimizer):
         batch_obs = batch[0]
         batch_skill_ids = batch[1]
-        input_state = self.agent.get_state_from_observation(self.encoder, batch_obs, batch_skill_ids)
-        # input_state = self.agent.get_state_from_observation(self.model.encoder, batch_obs, batch_skill_ids)
-        # enc_state = self.model.encoder({"obs": input_state.float()})
-        policy_actions, log_pi = self.actor.get_actions(input_state, deterministic=False, reparameterize=True)
-        q1, q2 = self.critic(input_state, policy_actions)
+        skill_vector = self.agent.get_skill_vector(batch_skill_ids)
+        enc_ob = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()}).squeeze(0)
+        actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
+        policy_actions, log_pi = self.actor.get_actions(actor_input, deterministic=False, reparameterize=True)
+        q1, q2 = self.critic(actor_input, policy_actions)
         Q_value = torch.min(q1, q2)
         actor_loss = (self.alpha * log_pi - Q_value).mean()
 
@@ -220,30 +219,28 @@ class SACNGMM(TaskModel):
 
         return actor_loss, alpha_loss
 
-    # def compute_model_loss(self, batch, model_optimizer):
-    #     batch_obs = batch[0]
-    #     batch_skill_ids = batch[1]
+    def compute_model_loss(self, batch, model_optimizer):
+        batch_obs = batch[0]
 
-    #     # Reconstruction Loss
-    #     input_state = self.agent.get_state_from_observation(self.encoder, batch_obs, batch_skill_ids, "cuda")
-    #     enc_state = self.model.encoder({"obs": input_state.float()})
-    #     recon_obs = self.model.decoder(enc_state)
-    #     recon_loss = -recon_obs["obs"].log_prob(input_state).mean()
+        # Reconstruction Loss
+        enc_state = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()})
+        recon_obs = self.model.decoder(enc_state)
+        recon_loss = -recon_obs["obs"].log_prob(batch_obs["rgb_gripper"].float()).mean()
 
-    #     model_optimizer.zero_grad()
-    #     self.manual_backward(recon_loss)
-    #     model_optimizer.step()
+        model_optimizer.zero_grad()
+        self.manual_backward(recon_loss)
+        model_optimizer.step()
 
-    #     model_loss_dict = {}
-    #     model_loss_dict["recon_loss"] = recon_loss
+        model_loss_dict = {}
+        model_loss_dict["recon_loss"] = recon_loss
 
-    #     # Visualize Decoded Images
-    #     # if self.episode_done:
-    #     #     if self.episode_idx % self.eval_frequency == 0:
-    #     #         # Log image and decoded image
-    #     #         rand_idx = torch.randint(0, batch_obs["rgb_gripper"].shape[0], (1,)).item()
-    #     #         image = batch_obs["rgb_gripper"][rand_idx].detach()
-    #     #         decoded_image = recon_obs["obs"].mean[rand_idx].detach()
-    #     #         self.log_image(image, "train/image")
-    #     #         self.log_image(decoded_image, "train/decoded_image")
-    #     return model_loss_dict
+        # Visualize Decoded Images
+        if self.episode_done:
+            if self.episode_idx % self.eval_frequency == 0:
+                # Log image and decoded image
+                rand_idx = torch.randint(0, batch_obs["rgb_gripper"].shape[0], (1,)).item()
+                image = batch_obs["rgb_gripper"][rand_idx].detach()
+                decoded_image = recon_obs["obs"].mean[rand_idx].detach()
+                self.log_image(image, "eval/gripper")
+                self.log_image(decoded_image, "eval/decoded_gripper")
+        return model_loss_dict

@@ -26,10 +26,10 @@ agent:
   sparse_reward: false
 
 # Experiment length
-max_env_steps: 1e6
+max_env_steps: 2e6
 
 # evaluation frequency:
-eval_frequency: 160
+eval_frequency: 100
 num_init_steps: 256
 num_eval_episodes: 10
 

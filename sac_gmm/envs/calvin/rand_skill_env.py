@@ -31,6 +31,8 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         self.cameras_c = pt_cfg["cameras"]
         super(CalvinRandSkillEnv, self).__init__(**pt_cfg)
 
+        self.gripper_width = 64
+
         self.action_space = self.get_action_space()
         self.observation_space = self.get_observation_space()
 
@@ -57,82 +59,23 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         return gym.spaces.Box(low=-1, high=1, shape=(7,))
 
     def get_observation_space(self):
-        """Return only position and gripper_width by default"""
-        # return self.get_custom_obs_space2()
-        return self.get_default_obs_space()
-
-    def get_default_obs_space(self):
+        """Return only position and gripper_image by default"""
         observation_space = {}
         observation_space["robot_obs"] = gym.spaces.Box(low=-1, high=1, shape=(7,))
-        observation_space["rgb_gripper"] = gym.spaces.Box(low=-1, high=1, shape=(3, 84, 84))
-        return gym.spaces.Dict(observation_space)
-
-    def get_custom_obs_space(self):
-        observation_space = {}
-        observation_space["state"] = gym.spaces.Box(low=-1, high=1, shape=(25,))
-        return gym.spaces.Dict(observation_space)
-
-    def get_custom_obs_space2(self):
-        observation_space = {}
-        observation_space["state"] = gym.spaces.Box(low=-1, high=1, shape=(33,))
+        observation_space["rgb_gripper"] = gym.spaces.Box(
+            low=-1, high=1, shape=(self.gripper_width, self.gripper_width, 3)
+        )
         return gym.spaces.Dict(observation_space)
 
     def get_obs(self):
-        # return self.get_custom_obs2()
-        return self.get_default_obs()
-
-    def get_default_obs(self):
         obs = super().get_obs()
 
         nobs = {}
         nobs["robot_obs"] = obs["robot_obs"][:7]
-        nobs["rgb_gripper"] = np.moveaxis(obs["rgb_obs"]["rgb_gripper"], 2, 0)
-        return nobs
-
-    def get_custom_obs(self):
-        obs = self.get_state_obs()
-
-        nobs = {}
-        nobs["robot_obs"] = obs["robot_obs"][:7]
-
-        robot_ee_pos = obs["robot_obs"][:3]
-        dist_to_button = np.linalg.norm(robot_ee_pos - self.object_position(self.scene.buttons[0]))
-        dist_to_switch = np.linalg.norm(robot_ee_pos - self.object_position(self.scene.switches[0]))
-        dist_to_slider = np.linalg.norm(robot_ee_pos - self.object_position(self.scene.doors[0]))
-        dist_to_drawer = np.linalg.norm(robot_ee_pos - self.object_position(self.scene.doors[1]))
-        nobs["state"] = np.concatenate(
-            [
-                obs["robot_obs"],
-                obs["scene_obs"],
-                np.array([dist_to_button, dist_to_switch, dist_to_slider, dist_to_drawer]),
-            ]
+        nobs["rgb_gripper"] = cv2.resize(
+            obs["rgb_obs"]["rgb_gripper"], (self.gripper_width, self.gripper_width), interpolation=cv2.INTER_AREA
         )
         return nobs
-
-    def get_custom_obs2(self):
-        obs = self.get_state_obs()
-
-        nobs = {}
-        nobs["robot_obs"] = obs["robot_obs"][:7]
-
-        robot_ee_pos = obs["robot_obs"][:3]
-        button_pos = self.object_position(self.scene.buttons[0])
-        switch_pos = self.object_position(self.scene.switches[0])
-        slider_pos = self.object_position(self.scene.doors[0])
-        drawer_pos = self.object_position(self.scene.doors[1])
-        nobs["state"] = np.concatenate(
-            [
-                obs["robot_obs"],
-                obs["scene_obs"],
-                np.concatenate([button_pos, switch_pos, slider_pos, drawer_pos]),
-            ]
-        )
-        return nobs
-
-    def object_position(self, obj):
-        base = self.scene.fixed_objects[0]
-        ln = self.p.getJointInfo(base.uid, obj.joint_index, physicsClientId=self.cid)[12].decode()
-        return np.array(self.p.getLinkState(base.uid, base.get_info()["links"][ln], physicsClientId=self.cid)[0])
 
     def set_task(self, task):
         self.target_tasks = task

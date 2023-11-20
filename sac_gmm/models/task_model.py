@@ -56,43 +56,40 @@ class TaskModel(pl.LightningModule):
         self.replay_buffer = hydra.utils.instantiate(replay_buffer)
 
         # Encoder
-        self.encoder = hydra.utils.instantiate(encoder)
+        # self.encoder = hydra.utils.instantiate(encoder)
+        self.encoder = None
 
         # Agent
         self.agent = agent
         self.action_space = self.agent.get_action_space()
         self.action_dim = self.action_space.shape[0]
 
-        # Model (Input encoder, State decoder, Dynamics and Reward predictor)
+        # Skill Conditioning Vector (use skill means and priors for now)
         self.skill_vector_size = self.agent.skill_actor.means_size + self.agent.skill_actor.priors_size
-        # self.skill_vector_size = len(self.agent.task.skills)
-        # Model input size = RGB Gripper Flattened (512) + Skill Vector (Priors + Means)
-        model.state_dim = (
-            self.agent.get_state_dim(feature_size=self.encoder.feature_size) + self.skill_vector_size
-        )  # State + Skill Vector (Priors + Means)
-        # model.input_dim = 0
-        model.ac_dim = self.action_dim
-        self.model = hydra.utils.instantiate(model)
-        # model_ob_space = gym.spaces.Dict({"obs": gym.spaces.Box(low=-1, high=1, shape=(model.input_dim,))})
-        # model_ob_space = gym.spaces.Dict({"obs": self.agent.env.get_observation_space()["rgb_gripper"]})
-        # self.model.make_encoder(model_ob_space, model.state_dim)
-        # self.model.make_decoder(model.state_dim, model_ob_space)
+        # self.skill_vector_size = len(self.agent.task.skills) # If using one-hot encoding
 
-        self.model_target = hydra.utils.instantiate(model)
-        self.model_target.load_state_dict(self.model.state_dict())
+        # Model only has autoencoder for now (Input encoder, State decoder)
+        self.model = hydra.utils.instantiate(model).to(self.device)
+        # ob_space = gym.spaces.Dict({"obs": gym.spaces.Box(low=-1, high=1, shape=(model.input_dim,))})
+        ob_space = gym.spaces.Dict({"obs": self.agent.env.get_observation_space()["rgb_gripper"]})
+        self.model.make_enc_dec(model, ob_space)
+
+        # self.model_target = hydra.utils.instantiate(model).to(self.device)
+        # self.model_target.make_enc_dec(model, ob_space)
+        # self.model_target.load_state_dict(self.model.state_dict())
         self.model_tau = model_tau
         self.model_lr = model_lr
 
         # Actor
-        actor.input_dim = model.state_dim
+        actor.input_dim = self.model.state_dim + self.skill_vector_size
         actor.action_dim = self.action_dim
         self.actor = hydra.utils.instantiate(actor)  # .to(self.device)
         self.actor.set_action_space(self.action_space)
-        self.actor.set_encoder(self.encoder)
+        # self.actor.set_encoder(self.encoder)
 
         # Critic
         self.critic_tau = critic_tau
-        critic.input_dim = model.state_dim + self.action_dim
+        critic.input_dim = self.model.state_dim + self.skill_vector_size + self.action_dim
         self.critic = hydra.utils.instantiate(critic)  # .to(device)
 
         self.critic_target = hydra.utils.instantiate(critic)  # .to(device)
@@ -119,6 +116,13 @@ class TaskModel(pl.LightningModule):
         # PyTorch Lightning
         self.automatic_optimization = False
         self.save_hyperparameters()
+
+        # Torch compile
+        # self.actor = torch.compile(self.actor)
+        # self.critic = torch.compile(self.critic)
+        # self.critic_target = torch.compile(self.critic_target)
+        # self.model = torch.compile(self.model)
+        # self.model_target = torch.compile(self.model_target)
 
     def configure_optimizers(self):
         """Initialize optimizers"""
@@ -171,7 +175,7 @@ class TaskModel(pl.LightningModule):
             self.log(key, val, on_step=on_step, on_epoch=on_epoch)
 
     def log_image(self, image: torch.Tensor, name: str):
-        pil_image = Image.fromarray(image.permute(1, 2, 0).cpu().numpy().astype(np.uint8))
+        pil_image = Image.fromarray(image.cpu().numpy().astype(np.uint8))
         self.logger.experiment.log({name: [wandb.Image(pil_image)]})
 
     def log_video(self, video_path, name: str):

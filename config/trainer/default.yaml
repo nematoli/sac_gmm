@@ -3,7 +3,7 @@ accelerator: gpu
 devices: 1 #auto
 strategy: auto #"ddp", "ddp_spawn", "deepspeed"
 precision: 32
-max_epochs: 100000
+max_epochs: 1000000 # This is the number of episodes but the programs stops when the max_env_steps is reached
 max_steps: -1 # 8e4 will get you just over 8.5K episodes
 log_every_n_steps:       1             #help='print/disp/save frequency'
 resume_from_checkpoint:  null            #help='path to latest checkpoint'

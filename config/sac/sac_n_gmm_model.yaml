@@ -3,7 +3,7 @@ defaults:
   - encoder: default
   - actor: default
   - critic: default
-  - model: default
+  - model: dreamer
   - replay_buffer: replay_buffer_task
 
 _target_: sac_gmm.models.sac_n_gmm_model.SACNGMM

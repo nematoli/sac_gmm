@@ -21,13 +21,6 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-class SKILLS(Enum):
-    open_drawer = 0
-    turn_on_lightbulb = 1
-    move_slider_left = 2
-    turn_on_led = 3
-
-
 class CALVIN_SACNGMMAgent(Agent):
     def __init__(
         self,
@@ -99,6 +92,7 @@ class CALVIN_SACNGMMAgent(Agent):
         self.skill_id = self.task.skills.index(self.env.target_skill)
 
         self.nan_counter = 0
+        self.one_hot_skill_vector = False
 
     @torch.no_grad()
     def play_step(self, refine_actor, model, strategy="stochastic", replay_buffer=None, device="cuda", critic=None):
@@ -295,22 +289,27 @@ class CALVIN_SACNGMMAgent(Agent):
         change_dict = {"mu": mu, "priors": priors}
         self.skill_actor.update_model(change_dict, skill_id)
 
+    def get_skill_vector(self, skill_id, device="cuda"):
+        if type(skill_id) is int:  # When skill_id is of shape (Batch x 1)
+            if self.one_hot_skill_vector:
+                skill_vector = torch.eye(len(self.task.skills))[skill_id]
+            else:
+                skill_vector = self.skill_params_stacked[skill_id].squeeze(0)
+        else:
+            if self.one_hot_skill_vector:
+                skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()]
+            else:
+                skill_vector = self.skill_params_stacked[skill_id[:, 0].cpu().int()]
+        return skill_vector.to(device)
+
     def get_state_from_observation(self, encoder, obs, skill_id, device="cuda"):
+        skill_vector = self.get_skill_vector(skill_id, device=device)
         if isinstance(obs, dict):
             # Robot obs
             if "state" in obs:
                 name = "state"
             elif "robot_obs" in obs:
                 name = "robot_obs"
-
-            if obs[name].ndim > 1:  # When obs is of shape (Batch x obs_dim)
-                # fc_input = torch.tensor(obs[name][:, :]).to(device)
-                # skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()].to(device)
-                skill_vector = self.skill_params_stacked[skill_id[:, 0].cpu().int()].to(device)
-            else:
-                # fc_input = torch.tensor(obs[name]).to(device)
-                # skill_vector = torch.eye(len(self.task.skills))[skill_id].to(device)
-                skill_vector = self.skill_params_stacked[skill_id].squeeze(0).to(device)
             # RGB obs
             if "rgb_gripper" in obs:
                 x = obs["rgb_gripper"]
@@ -330,7 +329,7 @@ class CALVIN_SACNGMMAgent(Agent):
             fc_input = torch.cat((fc_input, skill_vector.squeeze()), dim=-1).to(device)
             return fc_input.float()
 
-        return obs.float()
+        return skill_vector
 
     def get_action(self, actor, model, skill_id, observation, strategy="stochastic", device="cuda"):
         """Interface to get action from SAC Actor,
@@ -347,10 +346,11 @@ class CALVIN_SACNGMMAgent(Agent):
             deterministic = True
         else:
             raise Exception("Strategy not implemented")
-        input_state = self.get_state_from_observation(actor.encoder, observation, skill_id, device)
-        # enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
-        # input_state = self.get_state_from_observation(model.encoder, observation, skill_id, device)
-        action, _ = actor.get_actions(input_state, deterministic=deterministic, reparameterize=False)
+        skill_vector = self.get_skill_vector(skill_id, device)
+        img_tensor = torch.from_numpy(observation["rgb_gripper"]).to(device)
+        enc_ob = model.encoder({"obs": img_tensor.float()}).squeeze(0)
+        actor_input = torch.cat((enc_ob, skill_vector), dim=-1).to(device).float()
+        action, _ = actor.get_actions(actor_input, deterministic=deterministic, reparameterize=False)
         actor.train()
         model.train()
         return action.detach().cpu().numpy()
