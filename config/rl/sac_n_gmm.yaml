@@ -1,0 +1,10 @@
+defaults:
+  - default
+  - encoder: default
+  - actor: default
+  - critic: default
+  - model: dreamer
+  - replay_buffer: replay_buffer_task
+
+_target_: sac_gmm.rl.sac_n_gmm.SACNGMM
+_recursive_: false

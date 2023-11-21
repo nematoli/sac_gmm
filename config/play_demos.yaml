@@ -1,6 +1,6 @@
 defaults:
   - setup
-  - skill_setup
+  - setup_single_skill
   - datamodule: calvin_ds5
 
 

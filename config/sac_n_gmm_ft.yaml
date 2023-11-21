@@ -1,9 +1,9 @@
 defaults:
   - setup
-  - incr_skill_setup
+  - setup_task
   - callbacks: default
   - datamodule: calvin_ds2
-  - sac: sac_n_gmm_ft_model
+  - rl: sac_n_gmm_ft
   - agent: sac_n_gmm_ft_calvin
   - logger: wandb
   - trainer: default
@@ -25,9 +25,12 @@ task_order: "ABCD"
 agent: 
   sparse_reward: false
 
+# Experiment length
+max_env_steps: 1e6
+
 # evaluation frequency:
 eval_frequency: 25
-num_init_steps: 256
+num_init_steps: 32
 num_eval_episodes: 10
 
 # Dataset params:
@@ -45,8 +48,9 @@ record: true
 # model_ckpt: "logs/sac-n-gmm-train/2023_11_03/16_40_49/model_weights/last.ckpt"
 # rb_dir: "logs/sac-n-gmm-train/2023_11_03/16_40_49/replay_buffer/"
 
-model_ckpt: "logs/sac-n-gmm-train/2023_11_09/17_46_03/model_weights/last.ckpt"
-rb_dir: "logs/sac-n-gmm-train/2023_11_09/17_46_03/replay_buffer/"
+# model_ckpt: "logs/sac-n-gmm-train/2023_11_16/18_24_08/model_weights/last.ckpt"
+model_ckpt: "logs/sac-n-gmm-train/2023_11_16/21_00_24/model_weights/episode_number=0_total-env-steps=600531.0_episode_avg_return=0-v1.ckpt"
+rb_dir: null # "logs/sac-n-gmm-train/2023_11_13/14_47_07/replay_buffer/"
 
 # Logging
 logger:

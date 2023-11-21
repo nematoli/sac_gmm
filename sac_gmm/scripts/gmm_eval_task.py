@@ -14,8 +14,8 @@ from pytorch_lightning.utilities import rank_zero_only
 from pytorch_lightning import seed_everything
 from sac_gmm.utils.utils import print_system_env_info, setup_logger
 from sac_gmm.utils.env_maker import make_env
-from sac_gmm.models.gmm.utils.rotation_utils import get_relative_quaternion
-from sac_gmm.models.skill_actor import SkillActor
+from sac_gmm.gmm.utils.rotation_utils import get_relative_quaternion
+from sac_gmm.rl.helpers.skill_actor import SkillActor
 from collections import Counter
 
 cwd_path = Path(__file__).absolute().parents[0]

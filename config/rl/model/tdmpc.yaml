@@ -1,0 +1,58 @@
+_target_: sac_gmm.networks.model.tdmpc_model.TDMPCModel
+_recursive_: false
+
+input_dim: ??
+state_dim: 512
+ac_dim: ??
+num_units: 256
+num_layers: 4
+dense_act: elu
+# weight_decay: 0.0
+# log_std: false
+# lstm: true
+# lstm_units: 128
+
+cfg:
+  model: 1
+  reward: 0.5
+  value: 0.1
+  cosistency: 2
+  rho: 0.5
+  encoder_kl: 0.0001
+  model_target_update_freq: 2
+
+encoder_cfg:
+  
+  image_shape: [84, 84, 3]
+  kernel_size: [4, 4, 4, 4, 2]
+  stride: [2, 2, 2, 2, 2]
+  conv_dim: [32, 64, 128, 256, 512]
+  # image_shape: [64, 64, 3]
+  # kernel_size: [4, 4, 4, 4]
+  # stride: [2, 2, 2, 2]
+  # image_shape: [32, 32, 3]
+  # kernel_size: [4, 4, 4, 2]
+  # stride: [2, 2, 2, 1]
+  # conv_dim: [32, 64, 128, 256]
+  cnn_act: relu
+  embed_dim: ${..num_units}
+  hidden_dims: []
+  dense_act: elu
+
+decoder_cfg:
+  image_shape: [84, 84, 3]
+  kernel_size: [5, 5, 4, 6]
+  stride: [2, 2, 3, 2]
+  conv_dim: [1024, 128, 64, 32]
+  # image_shape: [64, 64, 3]
+  # kernel_size: [5, 5, 6, 6]
+  # stride: [2, 2, 2, 2]
+  # image_shape: [32, 32, 3]
+  # kernel_size: [5, 5, 6, 3]
+  # stride: [2, 2, 2, 1]
+  # conv_dim: [1024, 128, 64, 32]
+  cnn_act: relu
+  hidden_dims:
+    - ${...num_units}
+    - ${...num_units}
+  dense_act: elu

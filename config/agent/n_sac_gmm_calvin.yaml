@@ -1,4 +1,4 @@
-_target_: sac_gmm.models.agent.calvin.n_sac_gmm_calvin.CALVIN_NSACGMMAgent
+_target_: sac_gmm.rl.agent.calvin.n_sac_gmm_calvin.CALVIN_NSACGMMAgent
 _recursive_: false
 
 calvin_env: ${env}
@@ -21,6 +21,6 @@ root_dir: ${root}
 render: ${render}
 record: ${record}
 
-sac: ${sac}
+rl: ${rl}
 model_ckpts: ${model_ckpts}
 device: ${device}

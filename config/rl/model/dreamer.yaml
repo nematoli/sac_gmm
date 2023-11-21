@@ -1,0 +1,24 @@
+_target_: sac_gmm.networks.model.dreamer_model.DreamerModel
+_recursive_: false
+
+encoder:
+  image_shape: [64, 64, 3]
+  kernel_size: [4, 4, 4, 4]
+  stride: [2, 2, 2, 2]
+  conv_dim: [3, 32, 64, 128, 256]
+  cnn_act: silu
+  hidden_dims: [512, 512]
+  dense_act: silu
+  symlog: true
+
+decoder:
+  image_shape: [64, 64, 3]
+  seed_shape: [4, 4, 256]
+  kernel_size: [4, 4, 4, 4]
+  stride: [2, 2, 2, 2]
+  conv_dim: [256, 128, 64, 32, 3]
+  cnn_act: silu
+  hidden_dims: [512, 512]
+  dense_act: silu
+  image_loss: mse
+  state_loss: symlog_mse

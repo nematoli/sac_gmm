@@ -1,9 +1,9 @@
 defaults:
   - setup
-  - skill_setup
+  - setup_single_skill
   - callbacks: default
   - datamodule: calvin_ds2
-  - sac: sac_gmm_model
+  - rl: sac_gmm
   - agent: sac_gmm_calvin
   - logger: wandb
   - trainer: default

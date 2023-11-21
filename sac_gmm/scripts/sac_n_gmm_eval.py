@@ -8,8 +8,6 @@ from pytorch_lightning import seed_everything, Trainer
 from pytorch_lightning.utilities import rank_zero_only
 from sac_gmm.utils.utils import print_system_env_info, setup_logger, setup_callbacks, get_last_checkpoint
 
-import sac_gmm.models.sac_n_gmm_model as models_m
-
 cwd_path = Path(__file__).absolute().parents[0]  # scripts
 sac_gmm_path = cwd_path.parents[0]
 root = sac_gmm_path.parents[0]
@@ -46,14 +44,10 @@ def eval(cfg: DictConfig) -> None:
     log_rank_0(print_system_env_info())
     chk = get_last_checkpoint(model_dir)
 
-    # Load Model
-    if chk is not None:
-        model = getattr(models_m, cfg.sac["_target_"].split(".")[-1]).load_from_checkpoint(chk.as_posix())
-    else:
-        agent = hydra.utils.instantiate(cfg.agent)
-        model = hydra.utils.instantiate(cfg.sac, agent=agent)
+    agent = hydra.utils.instantiate(cfg.agent)
+    algo = hydra.utils.instantiate(cfg.rl, agent=agent)
 
-    model.evaluate()
+    algo.evaluate()
 
 
 if __name__ == "__main__":

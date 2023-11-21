@@ -1,6 +1,6 @@
 defaults:
   - setup
-  - incr_skill_setup
+  - setup_task
   - datamodule: calvin_ds2
   - logger: wandb
 

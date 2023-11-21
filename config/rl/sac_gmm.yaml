@@ -1,0 +1,9 @@
+defaults:
+  - default
+  - encoder: default
+  - actor: default
+  - critic: default
+  - replay_buffer: default
+
+_target_: sac_gmm.rl.sac_gmm.SACGMM
+_recursive_: false
