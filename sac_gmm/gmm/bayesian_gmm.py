@@ -1,7 +1,6 @@
 from sklearn.mixture import BayesianGaussianMixture
-from sac_gmm.gmm.utils.gmr.gmr import GMM
+from gmr import GMM
 from sac_gmm.gmm.base_gmm import BaseGMM
-from sac_gmm.gmm.batch_gmm import BatchGMM
 import numpy as np
 import logging
 from pathlib import Path
@@ -71,22 +70,6 @@ class BayesianGMM(BaseGMM):
         super().copy_model(gmm)
         self.gmm.means = self.means
         self.gmm.priors = self.priors
-
-    def batch_predict(self, batch_priors, batch_means, batch_covariances, batch_x):
-        """
-        Batch Predict function for BayesianGMM
-
-        Along the batch dimension, you have different means, covariances, and priors and input.
-        The function outputs the predicted delta x for each batch.
-        """
-        batch_condition = BatchGMM(
-            n_components=self.n_components,
-            priors=batch_priors,
-            means=batch_means,
-            covariances=batch_covariances,
-            random_state=self.random_state,
-        ).condition([0, 1, 2], batch_x)
-        return batch_condition.one_sample_confidence_region(alpha=0.7)
 
     def predict1(self, x):
         cgmm = self.gmm.condition([0, 1, 2], x[:3].reshape(1, -1))

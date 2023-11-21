@@ -1,5 +1,5 @@
 import numpy as np
-from .utils.gmr.gmr.utils import check_random_state
+from gmr.utils import check_random_state
 import scipy as sp
 from scipy.stats import chi2, norm
 import torch
