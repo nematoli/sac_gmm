@@ -81,10 +81,46 @@ class SACNGMM(TaskModel):
         self.soft_update(self.critic_target, self.critic, self.critic_tau)
         # self.soft_update(self.model_target, self.model, self.model_tau)
 
+    def evaluation_step(self):
+        metrics = {}
+        eval_accuracy, eval_return, eval_length, eval_skill_ids, eval_video_paths = self.agent.evaluate(
+            self.actor, self.model
+        )
+        eval_metrics = {
+            "eval/accuracy": eval_accuracy,
+            "eval/episode-avg-return": eval_return,
+            "eval/episode-avg-length": eval_length,
+            "eval/total-env-steps": self.agent.total_env_steps,
+            "eval/nan-counter": self.agent.nan_counter,
+            "eval/episode-number": self.episode_idx,
+            # The following are for lightning to save checkpoints
+            "accuracy": round(eval_accuracy, 3),
+            "episode_number": self.episode_idx,
+            "total-env-steps": self.agent.total_env_steps,
+        }
+        metrics.update(eval_metrics)
+        # Log the skill distribution
+        if len(eval_skill_ids) > 0:
+            skill_id_counts = Counter(eval_skill_ids)
+            skill_ids = {
+                f"eval/{self.agent.task.skills[k]}": v / self.agent.num_eval_episodes
+                for k, v in skill_id_counts.items()
+            }
+            # Add 0 values for skills that were not used at all
+            unused_skill_ids = set(range(len(self.agent.task.skills))) - set(skill_id_counts.keys())
+            if len(unused_skill_ids) > 0:
+                skill_ids.update({f"eval/{self.agent.task.skills[k]}": 0 for k in list(unused_skill_ids)})
+        else:
+            skill_ids = {f"eval/{k}": 0 for k in self.agent.task.skills}
+        metrics.update(skill_ids)
+        # Log the video GIF to wandb if exists
+        return metrics, eval_video_paths
+
     def on_train_epoch_end(self):
         if self.episode_done:
-            metrics = {"eval/episode-avg-return": float("-inf")}
-            metrics = {"episode-avg-return": float("-inf")}
+            video_paths = None
+            metrics = {"eval/accuracy": float("-inf")}
+            metrics = {"accuracy": float("-inf")}
             log_rank_0(f"Episode Done: {self.episode_idx}")
             train_metrics = {
                 "train/episode-return": self.episode_return,
@@ -95,51 +131,24 @@ class SACNGMM(TaskModel):
                 "train/total-env-steps": self.agent.total_env_steps,
             }
             metrics.update(train_metrics)
-            eval_return = float("-inf")
-            eval_accuracy = float("-inf")
+
             if self.episode_idx % self.eval_frequency == 0:
-                eval_accuracy, eval_return, eval_length, eval_skill_ids, eval_video_paths = self.agent.evaluate(
-                    self.actor, self.model
-                )
-                eval_metrics = {
-                    "eval/accuracy": eval_accuracy,
-                    "eval/episode-avg-return": eval_return,
-                    "eval/episode-avg-length": eval_length,
-                    "eval/total-env-steps": self.agent.total_env_steps,
-                    "eval/nan-counter": self.agent.nan_counter,
-                    "eval/episode-number": self.episode_idx,
-                    # The following are for lightning to save checkpoints
-                    "episode-avg-return": eval_return,
-                    "episode-number": self.episode_idx,
-                    "total-env-steps": self.agent.total_env_steps,
-                }
+                eval_metrics, video_paths = self.evaluation_step()
                 metrics.update(eval_metrics)
-                # Log the skill distribution
-                if len(eval_skill_ids) > 0:
-                    skill_id_counts = Counter(eval_skill_ids)
-                    skill_ids = {
-                        f"eval/{self.agent.task.skills[k]}": v / self.agent.num_eval_episodes
-                        for k, v in skill_id_counts.items()
-                    }
-                    # Add 0 values for skills that were not used at all
-                    unused_skill_ids = set(range(len(self.agent.task.skills))) - set(skill_id_counts.keys())
-                    if len(unused_skill_ids) > 0:
-                        skill_ids.update({f"eval/{self.agent.task.skills[k]}": 0 for k in list(unused_skill_ids)})
-                else:
-                    skill_ids = {f"eval/{k}": 0 for k in self.agent.task.skills}
-                metrics.update(skill_ids)
-                # Log the video GIF to wandb if exists
-                if eval_video_paths is not None and len(eval_video_paths.keys()) > 0:
-                    for skill_name, video_path in eval_video_paths.items():
-                        self.log_video(video_path, f"eval/{skill_name}_video")
 
             self.episode_return, self.episode_play_steps = 0, 0
             self.episode_idx += 1
-
             self.replay_buffer.save()
-            self.log_metrics(metrics, on_step=False, on_epoch=True)
+
+            # Programs exits when maximum env steps is reached
+            # Before exiting, logs the evaluation metrics and videos
             if self.agent.total_env_steps > self.max_env_steps:
+                if self.episode_idx % self.eval_frequency != 0:
+                    eval_metrics, video_paths = self.evaluation_step()
+                    metrics.update(eval_metrics)
+                self.log_metrics_and_videos(metrics, video_paths)
                 raise KeyboardInterrupt
+            self.log_metrics_and_videos(metrics, video_paths)
 
     def loss(self, batch):
         critic_optimizer, actor_optimizer, alpha_optimizer, model_optimizer = self.optimizers()

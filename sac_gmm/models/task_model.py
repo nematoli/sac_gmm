@@ -83,16 +83,16 @@ class TaskModel(pl.LightningModule):
         # Actor
         actor.input_dim = self.model.state_dim + self.skill_vector_size
         actor.action_dim = self.action_dim
-        self.actor = hydra.utils.instantiate(actor)  # .to(self.device)
+        self.actor = hydra.utils.instantiate(actor).to(self.device)
         self.actor.set_action_space(self.action_space)
         # self.actor.set_encoder(self.encoder)
 
         # Critic
         self.critic_tau = critic_tau
         critic.input_dim = self.model.state_dim + self.skill_vector_size + self.action_dim
-        self.critic = hydra.utils.instantiate(critic)  # .to(device)
+        self.critic = hydra.utils.instantiate(critic).to(self.device)
 
-        self.critic_target = hydra.utils.instantiate(critic)  # .to(device)
+        self.critic_target = hydra.utils.instantiate(critic).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # Entropy: Set target entropy to -|A|
@@ -169,6 +169,14 @@ class TaskModel(pl.LightningModule):
         for key, val in loss.items():
             if loss[key] != 0:
                 self.log(key, loss[key], on_step=True, on_epoch=False)
+
+    def log_metrics_and_videos(self, metrics, video_paths):
+        self.log_metrics(metrics, on_step=False, on_epoch=True)
+
+        # Log the video GIF to wandb if exists
+        if video_paths is not None and len(video_paths.keys()) > 0:
+            for skill_name, video_path in video_paths.items():
+                self.log_video(video_path, f"eval/{skill_name}_video")
 
     def log_metrics(self, metrics: Dict[str, torch.Tensor], on_step: bool, on_epoch: bool):
         for key, val in metrics.items():
