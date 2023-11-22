@@ -14,14 +14,13 @@ from .utils.distributions import Bernoulli, Symlog, SymlogDiscrete
 class DreamerModel(nn.Module):
     """DreamerV3's Observation Encoder and Decoder."""
 
-    def __init__(self, encoder, decoder):
+    def __init__(self, encoder, decoder, state_dim):
         super().__init__()
         self.state_dim = 0
 
-    def make_enc_dec(self, cfg, ob_space, dtype=torch.float64):
-        self.encoder = Encoder(cfg.encoder, ob_space)
-        self.state_dim = self.encoder.output_dim
-        self.decoder = Decoder(cfg.decoder, self.state_dim, ob_space)
+    def make_enc_dec(self, cfg, ob_space, state_dim, dtype=torch.float64):
+        self.encoder = Encoder(cfg.encoder, ob_space, state_dim)
+        self.decoder = Decoder(cfg.decoder, state_dim, ob_space)
 
     def load_state_dict(self, ckpt):
         try:
@@ -34,7 +33,7 @@ class DreamerModel(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, cfg, ob_space):
+    def __init__(self, cfg, ob_space, state_dim):
         super().__init__()
         self._ob_space = ob_space
         self.encoders = nn.ModuleDict()
@@ -59,10 +58,13 @@ class Encoder(nn.Module):
             else:
                 raise ValueError("Observations should be either vectors or RGB images")
             self.output_dim += self.encoders[k].output_dim
+        self.fc = MLP(self.output_dim, state_dim, [], cfg.dense_act)
+        self.act = get_activation(cfg.dense_act)
+        self.output_dim = state_dim
 
     def forward(self, ob):
-        embeddings = [self.encoders[k](v) for k, v in ob.items()]
-        return torch.cat(embeddings, -1)
+        embeddings = [self.act(self.encoders[k](v)) for k, v in ob.items()]
+        return self.fc(torch.cat(embeddings, -1))
 
 
 class DenseEncoder(nn.Module):

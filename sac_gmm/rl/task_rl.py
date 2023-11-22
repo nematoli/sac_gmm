@@ -72,7 +72,7 @@ class TaskRL(pl.LightningModule):
         self.model = hydra.utils.instantiate(model).to(self.device)
         # ob_space = gym.spaces.Dict({"obs": gym.spaces.Box(low=-1, high=1, shape=(model.input_dim,))})
         ob_space = gym.spaces.Dict({"obs": self.agent.env.get_observation_space()["rgb_gripper"]})
-        self.model.make_enc_dec(model, ob_space)
+        self.model.make_enc_dec(model, ob_space, model.state_dim)
 
         # self.model_target = hydra.utils.instantiate(model).to(self.device)
         # self.model_target.make_enc_dec(model, ob_space)
@@ -81,7 +81,7 @@ class TaskRL(pl.LightningModule):
         self.model_lr = model_lr
 
         # Actor
-        actor.input_dim = self.model.state_dim + self.skill_vector_size
+        actor.input_dim = model.state_dim + self.skill_vector_size
         actor.action_dim = self.action_dim
         self.actor = hydra.utils.instantiate(actor).to(self.device)
         self.actor.set_action_space(self.action_space)
@@ -89,7 +89,7 @@ class TaskRL(pl.LightningModule):
 
         # Critic
         self.critic_tau = critic_tau
-        critic.input_dim = self.model.state_dim + self.skill_vector_size + self.action_dim
+        critic.input_dim = model.state_dim + self.skill_vector_size + self.action_dim
         self.critic = hydra.utils.instantiate(critic).to(self.device)
 
         self.critic_target = hydra.utils.instantiate(critic).to(self.device)

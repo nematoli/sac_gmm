@@ -79,7 +79,6 @@ class SACNGMM(TaskRL):
         losses = self.loss(self.check_batch(batch))
         self.log_loss(losses)
         self.soft_update(self.critic_target, self.critic, self.critic_tau)
-        # self.soft_update(self.model_target, self.model, self.model_tau)
 
     def evaluation_step(self):
         metrics = {}
@@ -188,9 +187,10 @@ class SACNGMM(TaskRL):
             q_target = batch_rewards + (1 - batch_dones) * self.discount * (q_next_target - self.alpha * log_pi)
 
         # Bellman loss
-        skill_vector = self.agent.get_skill_vector(batch_skill_ids)
-        enc_ob = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()}).squeeze(0)
-        actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
+        with torch.no_grad():
+            skill_vector = self.agent.get_skill_vector(batch_skill_ids)
+            enc_ob = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()}).squeeze(0)
+            actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
         q1_pred, q2_pred = self.critic(actor_input, batch_actions.float())
         bellman_loss = F.mse_loss(q1_pred, q_target) + F.mse_loss(q2_pred, q_target)
 
@@ -203,9 +203,10 @@ class SACNGMM(TaskRL):
     def compute_actor_and_alpha_loss(self, batch, actor_optimizer, alpha_optimizer):
         batch_obs = batch[0]
         batch_skill_ids = batch[1]
-        skill_vector = self.agent.get_skill_vector(batch_skill_ids)
-        enc_ob = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()}).squeeze(0)
-        actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
+        with torch.no_grad():
+            skill_vector = self.agent.get_skill_vector(batch_skill_ids)
+            enc_ob = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()}).squeeze(0)
+            actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
         policy_actions, log_pi = self.actor.get_actions(actor_input, deterministic=False, reparameterize=True)
         q1, q2 = self.critic(actor_input, policy_actions)
         Q_value = torch.min(q1, q2)
