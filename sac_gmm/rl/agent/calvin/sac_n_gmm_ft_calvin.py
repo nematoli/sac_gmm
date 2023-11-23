@@ -103,11 +103,12 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
         self.record = record
 
         self.reset()
-        self.skill_id = self.env.start_skill
+        self.skill_id = 0
 
         self.root_dir = root_dir
 
         self.nan_counter = 0
+        self.one_hot_skill_vector = False
 
     @torch.no_grad()
     def play_step(self, refine_actor, model, strategy="stochastic", replay_buffer=None, device="cuda", critic=None):
@@ -144,12 +145,10 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
             if done:
                 break
 
-        if self.episode_env_steps >= (self.task.skill_max_steps * (len(self.task.skills) - self.env.start_skill)):
+        if self.episode_env_steps >= self.task.max_steps:
             done = True
 
-        if done and (
-            self.episode_env_steps < (self.task.skill_max_steps * (len(self.task.skills) - self.env.start_skill))
-        ):
+        if done and self.episode_env_steps < self.task.max_steps:
             # If the episode is done, the self.skill_counter rotates back to 0
             # but this is not the true next skill, so we need to set it to the actual last skill of the task
             next_skill_id = len(self.task.skills) - 1
@@ -164,7 +163,7 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
 
         if done or not conn:
             self.reset()
-            self.skill_id = self.env.start_skill
+            self.skill_id = 0
         return gmm_reward, done
 
     @torch.no_grad()
@@ -179,7 +178,7 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
         for episode in tqdm(range(1, self.num_eval_episodes + 1)):
             skill_id = 0
             episode_return, episode_env_steps = 0, 0
-            self.obs = self.env.reset(start_skill=0)
+            self.obs = self.env.reset()
             # log_rank_0(f"Skill: {skill} - Obs: {self.obs['robot_obs']}")
             # Recording setup
             if self.record and (episode == rand_idx):
@@ -218,7 +217,7 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
                         break
 
                 if done:
-                    self.reset(start_skill=0)
+                    self.reset()
                     skill_id = 0
                     break
 
@@ -311,22 +310,27 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
         #     change_dict["sigma"] = gmm_change[size_priors + size_mu :] * parameter_space["sigma"].high
         self.skill_actor.update_model(change_dict, skill_id)
 
+    def get_skill_vector(self, skill_id, device="cuda"):
+        if type(skill_id) is int:  # When skill_id is of shape (Batch x 1)
+            if self.one_hot_skill_vector:
+                skill_vector = torch.eye(len(self.task.skills))[skill_id]
+            else:
+                skill_vector = self.skill_params_stacked[skill_id].squeeze(0)
+        else:
+            if self.one_hot_skill_vector:
+                skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()]
+            else:
+                skill_vector = self.skill_params_stacked[skill_id[:, 0].cpu().int()]
+        return skill_vector.to(device)
+
     def get_state_from_observation(self, encoder, obs, skill_id, device="cuda"):
+        skill_vector = self.get_skill_vector(skill_id, device=device)
         if isinstance(obs, dict):
             # Robot obs
             if "state" in obs:
                 name = "state"
             elif "robot_obs" in obs:
                 name = "robot_obs"
-
-            if obs[name].ndim > 1:  # When obs is of shape (Batch x obs_dim)
-                # fc_input = torch.tensor(obs[name][:, :]).to(device)
-                # skill_vector = torch.eye(len(self.task.skills))[skill_id[:, 0].cpu().int()]
-                skill_vector = self.skill_params_stacked[skill_id[:, 0].cpu().int()].to(device)
-            else:
-                # fc_input = torch.tensor(obs[name]).to(device)
-                # skill_vector = torch.eye(len(self.task.skills))[skill_id]
-                skill_vector = self.skill_params_stacked[skill_id].squeeze(0).to(device)
             # RGB obs
             if "rgb_gripper" in obs:
                 x = obs["rgb_gripper"]
@@ -346,7 +350,7 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
             fc_input = torch.cat((fc_input, skill_vector.squeeze()), dim=-1).to(device)
             return fc_input.float()
 
-        return obs.float()
+        return skill_vector
 
     def get_action(self, actor, model, skill_id, observation, strategy="stochastic", device="cuda"):
         """Interface to get action from SAC Actor,
@@ -363,10 +367,12 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
             deterministic = True
         else:
             raise Exception("Strategy not implemented")
-        input_state = self.get_state_from_observation(actor.encoder, observation, skill_id, device)
-        # enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
-        # input_state = self.get_state_from_observation(model.encoder, observation, skill_id, device)
-        action, _ = actor.get_actions(input_state, deterministic=deterministic, reparameterize=False)
+        with torch.no_grad():
+            skill_vector = self.get_skill_vector(skill_id, device)
+            img_tensor = torch.from_numpy(observation["rgb_gripper"]).to(device)
+            enc_ob = model.encoder({"obs": img_tensor.float()}).squeeze(0)
+            actor_input = torch.cat((enc_ob, skill_vector), dim=-1).to(device).float()
+            action, _ = actor.get_actions(actor_input, deterministic=deterministic, reparameterize=False)
         actor.train()
         model.train()
         return action.detach().cpu().numpy()

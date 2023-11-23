@@ -345,11 +345,12 @@ class CALVIN_SACNGMMAgent(BaseAgent):
             deterministic = True
         else:
             raise Exception("Strategy not implemented")
-        skill_vector = self.get_skill_vector(skill_id, device)
-        img_tensor = torch.from_numpy(observation["rgb_gripper"]).to(device)
-        enc_ob = model.encoder({"obs": img_tensor.float()}).squeeze(0)
-        actor_input = torch.cat((enc_ob, skill_vector), dim=-1).to(device).float()
-        action, _ = actor.get_actions(actor_input, deterministic=deterministic, reparameterize=False)
+        with torch.no_grad():
+            skill_vector = self.get_skill_vector(skill_id, device)
+            img_tensor = torch.from_numpy(observation["rgb_gripper"]).to(device)
+            enc_ob = model.encoder({"obs": img_tensor.float()}).squeeze(0)
+            actor_input = torch.cat((enc_ob, skill_vector), dim=-1).to(device).float()
+            action, _ = actor.get_actions(actor_input, deterministic=deterministic, reparameterize=False)
         actor.train()
         model.train()
         return action.detach().cpu().numpy()

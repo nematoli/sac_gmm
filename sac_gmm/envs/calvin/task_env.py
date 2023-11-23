@@ -31,6 +31,8 @@ class CalvinTaskEnv(PlayTableSimEnv):
         self.cameras_c = pt_cfg["cameras"]
         super().__init__(**pt_cfg)
 
+        self.gripper_width = 64
+
         self.action_space = self.get_action_space()
         self.observation_space = self.get_observation_space()
 
@@ -60,10 +62,12 @@ class CalvinTaskEnv(PlayTableSimEnv):
         return gym.spaces.Box(low=-1, high=1, shape=(7,))
 
     def get_observation_space(self):
-        """Return only position and gripper_width by default"""
+        """Return 7-dim robot obs and a gripper image by default"""
         observation_space = {}
         observation_space["robot_obs"] = gym.spaces.Box(low=-1, high=1, shape=(7,))
-        observation_space["rgb_gripper"] = gym.spaces.Box(low=-1, high=1, shape=(64, 64, 3))
+        observation_space["rgb_gripper"] = gym.spaces.Box(
+            low=-1, high=1, shape=(self.gripper_width, self.gripper_width, 3)
+        )
         return gym.spaces.Dict(observation_space)
 
     def get_obs(self):
@@ -71,13 +75,10 @@ class CalvinTaskEnv(PlayTableSimEnv):
 
         nobs = {}
         nobs["robot_obs"] = obs["robot_obs"][:7]
-        nobs["rgb_gripper"] = np.moveaxis(obs["rgb_obs"]["rgb_gripper"], 2, 0)
+        nobs["rgb_gripper"] = cv2.resize(
+            obs["rgb_obs"]["rgb_gripper"], (self.gripper_width, self.gripper_width), interpolation=cv2.INTER_AREA
+        )
         return nobs
-
-    def object_position(self, obj):
-        base = self.scene.fixed_objects[0]
-        ln = self.p.getJointInfo(base.uid, obj.joint_index, physicsClientId=self.cid)[12].decode()
-        return np.array(self.p.getLinkState(base.uid, base.get_info()["links"][ln], physicsClientId=self.cid)[0])
 
     def set_task(self, task):
         self.target_tasks = task

@@ -87,10 +87,46 @@ class SACNGMM_FT(TaskRL):
         self.soft_update(self.critic_target, self.critic, self.critic_tau)
         # self.soft_update(self.model_target, self.model, self.model_tau)
 
+    def evaluation_step(self):
+        metrics = {}
+        eval_accuracy, eval_return, eval_length, eval_skill_ids, eval_video_paths = self.agent.evaluate(
+            self.actor, self.model
+        )
+        eval_metrics = {
+            "eval/accuracy": eval_accuracy,
+            "eval/episode-avg-return": eval_return,
+            "eval/episode-avg-length": eval_length,
+            "eval/total-env-steps": self.agent.total_env_steps,
+            "eval/nan-counter": self.agent.nan_counter,
+            "eval/episode-number": self.episode_idx,
+            # The following are for lightning to save checkpoints
+            "accuracy": round(eval_accuracy, 3),
+            "episode_number": self.episode_idx,
+            "total-env-steps": self.agent.total_env_steps,
+        }
+        metrics.update(eval_metrics)
+        # Log the skill distribution
+        if len(eval_skill_ids) > 0:
+            skill_id_counts = Counter(eval_skill_ids)
+            skill_ids = {
+                f"eval/{self.agent.task.skills[k]}": v / self.agent.num_eval_episodes
+                for k, v in skill_id_counts.items()
+            }
+            # Add 0 values for skills that were not used at all
+            unused_skill_ids = set(range(len(self.agent.task.skills))) - set(skill_id_counts.keys())
+            if len(unused_skill_ids) > 0:
+                skill_ids.update({f"eval/{self.agent.task.skills[k]}": 0 for k in list(unused_skill_ids)})
+        else:
+            skill_ids = {f"eval/{k}": 0 for k in self.agent.task.skills}
+        metrics.update(skill_ids)
+        # Log the video GIF to wandb if exists
+        return metrics, eval_video_paths
+
     def on_train_epoch_end(self):
         if self.episode_done:
-            metrics = {"eval/episode-avg-return": float("-inf")}
-            metrics = {"episode-avg-return": float("-inf")}
+            video_paths = None
+            metrics = {"eval/accuracy": float("-inf")}
+            metrics = {"accuracy": float("-inf")}
             log_rank_0(f"Episode Done: {self.episode_idx}")
             train_metrics = {
                 "train/episode-return": self.episode_return,
@@ -101,65 +137,37 @@ class SACNGMM_FT(TaskRL):
                 "train/total-env-steps": self.agent.total_env_steps,
             }
             metrics.update(train_metrics)
-            eval_return = float("-inf")
-            eval_accuracy = float("-inf")
+
             if self.episode_idx % self.eval_frequency == 0:
-                eval_accuracy, eval_return, eval_length, eval_skill_ids, eval_video_paths = self.agent.evaluate(
-                    self.actor, self.model
-                )
-                eval_metrics = {
-                    "eval/accuracy": eval_accuracy,
-                    "eval/episode-avg-return": eval_return,
-                    "eval/episode-avg-length": eval_length,
-                    "eval/total-env-steps": self.agent.total_env_steps,
-                    "eval/nan-counter": self.agent.nan_counter,
-                    "eval/episode-number": self.episode_idx,
-                    # The following are for lightning to save checkpoints
-                    "episode-avg-return": eval_return,
-                    "episode-number": self.episode_idx,
-                    "total-env-steps": self.agent.total_env_steps,
-                }
+                eval_metrics, video_paths = self.evaluation_step()
                 metrics.update(eval_metrics)
-                # Log the skill distribution
-                if len(eval_skill_ids) > 0:
-                    skill_id_counts = Counter(eval_skill_ids)
-                    skill_ids = {
-                        f"eval/{self.agent.task.skills[k]}": v / self.agent.num_eval_episodes
-                        for k, v in skill_id_counts.items()
-                    }
-                    # Add 0 values for skills that were not used at all
-                    unused_skill_ids = set(range(len(self.agent.task.skills))) - set(skill_id_counts.keys())
-                    if len(unused_skill_ids) > 0:
-                        skill_ids.update({f"eval/{self.agent.task.skills[k]}": 0 for k in list(unused_skill_ids)})
-                else:
-                    skill_ids = {f"eval/{k}": 0 for k in self.agent.task.skills}
-                metrics.update(skill_ids)
-                # Log the video GIF to wandb if exists
-                if eval_video_paths is not None:
-                    if type(eval_video_paths) is dict and len(eval_video_paths.keys()) > 0:
-                        for skill_name, video_path in eval_video_paths.items():
-                            self.log_video(video_path, f"eval/{skill_name}_video")
-                    elif type(eval_video_paths) is str:
-                        self.log_video(eval_video_paths, "eval/video")
 
             self.episode_return, self.episode_play_steps = 0, 0
             self.episode_idx += 1
-
             self.replay_buffer.save()
-            self.log_metrics(metrics, on_step=False, on_epoch=True)
+
+            # Programs exits when maximum env steps is reached
+            # Before exiting, logs the evaluation metrics and videos
+            if self.agent.total_env_steps > self.max_env_steps:
+                if self.episode_idx % self.eval_frequency != 0:
+                    eval_metrics, video_paths = self.evaluation_step()
+                    metrics.update(eval_metrics)
+                self.log_metrics_and_videos(metrics, video_paths)
+                raise KeyboardInterrupt
+            self.log_metrics_and_videos(metrics, video_paths)
 
     def loss(self, batch):
         critic_optimizer, actor_optimizer, alpha_optimizer, model_optimizer = self.optimizers()
         critic_loss = self.compute_critic_loss(batch, critic_optimizer)
         actor_loss, alpha_loss = self.compute_actor_and_alpha_loss(batch, actor_optimizer, alpha_optimizer)
-        # model_loss = self.compute_model_loss(batch, model_optimizer)
+        model_loss = self.compute_model_loss(batch, model_optimizer)
 
         losses = {
             "losses/critic": critic_loss,
             "losses/actor": actor_loss,
             "losses/alpha": alpha_loss,
             "losses/alpha_value": self.alpha,
-            # "losses/reconstruction": model_loss["recon_loss"],
+            "losses/reconstruction": model_loss["recon_loss"],
         }
         return losses
 
@@ -175,22 +183,22 @@ class SACNGMM_FT(TaskRL):
         ) = batch
 
         with torch.no_grad():
-            input_state = self.agent.get_state_from_observation(self.encoder, batch_next_obs, batch_next_skill_ids)
-            # input_state = self.agent.get_state_from_observation(
-            # self.model.encoder, batch_next_obs, batch_next_skill_ids
-            # )
-            # enc_state = self.model.encoder({"obs": input_state.float()})
-            policy_actions, log_pi = self.actor.get_actions(input_state, deterministic=False, reparameterize=False)
-            q1_next_target, q2_next_target = self.critic_target(input_state, policy_actions)
+            skill_vector = self.agent.get_skill_vector(batch_next_skill_ids)
+            enc_ob = self.model.encoder({"obs": batch_next_obs["rgb_gripper"].float()}).squeeze(0)
+            actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
+
+            policy_actions, log_pi = self.actor.get_actions(actor_input, deterministic=False, reparameterize=False)
+            q1_next_target, q2_next_target = self.critic_target(actor_input, policy_actions)
 
             q_next_target = torch.min(q1_next_target, q2_next_target)
             q_target = batch_rewards + (1 - batch_dones) * self.discount * (q_next_target - self.alpha * log_pi)
 
         # Bellman loss
-        input_state = self.agent.get_state_from_observation(self.encoder, batch_obs, batch_skill_ids)
-        # input_state = self.agent.get_state_from_observation(self.model.encoder, batch_obs, batch_skill_ids)
-        # enc_state = self.model.encoder({"obs": input_state.float()})
-        q1_pred, q2_pred = self.critic(input_state, batch_actions.float())
+        with torch.no_grad():
+            skill_vector = self.agent.get_skill_vector(batch_skill_ids)
+            enc_ob = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()}).squeeze(0)
+            actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
+        q1_pred, q2_pred = self.critic(actor_input, batch_actions.float())
         bellman_loss = F.mse_loss(q1_pred, q_target) + F.mse_loss(q2_pred, q_target)
 
         critic_optimizer.zero_grad()
@@ -202,11 +210,12 @@ class SACNGMM_FT(TaskRL):
     def compute_actor_and_alpha_loss(self, batch, actor_optimizer, alpha_optimizer):
         batch_obs = batch[0]
         batch_skill_ids = batch[1]
-        input_state = self.agent.get_state_from_observation(self.encoder, batch_obs, batch_skill_ids)
-        # input_state = self.agent.get_state_from_observation(self.model.encoder, batch_obs, batch_skill_ids)
-        # enc_state = self.model.encoder({"obs": input_state.float()})
-        policy_actions, log_pi = self.actor.get_actions(input_state, deterministic=False, reparameterize=True)
-        q1, q2 = self.critic(input_state, policy_actions)
+        with torch.no_grad():
+            skill_vector = self.agent.get_skill_vector(batch_skill_ids)
+            enc_ob = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()}).squeeze(0)
+            actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
+        policy_actions, log_pi = self.actor.get_actions(actor_input, deterministic=False, reparameterize=True)
+        q1, q2 = self.critic(actor_input, policy_actions)
         Q_value = torch.min(q1, q2)
         actor_loss = (self.alpha * log_pi - Q_value).mean()
 
@@ -227,33 +236,31 @@ class SACNGMM_FT(TaskRL):
 
         return actor_loss, alpha_loss
 
-    # def compute_model_loss(self, batch, model_optimizer):
-    #     batch_obs = batch[0]
-    #     batch_skill_ids = batch[1]
+    def compute_model_loss(self, batch, model_optimizer):
+        batch_obs = batch[0]
 
-    #     # Reconstruction Loss
-    #     input_state = self.agent.get_state_from_observation(self.encoder, batch_obs, batch_skill_ids, "cuda")
-    #     enc_state = self.model.encoder({"obs": input_state.float()})
-    #     recon_obs = self.model.decoder(enc_state)
-    #     recon_loss = -recon_obs["obs"].log_prob(input_state).mean()
+        # Reconstruction Loss
+        enc_state = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()})
+        recon_obs = self.model.decoder(enc_state)
+        recon_loss = -recon_obs["obs"].log_prob(batch_obs["rgb_gripper"].float()).mean()
 
-    #     model_optimizer.zero_grad()
-    #     self.manual_backward(recon_loss)
-    #     model_optimizer.step()
+        model_optimizer.zero_grad()
+        self.manual_backward(recon_loss)
+        model_optimizer.step()
 
-    #     model_loss_dict = {}
-    #     model_loss_dict["recon_loss"] = recon_loss
+        model_loss_dict = {}
+        model_loss_dict["recon_loss"] = recon_loss
 
-    #     # Visualize Decoded Images
-    #     # if self.episode_done:
-    #     #     if self.episode_idx % self.eval_frequency == 0:
-    #     #         # Log image and decoded image
-    #     #         rand_idx = torch.randint(0, batch_obs["rgb_gripper"].shape[0], (1,)).item()
-    #     #         image = batch_obs["rgb_gripper"][rand_idx].detach()
-    #     #         decoded_image = recon_obs["obs"].mean[rand_idx].detach()
-    #     #         self.log_image(image, "train/image")
-    #     #         self.log_image(decoded_image, "train/decoded_image")
-    #     return model_loss_dict
+        # Visualize Decoded Images
+        if self.episode_done:
+            if self.episode_idx % self.eval_frequency == 0:
+                # Log image and decoded image
+                rand_idx = torch.randint(0, batch_obs["rgb_gripper"].shape[0], (1,)).item()
+                image = batch_obs["rgb_gripper"][rand_idx].detach()
+                decoded_image = recon_obs["obs"].mean[rand_idx].detach()
+                self.log_image(image, "eval/gripper")
+                self.log_image(decoded_image, "eval/decoded_gripper")
+        return model_loss_dict
 
     def load_checkpoint(self, model_ckpt, root_dir):
         """Load pretrained weights of actor and critic"""
@@ -286,13 +293,12 @@ class SACNGMM_FT(TaskRL):
         self.critic_target.load_state_dict(critic_state_dict)
 
         # Get only model related state_dict
-        # model_state_dict = {
-        #     k.replace("model.", ""): v
-        #     for k, v in ckpt["state_dict"].items()
-        #     if k.replace("model.", "") in self.model.state_dict()
-        # }
-        # self.model.load_state_dict(model_state_dict)
-        # self.model_target.load_state_dict(model_state_dict)
+        model_state_dict = {
+            k.replace("model.", ""): v
+            for k, v in ckpt["state_dict"].items()
+            if k.replace("model.", "") in self.model.state_dict()
+        }
+        self.model.load_state_dict(model_state_dict)
 
     def load_replay_buffer(self, replay_buffer_dir, root_dir):
         # Load replay buffer
