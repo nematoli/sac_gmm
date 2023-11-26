@@ -84,8 +84,9 @@ class CALVIN_SACNGMMAgent(BaseAgent):
         self.skill_params_stacked = torch.from_numpy(self.skill_actor.get_all_skill_params(self.initial_gmms))
 
         # Store skill info - starts, goals, fixed_ori, pos_dt, ori_dt
-        self.env.store_skill_info(self.skill_actor.skills)
-        # # record setup
+        # self.env.store_skill_info(self.skill_actor.skills)
+
+        # Record setup
         self.video_dir = os.path.join(exp_dir, "videos")
         os.makedirs(self.video_dir, exist_ok=True)
         self.render = render
@@ -98,7 +99,7 @@ class CALVIN_SACNGMMAgent(BaseAgent):
         self.one_hot_skill_vector = False
 
     @torch.no_grad()
-    def play_step(self, refine_actor, model, strategy="stochastic", replay_buffer=None, device="cuda", critic=None):
+    def play_step(self, refine_actor, model, strategy="stochastic", replay_buffer=None, device="cuda"):
         """Perform a step in the environment and add the transition
         tuple to the replay buffer"""
         # Change dynamical system

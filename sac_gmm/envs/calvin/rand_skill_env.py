@@ -17,9 +17,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-GYM_POSITION_INDICES = np.array([0, 1, 2])
-GYM_ORIENTATION_INDICES = np.array([3, 4, 5])
-
 
 class CalvinRandSkillEnv(PlayTableSimEnv):
     def __init__(self, cfg):

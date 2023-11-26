@@ -10,6 +10,8 @@ from pytorch_lightning.utilities import rank_zero_only
 from sac_gmm.datasets.rl_dataset import RLDataset
 from torch.utils.data import DataLoader
 import wandb
+import gym
+from PIL import Image
 
 
 logger = logging.getLogger(__name__)
@@ -19,6 +21,10 @@ logger = logging.getLogger(__name__)
 def log_rank_0(*args, **kwargs):
     # when using ddp, only log with rank 0 process
     logger.info(*args, **kwargs)
+
+
+OBS_KEY = "rgb_gripper"
+# OBS_KEY = "robot_obs"
 
 
 class SkillRL(pl.LightningModule):
@@ -43,6 +49,9 @@ class SkillRL(pl.LightningModule):
         init_alpha: float,
         fixed_alpha: bool,
         eval_frequency: int,
+        model: DictConfig,
+        model_lr: float,
+        model_tau: float,
     ):
         super(SkillRL, self).__init__()
 
@@ -52,28 +61,33 @@ class SkillRL(pl.LightningModule):
         self.replay_buffer = hydra.utils.instantiate(replay_buffer)
 
         # Encoder
-        self.encoder = hydra.utils.instantiate(encoder)
+        # self.encoder = hydra.utils.instantiate(encoder)
+        self.encoder = None
 
         # Agent
         self.agent = agent
         self.action_space = self.agent.get_action_space()
         self.action_dim = self.action_space.shape[0]
-        self.state_dim = self.agent.get_state_dim(feature_size=self.encoder.feature_size)
+
+        # Model
+        self.model = hydra.utils.instantiate(model)
+        ob_space = gym.spaces.Dict({"obs": self.agent.env.get_observation_space()[OBS_KEY]})
+        self.model.make_enc_dec(model, ob_space, model.state_dim)
+        self.model.to(self.device)
 
         # Actor
-        actor.input_dim = self.state_dim
+        actor.input_dim = model.state_dim
         actor.action_dim = self.action_dim
-        self.actor = hydra.utils.instantiate(actor)  # .to(self.device)
+        self.actor = hydra.utils.instantiate(actor).to(self.device)
         self.actor.set_action_space(self.action_space)
-        self.actor.set_encoder(self.encoder)
+        # self.actor.set_encoder(self.encoder)
 
         # Critic
         self.critic_tau = critic_tau
-        critic.input_dim = self.state_dim + self.action_dim
+        critic.input_dim = model.state_dim + self.action_dim
+        self.critic = hydra.utils.instantiate(critic).to(self.device)
 
-        self.critic = hydra.utils.instantiate(critic)  # .to(device)
-
-        self.critic_target = hydra.utils.instantiate(critic)  # .to(device)
+        self.critic_target = hydra.utils.instantiate(critic).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # Entropy: Set target entropy to -|A|
@@ -84,9 +98,10 @@ class SkillRL(pl.LightningModule):
 
         # Optimizers
         self.critic_lr, self.actor_lr, self.alpha_lr = critic_lr, actor_lr, alpha_lr
+        self.model_lr, self.model_tau = model_lr, model_tau
 
         # Populate Replay Buffer with Random Actions
-        self.agent.populate_replay_buffer(self.actor, None, self.replay_buffer)
+        self.agent.populate_replay_buffer(self.actor, self.model, self.replay_buffer)
 
         # Logic values
         self.episode_idx = 0
@@ -96,15 +111,22 @@ class SkillRL(pl.LightningModule):
 
         # PyTorch Lightning
         self.automatic_optimization = False
-
         self.save_hyperparameters()
+
+        # Torch compile
+        # self.actor = torch.compile(self.actor)
+        # self.critic = torch.compile(self.critic)
+        # self.critic_target = torch.compile(self.critic_target)
+        # self.model = torch.compile(self.model)
+        # self.model_target = torch.compile(self.model_target)
 
     def configure_optimizers(self):
         """Initialize optimizers"""
         critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.critic_lr)
         actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.actor_lr)
         log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.alpha_lr)
-        optimizers = [critic_optimizer, actor_optimizer, log_alpha_optimizer]
+        model_optimizer = torch.optim.Adam(self.model.parameters(), lr=self.model_lr)
+        optimizers = [critic_optimizer, actor_optimizer, log_alpha_optimizer, model_optimizer]
 
         return optimizers
 
@@ -147,6 +169,10 @@ class SkillRL(pl.LightningModule):
     def log_metrics(self, metrics: Dict[str, torch.Tensor], on_step: bool, on_epoch: bool):
         for key, val in metrics.items():
             self.log(key, val, on_step=on_step, on_epoch=on_epoch)
+
+    def log_image(self, image: torch.Tensor, name: str):
+        pil_image = Image.fromarray(image.cpu().numpy().astype(np.uint8))
+        self.logger.experiment.log({name: [wandb.Image(pil_image)]})
 
     def log_video(self, video_path, name: str):
         self.logger.experiment.log({name: wandb.Video(video_path, fps=30, format="gif")})

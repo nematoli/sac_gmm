@@ -146,9 +146,8 @@ class SACNGMM(TaskRL):
             # Programs exits when maximum env steps is reached
             # Before exiting, logs the evaluation metrics and videos
             if self.agent.total_env_steps > self.max_env_steps:
-                if self.episode_idx % self.eval_frequency != 0:
-                    eval_metrics, video_paths = self.evaluation_step()
-                    metrics.update(eval_metrics)
+                eval_metrics, video_paths = self.evaluation_step()
+                metrics.update(eval_metrics)
                 self.log_metrics_and_videos(metrics, video_paths)
                 raise KeyboardInterrupt
             self.log_metrics_and_videos(metrics, video_paths)

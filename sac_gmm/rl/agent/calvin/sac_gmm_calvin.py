@@ -19,6 +19,10 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
+OBS_KEY = "rgb_gripper"
+# OBS_KEY = "robot_obs"
+
+
 class CALVINSACGMMAgent(BaseAgent):
     def __init__(
         self,
@@ -50,11 +54,10 @@ class CALVINSACGMMAgent(BaseAgent):
         self.env.set_skill(self.skill)
 
         # Dataset
-
         datamodule.dataset.skill.skill = datamodule.dataset.skill.name
         self.datamodule = hydra.utils.instantiate(datamodule)
 
-        # GMM refine setup
+        # GMM
         gmm.skill.skill = gmm.skill.name
         self.gmm = hydra.utils.instantiate(gmm)
         self.gmm.load_model()
@@ -62,32 +65,31 @@ class CALVINSACGMMAgent(BaseAgent):
             self.gmm.manifold, self.gmm.manifold2 = self.gmm.make_manifold()
         self.gmm.set_skill_params(self.datamodule.dataset)
         self.initial_gmm = copy.deepcopy(self.gmm)
+
+        # Refine parameters
         self.priors_change_range = priors_change_range
         self.mu_change_range = mu_change_range
         self.adapt_cov = adapt_cov
         self.mean_shift = mean_shift
-        self.adapt_per_episode = adapt_per_episode
-        self.gmm_window = self.skill.max_steps // self.adapt_per_episode
+        self.gmm_window = 16
 
-        # # record setup
+        # Record setup
         self.video_dir = os.path.join(exp_dir, "videos")
         os.makedirs(self.video_dir, exist_ok=True)
         self.render = render
         self.record = record
 
-        self.env.set_init_pos(self.gmm.start)
         self.reset()
 
-        # NaN counter
         self.nan_counter = 0
 
     @torch.no_grad()
-    def play_step(self, actor, strategy="stochastic", replay_buffer=None, device="cuda"):
+    def play_step(self, actor, model, strategy="stochastic", replay_buffer=None, device="cuda"):
         """Perform a step in the environment and add the transition
         tuple to the replay buffer"""
         # Change dynamical system
         self.gmm.copy_model(self.initial_gmm)
-        gmm_change = self.get_action(actor, self.obs, strategy, device)
+        gmm_change = self.get_action(actor, model, self.obs, strategy, device)
         self.update_gaussians(gmm_change)
 
         # Act with the dynamical system in the environment
@@ -126,7 +128,7 @@ class CALVINSACGMMAgent(BaseAgent):
         return gmm_reward, done
 
     @torch.no_grad()
-    def evaluate(self, actor, device="cuda"):
+    def evaluate(self, actor, model, device="cuda"):
         """Evaluates the actor in the environment"""
         log_rank_0("Evaluation episodes in process")
         succesful_episodes, episodes_returns, episodes_lengths = 0, [], []
@@ -145,7 +147,7 @@ class CALVINSACGMMAgent(BaseAgent):
             while episode_env_steps < self.skill.max_steps:
                 # Change dynamical system
                 self.gmm.copy_model(self.initial_gmm)
-                gmm_change = self.get_action(actor, self.obs, "deterministic", device)
+                gmm_change = self.get_action(actor, model, self.obs, "deterministic", device)
                 self.update_gaussians(gmm_change)
 
                 # Act with the dynamical system in the environment
@@ -267,10 +269,11 @@ class CALVINSACGMMAgent(BaseAgent):
             fc_input = features.squeeze()
             return fc_input.float()
 
-    def get_action(self, actor, observation, strategy="stochastic", device="cuda"):
+    def get_action(self, actor, model, observation, strategy="stochastic", device="cuda"):
         """Interface to get action from SAC Actor,
         ready to be used in the environment"""
         actor.eval()
+        model.eval()
         if strategy == "random":
             return self.get_action_space().sample()
         elif strategy == "zeros":
@@ -281,9 +284,10 @@ class CALVINSACGMMAgent(BaseAgent):
             deterministic = True
         else:
             raise Exception("Strategy not implemented")
-        input_state = self.get_state_from_observation(actor.encoder, observation, device)
-        # enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
-        # input_state = self.get_state_from_observation(model.encoder, observation, skill_id, device)
-        action, _ = actor.get_actions(input_state, deterministic=deterministic, reparameterize=False)
+        with torch.no_grad():
+            obs_tensor = torch.from_numpy(observation[OBS_KEY]).to(device)
+            state = model.encoder({"obs": obs_tensor.float()}).squeeze(0)
+        action, _ = actor.get_actions(state, deterministic=deterministic, reparameterize=False)
         actor.train()
+        model.train()
         return action.detach().cpu().numpy()

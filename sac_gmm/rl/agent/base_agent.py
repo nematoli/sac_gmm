@@ -86,19 +86,14 @@ class BaseAgent(object):
             strategy: strategy to follow to select actions to fill the replay buffer
         """
         log_rank_0("Populating replay buffer with random warm up steps")
-        if model is not None:
-            for _ in tqdm(range(self.num_init_steps)):
-                self.play_step(actor, model, critic=None, strategy="random", replay_buffer=replay_buffer)
-        else:
-            # SACGMM
-            for _ in tqdm(range(self.num_init_steps)):
-                self.play_step(actor, strategy="random", replay_buffer=replay_buffer)
+        for _ in tqdm(range(self.num_init_steps)):
+            self.play_step(actor, model, strategy="random", replay_buffer=replay_buffer)
         replay_buffer.save()
 
     def get_action(self, actor, model, observation, strategy="stochastic", device="cuda"):
         raise NotImplementedError
 
-    def play_step(self, actor, strategy="stochastic", replay_buffer=None):
+    def play_step(self, actor, model, strategy="stochastic", replay_buffer=None):
         """Perform a step in the environment and add the transition
         tuple to the replay buffer"""
         raise NotImplementedError

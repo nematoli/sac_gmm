@@ -73,16 +73,15 @@ class TaskRL(pl.LightningModule):
         # self.skill_vector_size = len(self.agent.task.skills) # If using one-hot encoding
 
         # Model only has autoencoder for now (Input encoder, State decoder)
-        self.model = hydra.utils.instantiate(model).to(self.device)
+        self.model = hydra.utils.instantiate(model)
         # ob_space = gym.spaces.Dict({"obs": gym.spaces.Box(low=-1, high=1, shape=(model.input_dim,))})
         ob_space = gym.spaces.Dict({"obs": self.agent.env.get_observation_space()[OBS_KEY]})
         self.model.make_enc_dec(model, ob_space, model.state_dim)
+        self.model.to(self.device)
 
         # self.model_target = hydra.utils.instantiate(model).to(self.device)
         # self.model_target.make_enc_dec(model, ob_space)
         # self.model_target.load_state_dict(self.model.state_dict())
-        self.model_tau = model_tau
-        self.model_lr = model_lr
 
         # Actor
         actor.input_dim = model.state_dim + self.skill_vector_size
@@ -107,6 +106,7 @@ class TaskRL(pl.LightningModule):
 
         # Optimizers
         self.critic_lr, self.actor_lr, self.alpha_lr = critic_lr, actor_lr, alpha_lr
+        self.model_lr, self.model_tau = model_lr, model_tau
 
         # Populate Replay Buffer with Random Actions
         self.agent.populate_replay_buffer(self.actor, self.model, self.replay_buffer)
