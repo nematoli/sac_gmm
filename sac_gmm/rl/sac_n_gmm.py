@@ -16,6 +16,10 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
+OBS_KEY = "rgb_gripper"
+# OBS_KEY = "robot_obs"
+
+
 class SACNGMM(TaskRL):
     """SAC-N-GMM implementation using PyTorch Lightning"""
 
@@ -177,7 +181,7 @@ class SACNGMM(TaskRL):
 
         with torch.no_grad():
             skill_vector = self.agent.get_skill_vector(batch_next_skill_ids)
-            enc_ob = self.model.encoder({"obs": batch_next_obs["rgb_gripper"].float()}).squeeze(0)
+            enc_ob = self.model.encoder({"obs": batch_next_obs[OBS_KEY].float()}).squeeze(0)
             actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
 
             policy_actions, log_pi = self.actor.get_actions(actor_input, deterministic=False, reparameterize=False)
@@ -189,7 +193,7 @@ class SACNGMM(TaskRL):
         # Bellman loss
         with torch.no_grad():
             skill_vector = self.agent.get_skill_vector(batch_skill_ids)
-            enc_ob = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()}).squeeze(0)
+            enc_ob = self.model.encoder({"obs": batch_obs[OBS_KEY].float()}).squeeze(0)
             actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
         q1_pred, q2_pred = self.critic(actor_input, batch_actions.float())
         bellman_loss = F.mse_loss(q1_pred, q_target) + F.mse_loss(q2_pred, q_target)
@@ -205,7 +209,7 @@ class SACNGMM(TaskRL):
         batch_skill_ids = batch[1]
         with torch.no_grad():
             skill_vector = self.agent.get_skill_vector(batch_skill_ids)
-            enc_ob = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()}).squeeze(0)
+            enc_ob = self.model.encoder({"obs": batch_obs[OBS_KEY].float()}).squeeze(0)
             actor_input = torch.cat((enc_ob, skill_vector), dim=-1).cuda().float()
         policy_actions, log_pi = self.actor.get_actions(actor_input, deterministic=False, reparameterize=True)
         q1, q2 = self.critic(actor_input, policy_actions)
@@ -233,9 +237,9 @@ class SACNGMM(TaskRL):
         batch_obs = batch[0]
 
         # Reconstruction Loss
-        enc_state = self.model.encoder({"obs": batch_obs["rgb_gripper"].float()})
+        enc_state = self.model.encoder({"obs": batch_obs[OBS_KEY].float()})
         recon_obs = self.model.decoder(enc_state)
-        recon_loss = -recon_obs["obs"].log_prob(batch_obs["rgb_gripper"].float()).mean()
+        recon_loss = -recon_obs["obs"].log_prob(batch_obs[OBS_KEY].float()).mean()
 
         model_optimizer.zero_grad()
         self.manual_backward(recon_loss)
@@ -245,12 +249,11 @@ class SACNGMM(TaskRL):
         model_loss_dict["recon_loss"] = recon_loss
 
         # Visualize Decoded Images
-        if self.episode_done:
-            if self.episode_idx % self.eval_frequency == 0:
-                # Log image and decoded image
-                rand_idx = torch.randint(0, batch_obs["rgb_gripper"].shape[0], (1,)).item()
-                image = batch_obs["rgb_gripper"][rand_idx].detach()
-                decoded_image = recon_obs["obs"].mean[rand_idx].detach()
-                self.log_image(image, "eval/gripper")
-                self.log_image(decoded_image, "eval/decoded_gripper")
+        if OBS_KEY == "rgb_gripper" and self.episode_done and (self.episode_idx + 1 % self.eval_frequency == 0):
+            # Log image and decoded image
+            rand_idx = torch.randint(0, batch_obs[OBS_KEY].shape[0], (1,)).item()
+            image = batch_obs[OBS_KEY][rand_idx].detach()
+            decoded_image = recon_obs["obs"].mean[rand_idx].detach()
+            self.log_image(image, "eval/gripper")
+            self.log_image(decoded_image, "eval/decoded_gripper")
         return model_loss_dict

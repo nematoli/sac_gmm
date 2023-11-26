@@ -61,7 +61,7 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
     def get_observation_space(self):
         """Return only position and gripper_image by default"""
         observation_space = {}
-        observation_space["robot_obs"] = gym.spaces.Box(low=-1, high=1, shape=(7,))
+        observation_space["robot_obs"] = gym.spaces.Box(low=-1, high=1, shape=(21,))
         observation_space["rgb_gripper"] = gym.spaces.Box(
             low=-1, high=1, shape=(self.gripper_width, self.gripper_width, 3)
         )
@@ -71,7 +71,7 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         obs = super().get_obs()
 
         nobs = {}
-        nobs["robot_obs"] = obs["robot_obs"][:7]
+        nobs["robot_obs"] = np.concatenate([obs["robot_obs"], obs["scene_obs"]])[:21]
         nobs["rgb_gripper"] = cv2.resize(
             obs["rgb_obs"]["rgb_gripper"], (self.gripper_width, self.gripper_width), interpolation=cv2.INTER_AREA
         )

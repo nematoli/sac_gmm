@@ -21,6 +21,10 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
+OBS_KEY = "rgb_gripper"
+# OBS_KEY = "robot_obs"
+
+
 class CALVIN_SACNGMMAgent(BaseAgent):
     def __init__(
         self,
@@ -347,8 +351,8 @@ class CALVIN_SACNGMMAgent(BaseAgent):
             raise Exception("Strategy not implemented")
         with torch.no_grad():
             skill_vector = self.get_skill_vector(skill_id, device)
-            img_tensor = torch.from_numpy(observation["rgb_gripper"]).to(device)
-            enc_ob = model.encoder({"obs": img_tensor.float()}).squeeze(0)
+            obs_tensor = torch.from_numpy(observation[OBS_KEY]).to(device)
+            enc_ob = model.encoder({"obs": obs_tensor.float()}).squeeze(0)
             actor_input = torch.cat((enc_ob, skill_vector), dim=-1).to(device).float()
             action, _ = actor.get_actions(actor_input, deterministic=deterministic, reparameterize=False)
         actor.train()

@@ -22,6 +22,10 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
+OBS_KEY = "rgb_gripper"
+# OBS_KEY = "robot_obs"
+
+
 class TaskRL(pl.LightningModule):
     """
     The lightning module used for training/refining a task.
@@ -71,7 +75,7 @@ class TaskRL(pl.LightningModule):
         # Model only has autoencoder for now (Input encoder, State decoder)
         self.model = hydra.utils.instantiate(model).to(self.device)
         # ob_space = gym.spaces.Dict({"obs": gym.spaces.Box(low=-1, high=1, shape=(model.input_dim,))})
-        ob_space = gym.spaces.Dict({"obs": self.agent.env.get_observation_space()["rgb_gripper"]})
+        ob_space = gym.spaces.Dict({"obs": self.agent.env.get_observation_space()[OBS_KEY]})
         self.model.make_enc_dec(model, ob_space, model.state_dim)
 
         # self.model_target = hydra.utils.instantiate(model).to(self.device)

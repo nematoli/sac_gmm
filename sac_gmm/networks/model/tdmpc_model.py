@@ -11,29 +11,12 @@ from .utils.distributions import TanhNormal, Normal, MixedDistribution
 class TDMPCModel(nn.Module):
     """Task-Oriented Latent Dynamics model."""
 
-    def __init__(self, input_dim, state_dim, ac_dim, num_units, num_layers, dense_act, cfg, encoder_cfg, decoder_cfg):
+    def __init__(self, *args, **kwargs):
         super().__init__()
-        self.dynamics = MLP(
-            state_dim + ac_dim,
-            state_dim,
-            [num_units] * num_layers,
-            dense_act,
-        )
-        self.reward = Critic(
-            state_dim + ac_dim,
-            [num_units] * num_layers,
-            1,
-            dense_act,
-        )
-        self.cfg = cfg
-        self.encoder_cfg = encoder_cfg
-        self.decoder_cfg = decoder_cfg
 
-    def make_encoder(self, ob_space, state_dim):
-        self.encoder = Encoder(self.encoder_cfg, ob_space, state_dim)
-
-    def make_decoder(self, state_dim, ob_space):
-        self.decoder = Decoder(self.decoder_cfg, state_dim, ob_space)
+    def make_enc_dec(self, cfg, ob_space, state_dim):
+        self.encoder = Encoder(cfg.encoder, ob_space, state_dim)
+        self.decoder = Decoder(cfg.decoder, state_dim, ob_space)
 
     def imagine_step(self, state, ac):
         out = torch.cat([state, ac], dim=-1)

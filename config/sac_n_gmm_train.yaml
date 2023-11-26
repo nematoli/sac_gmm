@@ -26,7 +26,7 @@ agent:
   sparse_reward: false
 
 # Experiment length
-max_env_steps: 2e6
+max_env_steps: 1e6
 
 # evaluation frequency:
 eval_frequency: 100

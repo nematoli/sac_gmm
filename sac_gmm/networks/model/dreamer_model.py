@@ -14,7 +14,7 @@ from .utils.distributions import Bernoulli, Symlog, SymlogDiscrete
 class DreamerModel(nn.Module):
     """DreamerV3's Observation Encoder and Decoder."""
 
-    def __init__(self, encoder, decoder, state_dim):
+    def __init__(self, *args, **kwargs):
         super().__init__()
         self.state_dim = 0
 
