@@ -173,14 +173,29 @@ class RiepybdlibGMM(BaseGMM):
                     )
                     idx += 3
             else:
-                idx = 0
-                for i in range(len(self.gmm.gaussians)):
-                    self.gmm.gaussians[i].mu = (
-                        self.gmm.gaussians[i].mu[0] + delta["mu"][idx : idx + 3],
-                        self.gmm.gaussians[i].mu[1] + delta["mu"][idx : idx + 3],
-                        self.gmm.gaussians[i].mu[2],
-                    )
-                    idx += 3
+                if "quat" not in delta:
+                    # Only update position means for now
+                    idx = 0
+                    for i in range(len(self.gmm.gaussians)):
+                        self.gmm.gaussians[i].mu = (
+                            self.gmm.gaussians[i].mu[0] + delta["mu"][idx : idx + 3],
+                            self.gmm.gaussians[i].mu[1] + delta["mu"][idx : idx + 3],
+                            self.gmm.gaussians[i].mu[2],
+                        )
+                        idx += 3
+                else:
+                    # Update position and orientation means
+                    idx = 0
+                    quat_idx = 0
+                    quat_manifold = rm.get_quaternion_manifold("orientation")
+                    for i in range(len(self.gmm.gaussians)):
+                        self.gmm.gaussians[i].mu = (
+                            self.gmm.gaussians[i].mu[0] + delta["mu"][idx : idx + 3],
+                            self.gmm.gaussians[i].mu[1] + delta["mu"][idx : idx + 3],
+                            quat_manifold.exp(delta["quat"][quat_idx : quat_idx + 4], base=self.gmm.gaussians[i].mu[2]),
+                        )
+                        idx += 3
+                        quat_idx += 4
 
     def copy_model(self, gmm_obj):
         self.gmm = copy.deepcopy(gmm_obj.gmm)

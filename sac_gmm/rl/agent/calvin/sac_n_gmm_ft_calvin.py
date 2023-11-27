@@ -21,6 +21,9 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
+OBS_KEY = "rgb_gripper"
+# OBS_KEY = "robot_obs"
+
 LETTERS_TO_SKILLS = {
     "A": "open_drawer",
     "B": "turn_on_lightbulb",
@@ -44,6 +47,7 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
         gmm: DictConfig,
         priors_change_range: float,
         mu_change_range: float,
+        quat_change_range: float,
         adapt_cov: bool,
         mean_shift: bool,
         adapt_per_skill: int,
@@ -73,6 +77,7 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
         # Refine parameters
         self.priors_change_range = priors_change_range
         self.mu_change_range = mu_change_range
+        self.quat_change_range = quat_change_range
         self.adapt_cov = adapt_cov
         self.mean_shift = mean_shift
         self.adapt_per_skill = adapt_per_skill
@@ -243,71 +248,23 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
             saved_video_path,
         )
 
-    def get_action_space(self):
-        parameter_space = self.get_update_range_parameter_space()
-        mu_high = np.ones(parameter_space["mu"].shape[0])
-        priors_high = np.ones(parameter_space["priors"].shape[0])
-        action_high = np.concatenate((priors_high, mu_high), axis=-1)
-        if self.adapt_cov:
-            sigma_high = np.ones(parameter_space["sigma"].shape[0])
-            action_high = np.concatenate((action_high, sigma_high), axis=-1)
-
-        action_low = -action_high
-        self.action_space = gym.spaces.Box(action_low, action_high)
-        return self.action_space
-
-    def get_update_range_parameter_space(self):
-        """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
-
-        Returns:
-            param_space : gym.spaces.Dict
-                Range of GMM parameters parameters
-        """
-        # TODO: make low and high config variables
-        param_space = {}
-        param_space["priors"] = gym.spaces.Box(
-            low=-self.priors_change_range,
-            high=self.priors_change_range,
-            shape=(self.skill_actor.priors_size,),
-        )
-
-        if self.skill_actor.gmm_type in [1, 4]:
-            param_space["mu"] = gym.spaces.Box(
-                low=-self.mu_change_range, high=self.mu_change_range, shape=(self.skill_actor.means_size,)
-            )
-        elif self.skill_actor.gmm_type in [2, 5]:
-            param_space["mu"] = gym.spaces.Box(
-                low=-self.mu_change_range,
-                high=self.mu_change_range,
-                shape=(self.skill_actor.means_size // 2,),
-            )
-        else:
-            # Only update position means for now
-            total_size = self.skill_actor.means_size
-            just_positions_size = total_size - self.skill_actor.priors_size * 4
-            param_space["mu"] = gym.spaces.Box(
-                low=-self.mu_change_range,
-                high=self.mu_change_range,
-                shape=(just_positions_size // 2,),
-            )
-
-        # dim = self.gmm.means.shape[1] // 2
-        # num_gaussians = self.gmm.means.shape[0]
-        # sigma_change_size = int(num_gaussians * dim * (dim + 1) / 2 + dim * dim * num_gaussians)
-        # param_space["sigma"] = gym.spaces.Box(low=-1e-6, high=1e-6, shape=(sigma_change_size,))
-        return gym.spaces.Dict(param_space)
-
     def update_gaussians(self, gmm_change, skill_id):
         parameter_space = self.get_update_range_parameter_space()
-        size_priors = parameter_space["priors"].shape[0]
+        change_dict = {}
+        if "priors" in parameter_space.spaces:
+            size_priors = parameter_space["priors"].shape[0]
+            priors = gmm_change[:size_priors] * parameter_space["priors"].high
+            change_dict.update({"priors": priors})
+        else:
+            size_priors = 0
+
         size_mu = parameter_space["mu"].shape[0]
-
-        priors = gmm_change[:size_priors] * parameter_space["priors"].high
         mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
+        change_dict.update({"mu": mu})
 
-        change_dict = {"mu": mu, "priors": priors}
-        # if self.adapt_cov:
-        #     change_dict["sigma"] = gmm_change[size_priors + size_mu :] * parameter_space["sigma"].high
+        if "quat" in parameter_space.spaces:
+            quat = gmm_change[size_priors + size_mu :] * parameter_space["quat"].high
+            change_dict.update({"quat": quat})
         self.skill_actor.update_model(change_dict, skill_id)
 
     def get_skill_vector(self, skill_id, device="cuda"):
@@ -369,8 +326,8 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
             raise Exception("Strategy not implemented")
         with torch.no_grad():
             skill_vector = self.get_skill_vector(skill_id, device)
-            img_tensor = torch.from_numpy(observation["rgb_gripper"]).to(device)
-            enc_ob = model.encoder({"obs": img_tensor.float()}).squeeze(0)
+            obs_tensor = torch.from_numpy(observation[OBS_KEY]).to(device)
+            enc_ob = model.encoder({"obs": obs_tensor.float()}).squeeze(0)
             actor_input = torch.cat((enc_ob, skill_vector), dim=-1).to(device).float()
             action, _ = actor.get_actions(actor_input, deterministic=deterministic, reparameterize=False)
         actor.train()

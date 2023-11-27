@@ -44,6 +44,7 @@ class CALVIN_NSACGMMAgent(BaseAgent):
         gmm: DictConfig,
         priors_change_range: float,
         mu_change_range: float,
+        quat_change_range: float,
         adapt_cov: bool,
         mean_shift: bool,
         adapt_per_skill: int,
@@ -73,6 +74,7 @@ class CALVIN_NSACGMMAgent(BaseAgent):
         # Refine parameters
         self.priors_change_range = priors_change_range
         self.mu_change_range = mu_change_range
+        self.quat_change_range = quat_change_range
         self.adapt_cov = adapt_cov
         self.mean_shift = mean_shift
         self.adapt_per_skill = adapt_per_skill
@@ -105,22 +107,6 @@ class CALVIN_NSACGMMAgent(BaseAgent):
 
         self.reset()
         self.skill_count = 0
-
-    def get_action_space(self):
-        parameter_space = self.get_update_range_parameter_space()
-        mu_high = np.ones(parameter_space["mu"].shape[0])
-        if self.mean_shift:
-            action_high = mu_high
-        else:
-            priors_high = np.ones(parameter_space["priors"].shape[0])
-            action_high = np.concatenate((priors_high, mu_high), axis=-1)
-            if self.adapt_cov:
-                sigma_high = np.ones(parameter_space["sigma"].shape[0])
-                action_high = np.concatenate((action_high, sigma_high), axis=-1)
-
-        action_low = -action_high
-        self.action_space = gym.spaces.Box(action_low, action_high)
-        return self.action_space
 
     @torch.no_grad()
     def evaluate(self, device="cuda"):
@@ -190,57 +176,6 @@ class CALVIN_NSACGMMAgent(BaseAgent):
             np.mean(episodes_lengths),
             saved_video_path,
         )
-
-    def get_update_range_parameter_space(self):
-        """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
-
-        Returns:
-            param_space : gym.spaces.Dict
-                Range of GMM parameters parameters
-        """
-        # TODO: make low and high config variables
-        means_size = self.actor.skills[0].means.size
-        priors_size = self.actor.skills[0].priors.size
-
-        param_space = {}
-        param_space["priors"] = gym.spaces.Box(
-            low=-self.priors_change_range,
-            high=self.priors_change_range,
-            shape=(priors_size,),
-        )
-
-        if self.actor.skills[0].gmm_type in [1, 4]:
-            param_space["mu"] = gym.spaces.Box(
-                low=-self.mu_change_range, high=self.mu_change_range, shape=(means_size,)
-            )
-        elif self.actor.skills[0].gmm_type in [2, 5]:
-            param_space["mu"] = gym.spaces.Box(
-                low=-self.mu_change_range,
-                high=self.mu_change_range,
-                shape=(means_size // 2,),
-            )
-        else:
-            # Only update position means for now
-            total_size = means_size
-            just_positions_size = total_size - priors_size * 4
-            param_space["mu"] = gym.spaces.Box(
-                low=-self.mu_change_range,
-                high=self.mu_change_range,
-                shape=(just_positions_size // 2,),
-            )
-
-        return gym.spaces.Dict(param_space)
-
-    def update_gaussians(self, gmm_change, skill_id):
-        parameter_space = self.get_update_range_parameter_space()
-        size_priors = parameter_space["priors"].shape[0]
-        size_mu = parameter_space["mu"].shape[0]
-
-        priors = gmm_change[:size_priors] * parameter_space["priors"].high
-        mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
-
-        change_dict = {"mu": mu, "priors": priors}
-        self.actor.update_model(change_dict, skill_id)
 
     def get_state_from_observation(self, encoder, obs, device="cuda"):
         if isinstance(obs, dict):

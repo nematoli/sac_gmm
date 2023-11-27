@@ -9,6 +9,7 @@ num_eval_episodes: ${num_eval_episodes}
 
 priors_change_range: 0.0
 mu_change_range: 0.05
+quat_change_range: 0.0
 
 skill: ${skill}
 gmm: ${gmm}

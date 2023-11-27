@@ -5,6 +5,7 @@ import numpy as np
 from tqdm import tqdm
 from pytorch_lightning.utilities import rank_zero_only
 from sac_gmm.utils.env_maker import make_env
+import gym
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +75,6 @@ class BaseAgent(object):
             state_dim = 33
         return state_dim
 
-    def get_action_space(self):
-        raise NotImplementedError
-
     def populate_replay_buffer(self, actor, model, replay_buffer):
         """
         Carries out several steps through the environment to initially fill
@@ -103,10 +101,92 @@ class BaseAgent(object):
         """Evaluates the actor in the environment"""
         raise NotImplementedError
 
-    def sample_start_position(self, error_margin=0.01, max_checks=15):
-        """Samples a random starting point and moves the end effector to that point"""
-        raise NotImplementedError
-
     def get_state_from_observation(self, encoder, obs, device="cuda"):
         """get state from observation"""
         raise NotImplementedError
+
+    def get_action_space(self):
+        parameter_space = self.get_update_range_parameter_space()
+        mu_high = np.ones(parameter_space["mu"].shape[0])
+        action_high = mu_high
+        if "priors" in parameter_space.spaces:
+            priors_high = np.ones(parameter_space["priors"].shape[0])
+            action_high = np.concatenate((priors_high, action_high), axis=-1)
+        if self.adapt_cov:
+            sigma_high = np.ones(parameter_space["sigma"].shape[0])
+            action_high = np.concatenate((action_high, sigma_high), axis=-1)
+        if "quat" in parameter_space.spaces:
+            quat_high = np.ones(parameter_space["quat"].shape[0])
+            action_high = np.concatenate((action_high, quat_high), axis=-1)
+
+        action_low = -action_high
+        self.action_space = gym.spaces.Box(action_low, action_high)
+        return self.action_space
+
+    def get_update_range_parameter_space(self):
+        """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
+
+        Returns:
+            param_space : gym.spaces.Dict
+                Range of GMM parameters parameters
+        """
+        # TODO: make low and high config variables
+        param_space = {}
+        if self.priors_change_range > 0:
+            param_space["priors"] = gym.spaces.Box(
+                low=-self.priors_change_range,
+                high=self.priors_change_range,
+                shape=(self.skill_actor.priors_size,),
+            )
+        if self.mu_change_range > 0:
+            if self.skill_actor.gmm_type in [1, 4]:
+                param_space["mu"] = gym.spaces.Box(
+                    low=-self.mu_change_range, high=self.mu_change_range, shape=(self.skill_actor.means_size,)
+                )
+            elif self.skill_actor.gmm_type in [2, 5]:
+                param_space["mu"] = gym.spaces.Box(
+                    low=-self.mu_change_range,
+                    high=self.mu_change_range,
+                    shape=(self.skill_actor.means_size // 2,),
+                )
+            else:
+                # Only update position means for now
+                total_size = self.skill_actor.means_size
+                just_positions_size = total_size - self.skill_actor.priors_size * 4
+                param_space["mu"] = gym.spaces.Box(
+                    low=-self.mu_change_range,
+                    high=self.mu_change_range,
+                    shape=(just_positions_size // 2,),
+                )
+                # Update orientations (quaternion) means also
+                if self.quat_change_range > 0:
+                    just_orientations_size = self.skill_actor.priors_size * 4
+                    param_space["quat"] = gym.spaces.Box(
+                        low=-self.quat_change_range,
+                        high=self.quat_change_range,
+                        shape=(just_orientations_size,),
+                    )
+
+        return gym.spaces.Dict(param_space)
+
+    def update_gaussians(self, gmm_change, skill_id=None):
+        parameter_space = self.get_update_range_parameter_space()
+        change_dict = {}
+        if "priors" in parameter_space.spaces:
+            size_priors = parameter_space["priors"].shape[0]
+            priors = gmm_change[:size_priors] * parameter_space["priors"].high
+            change_dict.update({"priors": priors})
+        else:
+            size_priors = 0
+
+        size_mu = parameter_space["mu"].shape[0]
+        mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
+        change_dict.update({"mu": mu})
+
+        if "quat" in parameter_space.spaces:
+            quat = gmm_change[size_priors + size_mu :] * parameter_space["quat"].high
+            change_dict.update({"quat": quat})
+        if skill_id is not None:
+            self.skill_actor.update_model(change_dict, skill_id)
+        else:
+            self.gmm.update_model(change_dict)

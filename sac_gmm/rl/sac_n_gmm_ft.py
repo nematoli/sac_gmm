@@ -17,6 +17,10 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
+OBS_KEY = "rgb_gripper"
+# OBS_KEY = "robot_obs"
+
+
 class SACNGMM_FT(TaskRL):
     """SAC-N-GMM Finetuning implementation using PyTorch Lightning"""
 
