@@ -45,6 +45,7 @@ class CalvinTaskEnv(PlayTableSimEnv):
         self.sequential = True
         self.reward_scale = 10
         self.sparse_reward = False
+        self.max_episode_steps = 0
 
         self.init_base_pos, self.init_base_orn = self.p.getBasePositionAndOrientation(self.robot.robot_uid)
         self.ee_noise = np.array([0.05, 0.05, 0.05])  # Units: meters
@@ -137,8 +138,9 @@ class CalvinTaskEnv(PlayTableSimEnv):
 
     def _termination(self):
         """Indicates if the robot has completed all tasks. Should be called after _reward()."""
-        done = len(self.tasks_to_complete) == 0
-        d_info = {"success": done}
+        success = len(self.tasks_to_complete) == 0
+        done = success or self._t >= self.max_episode_steps
+        d_info = {"success": success}
         return done, d_info
 
     def _postprocess_info(self, info):
@@ -170,15 +172,13 @@ class CalvinTaskEnv(PlayTableSimEnv):
         for _ in range(self.action_repeat):
             self.p.stepSimulation(physicsClientId=self.cid)
         self.scene.step()
+        self._t += 1
         obs = self.get_obs()
         info = self.get_info()
         reward, r_info = self._reward()
         done, d_info = self._termination()
         info.update(r_info)
         info.update(d_info)
-        self._t += 1
-        if self._t >= self.max_episode_steps:
-            done = True
         return obs, reward, done, self._postprocess_info(info)
 
     def get_episode_info(self):

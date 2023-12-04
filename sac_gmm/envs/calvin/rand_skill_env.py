@@ -223,10 +223,10 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
         for _ in range(self.action_repeat):
             self.p.stepSimulation(physicsClientId=self.cid)
         self.scene.step()
+        self._t += 1
         obs = self.get_obs()
         info = self.get_info()
         reward, r_info = self._reward()
-        self._t += 1
         done, d_info = self._termination(reward)
         info.update(r_info)
         info.update(d_info)

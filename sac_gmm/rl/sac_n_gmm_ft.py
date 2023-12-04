@@ -93,7 +93,7 @@ class SACNGMM_FT(TaskRL):
 
     def evaluation_step(self):
         metrics = {}
-        eval_accuracy, eval_return, eval_length, eval_skill_ids, eval_video_paths = self.agent.evaluate(
+        eval_accuracy, eval_return, eval_length, eval_skill_ids, eval_video_path = self.agent.evaluate(
             self.actor, self.model
         )
         eval_metrics = {
@@ -124,11 +124,11 @@ class SACNGMM_FT(TaskRL):
             skill_ids = {f"eval/{k}": 0 for k in self.agent.task.skills}
         metrics.update(skill_ids)
         # Log the video GIF to wandb if exists
-        return metrics, eval_video_paths
+        return metrics, eval_video_path
 
     def on_train_epoch_end(self):
         if self.episode_done:
-            video_paths = None
+            video_path = None
             metrics = {"eval/accuracy": float("-inf")}
             metrics = {"accuracy": float("-inf")}
             log_rank_0(f"Episode Done: {self.episode_idx}")
@@ -143,7 +143,7 @@ class SACNGMM_FT(TaskRL):
             metrics.update(train_metrics)
 
             if self.episode_idx % self.eval_frequency == 0:
-                eval_metrics, video_paths = self.evaluation_step()
+                eval_metrics, video_path = self.evaluation_step()
                 metrics.update(eval_metrics)
 
             self.episode_return, self.episode_play_steps = 0, 0
@@ -154,11 +154,16 @@ class SACNGMM_FT(TaskRL):
             # Before exiting, logs the evaluation metrics and videos
             if self.agent.total_env_steps > self.max_env_steps:
                 if self.episode_idx % self.eval_frequency != 0:
-                    eval_metrics, video_paths = self.evaluation_step()
+                    eval_metrics, video_path = self.evaluation_step()
                     metrics.update(eval_metrics)
-                self.log_metrics_and_videos(metrics, video_paths)
+                    self.log_metrics(metrics, on_step=False, on_epoch=True)
+                    if video_path is not None and isinstance(video_path, str):
+                        self.log_video(video_path, "eval/video")
+
                 raise KeyboardInterrupt
-            self.log_metrics_and_videos(metrics, video_paths)
+            self.log_metrics(metrics, on_step=False, on_epoch=True)
+            if video_path is not None and isinstance(video_path, str):
+                self.log_video(video_path, "eval/video")
 
     def loss(self, batch):
         critic_optimizer, actor_optimizer, alpha_optimizer, model_optimizer = self.optimizers()
@@ -256,14 +261,13 @@ class SACNGMM_FT(TaskRL):
         model_loss_dict["recon_loss"] = recon_loss
 
         # Visualize Decoded Images
-        if self.episode_done:
-            if self.episode_idx % self.eval_frequency == 0:
-                # Log image and decoded image
-                rand_idx = torch.randint(0, batch_obs["rgb_gripper"].shape[0], (1,)).item()
-                image = batch_obs["rgb_gripper"][rand_idx].detach()
-                decoded_image = recon_obs["obs"].mean[rand_idx].detach()
-                self.log_image(image, "eval/gripper")
-                self.log_image(decoded_image, "eval/decoded_gripper")
+        if OBS_KEY == "rgb_gripper" and self.episode_done and (self.episode_idx % self.eval_frequency == 0):
+            # Log image and decoded image
+            rand_idx = torch.randint(0, batch_obs["rgb_gripper"].shape[0], (1,)).item()
+            image = batch_obs["rgb_gripper"][rand_idx].detach()
+            decoded_image = recon_obs["obs"].mean[rand_idx].detach()
+            self.log_image(image, "eval/gripper")
+            self.log_image(decoded_image, "eval/decoded_gripper")
         return model_loss_dict
 
     def load_checkpoint(self, model_ckpt, root_dir):

@@ -123,7 +123,7 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
         self.skill_actor.copy_model(self.initial_gmms, self.skill_id)
         gmm_change = self.get_action(refine_actor, model, self.skill_id, self.obs, strategy, device)
         self.update_gaussians(gmm_change, self.skill_id)
-
+        previous_skill_id = self.skill_id
         # Act with the dynamical system in the environment
         gmm_reward = 0
         curr_obs = self.obs
@@ -143,24 +143,18 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
                 self.total_env_steps += 1
                 if reward > 0:
                     self.skill_id = (self.skill_id + 1) % len(self.task.skills)
-                    if self.skill_id != 0:
+                    if "success" in info and not info["success"]:
                         reward = 0
                 gmm_reward += reward
 
             if done:
                 break
 
-        if self.episode_env_steps >= self.task.max_steps:
-            done = True
-
-        if done and self.episode_env_steps < self.task.max_steps:
-            # If the episode is done, the self.skill_counter rotates back to 0
-            # but this is not the true next skill, so we need to set it to the actual last skill of the task
-            next_skill_id = len(self.task.skills) - 1
+        _, info = self.env._termination()
+        if "success" in info and info["success"]:
+            replay_buffer.add(self.obs, previous_skill_id, gmm_change, gmm_reward, curr_obs, previous_skill_id, done)
         else:
-            next_skill_id = self.skill_id
-
-        replay_buffer.add(self.obs, self.skill_id, gmm_change, gmm_reward, curr_obs, next_skill_id, done)
+            replay_buffer.add(self.obs, previous_skill_id, gmm_change, gmm_reward, curr_obs, self.skill_id, done)
         self.obs = curr_obs
 
         self.episode_play_steps += 1
@@ -247,25 +241,6 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
             succesful_skill_ids,
             saved_video_path,
         )
-
-    def update_gaussians(self, gmm_change, skill_id):
-        parameter_space = self.get_update_range_parameter_space()
-        change_dict = {}
-        if "priors" in parameter_space.spaces:
-            size_priors = parameter_space["priors"].shape[0]
-            priors = gmm_change[:size_priors] * parameter_space["priors"].high
-            change_dict.update({"priors": priors})
-        else:
-            size_priors = 0
-
-        size_mu = parameter_space["mu"].shape[0]
-        mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
-        change_dict.update({"mu": mu})
-
-        if "quat" in parameter_space.spaces:
-            quat = gmm_change[size_priors + size_mu :] * parameter_space["quat"].high
-            change_dict.update({"quat": quat})
-        self.skill_actor.update_model(change_dict, skill_id)
 
     def get_skill_vector(self, skill_id, device="cuda"):
         if type(skill_id) is int:  # When skill_id is of shape (Batch x 1)
