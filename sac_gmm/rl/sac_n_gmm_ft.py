@@ -46,7 +46,7 @@ class SACNGMM_FT(TaskRL):
         model_ckpt: str,
         rb_dir: str,
     ):
-        super(SACNGMM_FT, self).__init__(
+        super().__init__(
             discount=discount,
             batch_size=batch_size,
             replay_buffer=replay_buffer,
@@ -65,12 +65,16 @@ class SACNGMM_FT(TaskRL):
             model_tau=model_tau,
             eval_frequency=eval_frequency,
         )
+        self.episode_done = False
+        self.save_hyperparameters()
+        self.max_env_steps = None
+
+        # Populate the replay buffer with random actions
+        self.agent.populate_replay_buffer(self.actor, self.model, self.replay_buffer)
+
         self.load_checkpoint(model_ckpt, agent.root_dir)
         if rb_dir is not None:
             self.load_replay_buffer(rb_dir, agent.root_dir)
-
-        self.episode_done = False
-        self.save_hyperparameters()
 
     def training_step(self, batch, batch_idx):
         """
@@ -89,7 +93,6 @@ class SACNGMM_FT(TaskRL):
         losses = self.loss(self.check_batch(batch))
         self.log_loss(losses)
         self.soft_update(self.critic_target, self.critic, self.critic_tau)
-        # self.soft_update(self.model_target, self.model, self.model_tau)
 
     def evaluation_step(self):
         metrics = {}
@@ -153,13 +156,13 @@ class SACNGMM_FT(TaskRL):
             # Programs exits when maximum env steps is reached
             # Before exiting, logs the evaluation metrics and videos
             if self.agent.total_env_steps > self.max_env_steps:
-                if self.episode_idx % self.eval_frequency != 0:
-                    eval_metrics, video_path = self.evaluation_step()
-                    metrics.update(eval_metrics)
-                    self.log_metrics(metrics, on_step=False, on_epoch=True)
-                    if video_path is not None and isinstance(video_path, str):
-                        self.log_video(video_path, "eval/video")
-
+                eval_metrics, video_path = self.evaluation_step()
+                metrics.update(eval_metrics)
+                self.log_metrics(metrics, on_step=False, on_epoch=True)
+                if video_path is not None and isinstance(video_path, str):
+                    self.log_video(video_path, "eval/video")
+                log_rank_0("Maximum env steps reached. Exiting...")
+                wandb.finish()
                 raise KeyboardInterrupt
             self.log_metrics(metrics, on_step=False, on_epoch=True)
             if video_path is not None and isinstance(video_path, str):

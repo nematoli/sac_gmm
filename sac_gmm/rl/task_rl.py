@@ -52,7 +52,7 @@ class TaskRL(pl.LightningModule):
         model_tau: float,
         eval_frequency: int,
     ):
-        super(TaskRL, self).__init__()
+        super().__init__()
 
         self.discount = discount
 
@@ -79,10 +79,6 @@ class TaskRL(pl.LightningModule):
         self.model.make_enc_dec(model, ob_space, model.state_dim)
         self.model.to(self.device)
 
-        # self.model_target = hydra.utils.instantiate(model).to(self.device)
-        # self.model_target.make_enc_dec(model, ob_space)
-        # self.model_target.load_state_dict(self.model.state_dict())
-
         # Actor
         actor.input_dim = model.state_dim + self.skill_vector_size
         actor.action_dim = self.action_dim
@@ -107,9 +103,6 @@ class TaskRL(pl.LightningModule):
         # Optimizers
         self.critic_lr, self.actor_lr, self.alpha_lr = critic_lr, actor_lr, alpha_lr
         self.model_lr, self.model_tau = model_lr, model_tau
-
-        # Populate Replay Buffer with Random Actions
-        self.agent.populate_replay_buffer(self.actor, self.model, self.replay_buffer)
 
         # Logic values
         self.episode_idx = 0

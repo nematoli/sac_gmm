@@ -191,8 +191,7 @@ class CalvinSkillEnv(PlayTableSimEnv):
         output:
             observation, reward, done info
         """
-        env_action = action
-
+        env_action = action.copy()
         self.robot.apply_action(env_action)
         for i in range(self.action_repeat):
             self.p.stepSimulation(physicsClientId=self.cid)

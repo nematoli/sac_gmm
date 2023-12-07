@@ -66,6 +66,9 @@ class SACNGMM(TaskRL):
         self.save_hyperparameters()
         self.max_env_steps = None
 
+        # Populate the replay buffer with random actions
+        self.agent.populate_replay_buffer(self.actor, self.model, self.replay_buffer)
+
     def training_step(self, batch, batch_idx):
         """
         Carries out a single step through the environment to update the replay buffer.
@@ -149,6 +152,8 @@ class SACNGMM(TaskRL):
                 eval_metrics, video_paths = self.evaluation_step()
                 metrics.update(eval_metrics)
                 self.log_metrics_and_videos(metrics, video_paths)
+                log_rank_0("Maximum env steps reached. Exiting...")
+                wandb.finish()
                 raise KeyboardInterrupt
             self.log_metrics_and_videos(metrics, video_paths)
 
