@@ -88,6 +88,19 @@ class BaseAgent(object):
             self.play_step(actor, model, strategy="random", replay_buffer=replay_buffer)
         replay_buffer.save()
 
+    def populate_replay_buffer_with_critic(self, actor, model, critic, replay_buffer):
+        """
+        Carries out several steps through the environment to initially fill
+        up the replay buffer with experiences from the GMM
+        Args:
+            steps: number of random steps to populate the buffer with
+            strategy: strategy to follow to select actions to fill the replay buffer
+        """
+        log_rank_0("Populating replay buffer with random warm up steps")
+        for _ in tqdm(range(self.num_init_steps)):
+            self.play_step(actor, model, critic, strategy="random", replay_buffer=replay_buffer)
+        replay_buffer.save()
+
     def get_action(self, actor, model, observation, strategy="stochastic", device="cuda"):
         raise NotImplementedError
 

@@ -1,0 +1,44 @@
+_target_: sac_gmm.networks.model.tdmpc_custom.TDMPCCustomModel
+_recursive_: false
+
+input_dim: ??
+state_dim: 256
+ac_dim: ??
+num_units: 256
+num_layers: 4
+dense_act: elu
+# weight_decay: 0.0
+# log_std: false
+# lstm: true
+# lstm_units: 128
+
+cfg:
+  model: 1
+  reward: 0.5
+  value: 0.1
+  cosistency: 2
+  rho: 0.5
+  encoder_kl: 0.0001
+  model_target_update_freq: 2
+
+encoder:
+  image_shape: [64, 64, 3]
+  kernel_size: [4, 4, 4, 4]
+  stride: [2, 2, 2, 2]
+  conv_dim: [3, 32, 64, 128, 256]
+  cnn_act: silu
+  hidden_dims: [512, 512]
+  dense_act: silu
+  symlog: true
+
+decoder:
+  image_shape: [64, 64, 3]
+  seed_shape: [4, 4, 256]
+  kernel_size: [4, 4, 4, 4]
+  stride: [2, 2, 2, 2]
+  conv_dim: [256, 128, 64, 32, 3]
+  cnn_act: silu
+  hidden_dims: [512, 512]
+  dense_act: silu
+  image_loss: mse
+  state_loss: symlog_mse

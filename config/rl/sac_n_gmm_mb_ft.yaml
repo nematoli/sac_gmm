@@ -3,7 +3,7 @@ defaults:
   - encoder: default
   - actor: default
   - critic: default
-  - model: default
+  - model: tdmpc_custom
   - replay_buffer: replay_buffer_task
 
 model_ckpt: ${model_ckpt}

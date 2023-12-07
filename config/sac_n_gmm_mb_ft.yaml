@@ -1,0 +1,62 @@
+defaults:
+  - setup
+  - setup_task
+  - callbacks: default
+  - datamodule: calvin_ds2
+  - rl: sac_n_gmm_mb_ft
+  - agent: sac_n_gmm_mb_ft_calvin
+  - logger: wandb
+  - trainer: default
+
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+  - _self_
+
+# Env params
+show_gui: false
+
+# GMM params
+gmm_type: 2
+skill:
+  n_components: 3 # components change for RiepybdlibGMM
+
+task_order: "ABCD"
+
+agent: 
+  sparse_reward: false
+
+# Experiment length
+max_env_steps: 5e5
+
+# evaluation frequency:
+eval_frequency: 100
+num_init_steps: 2
+num_eval_episodes: 10
+
+# Dataset params:
+train: true # false to load validation dataset
+goal_centered: true # this must be false during evaluation
+
+# Visualization
+render: false
+record: true
+
+model_ckpt: "logs/sac-n-gmm-mb-train/2023_12_06/20_53_37/model_weights/last.ckpt"
+rb_dir: null 
+
+
+# Logging
+logger:
+  group: sac_n_gmm_mb_ft
+
+hydra:
+  run:
+    dir: ${log_dir}/sac-n-gmm-mb-ft/${now:%Y_%m_%d}/${now:%H_%M_%S}
+  sweep:
+    dir: ${log_dir}/sac-n-gmm-mb-ft/${now:%Y_%m_%d}/${now:%H_%M_%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir
