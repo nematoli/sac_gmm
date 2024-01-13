@@ -143,8 +143,8 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
                 self.total_env_steps += 1
                 if reward > 0:
                     self.skill_id = (self.skill_id + 1) % len(self.task.skills)
-                    if "success" in info and not info["success"]:
-                        reward = 0
+                    # if "success" in info and not info["success"]:
+                    #     reward = 0
                 gmm_reward += reward
 
             if done:
@@ -175,6 +175,7 @@ class CALVIN_SACNGMMAgent_FT(BaseAgent):
         # Choose a random episode to record
         rand_idx = np.random.randint(1, self.num_eval_episodes + 1)
         for episode in tqdm(range(1, self.num_eval_episodes + 1)):
+            # rand_idx = episode
             skill_id = 0
             episode_return, episode_env_steps = 0, 0
             self.obs = self.env.reset()

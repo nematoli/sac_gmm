@@ -232,3 +232,69 @@ class CALVINSACGMMAgent(BaseAgent):
         actor.train()
         model.train()
         return action.detach().cpu().numpy()
+
+    def get_update_range_parameter_space(self):
+        """Returns GMM parameters range as a gym.spaces.Dict for the agent to predict
+
+        Returns:
+            param_space : gym.spaces.Dict
+                Range of GMM parameters parameters
+        """
+        # TODO: make low and high config variables
+        param_space = {}
+        priors_size, means_size, _ = self.gmm.get_params_size()
+        if self.priors_change_range > 0:
+            param_space["priors"] = gym.spaces.Box(
+                low=-self.priors_change_range,
+                high=self.priors_change_range,
+                shape=(priors_size,),
+            )
+        if self.mu_change_range > 0:
+            if self.gmm.gmm_type in [1, 4]:
+                param_space["mu"] = gym.spaces.Box(
+                    low=-self.mu_change_range, high=self.mu_change_range, shape=(means_size,)
+                )
+            elif self.gmm.gmm_type in [2, 5]:
+                param_space["mu"] = gym.spaces.Box(
+                    low=-self.mu_change_range,
+                    high=self.mu_change_range,
+                    shape=(means_size // 2,),
+                )
+            else:
+                # Only update position means for now
+                total_size = means_size
+                just_positions_size = total_size - priors_size * 4
+                param_space["mu"] = gym.spaces.Box(
+                    low=-self.mu_change_range,
+                    high=self.mu_change_range,
+                    shape=(just_positions_size // 2,),
+                )
+                # Update orientations (quaternion) means also
+                if self.quat_change_range > 0:
+                    just_orientations_size = priors_size * 4
+                    param_space["quat"] = gym.spaces.Box(
+                        low=-self.quat_change_range,
+                        high=self.quat_change_range,
+                        shape=(just_orientations_size,),
+                    )
+
+        return gym.spaces.Dict(param_space)
+
+    def update_gaussians(self, gmm_change):
+        parameter_space = self.get_update_range_parameter_space()
+        change_dict = {}
+        if "priors" in parameter_space.spaces:
+            size_priors = parameter_space["priors"].shape[0]
+            priors = gmm_change[:size_priors] * parameter_space["priors"].high
+            change_dict.update({"priors": priors})
+        else:
+            size_priors = 0
+
+        size_mu = parameter_space["mu"].shape[0]
+        mu = gmm_change[size_priors : size_priors + size_mu] * parameter_space["mu"].high
+        change_dict.update({"mu": mu})
+
+        if "quat" in parameter_space.spaces:
+            quat = gmm_change[size_priors + size_mu :] * parameter_space["quat"].high
+            change_dict.update({"quat": quat})
+        self.gmm.update_model(change_dict)

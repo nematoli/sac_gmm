@@ -15,7 +15,7 @@ class SkillActor:
         self.skill_names = None
         self.skills_dir = cfg.skills_dir
         self.skills = None
-        self.logger = logging.getLogger("TaskActorWithNSACGMM")
+        self.logger = logging.getLogger("SkillActor")
         self.name = None
         self.gmm_type = None
         self.priors_size = None

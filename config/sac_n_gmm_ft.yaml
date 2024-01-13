@@ -2,7 +2,7 @@ defaults:
   - setup
   - setup_task
   - callbacks: default
-  - datamodule: calvin_ds2
+  - datamodule: calvin_ds3
   - rl: sac_n_gmm_ft
   - agent: sac_n_gmm_ft_calvin
   - logger: wandb
@@ -16,9 +16,9 @@ defaults:
 show_gui: false
 
 # GMM params
-gmm_type: 2
+gmm_type: 3
 skill:
-  n_components: 3 # components change for RiepybdlibGMM
+  n_components: 4 # components change for RiepybdlibGMM
 
 task_order: "ABCD"
 
@@ -26,7 +26,7 @@ agent:
   sparse_reward: false
 
 # Experiment length
-max_env_steps: 1e6
+max_env_steps: 5e5
 
 # evaluation frequency:
 eval_frequency: 25
@@ -49,8 +49,13 @@ record: true
 # rb_dir: "logs/sac-n-gmm-train/2023_11_03/16_40_49/replay_buffer/"
 
 # model_ckpt: "logs/sac-n-gmm-train/2023_11_16/18_24_08/model_weights/last.ckpt"
-model_ckpt: "logs/sac-n-gmm-train/2023_11_16/21_00_24/model_weights/episode_number=0_total-env-steps=600531.0_episode_avg_return=0-v1.ckpt"
-rb_dir: null # "logs/sac-n-gmm-train/2023_11_13/14_47_07/replay_buffer/"
+# model_ckpt: "logs/sac-n-gmm-train/2023_11_16/21_00_24/model_weights/episode_number=0_total-env-steps=600531.0_episode_avg_return=0-v1.ckpt"
+# model_ckpt: "logs/sac-n-gmm-train/2023_12_21/15_02_26/model_weights/last.ckpt" # Fresh Full 250K (Seed 1)
+model_ckpt: "logs/sac-n-gmm-train/2023_12_28/14_15_26/model_weights/last.ckpt" # Fresh Full 250K (Seed 2)
+# model_ckpt: "logs/sac-n-gmm-train/2023_12_21/15_14_37/model_weights/last.ckpt" # Fresh Full 400K
+# model_ckpt: "logs/sac-n-gmm-train/2023_12_21/15_03_18/model_weights/last.ckpt" # Fresh 10-4 250K
+# model_ckpt: "logs/sac-n-gmm-train/2023_12_21/15_15_06/model_weights/last.ckpt" # Fresh 10-4 400K
+rb_dir: null #"logs/sac-n-gmm-train/2023_12_19/09_05_11/replay_buffer/"
 
 # Logging
 logger:

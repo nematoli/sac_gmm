@@ -62,6 +62,12 @@ class CALVINDynSysDataset2(Dataset):
         self.dX_pos[:, :-1, :] = np.copy(self.X_pos[:, 1:, :])
         self.dX_pos[:, -1, :] = np.copy(self.X_pos[:, -1, :])
 
+        # max_demos = 10
+        # max_demos = min(max_demos, self.X_pos.shape[0])
+        # rand_idx = np.random.choice(self.X_pos.shape[0], max_demos, replace=False)
+        # self.X_pos = self.X_pos[rand_idx, :, :]
+        # self.dX_pos = self.dX_pos[rand_idx, :, :]
+
         self.X_pos = torch.from_numpy(self.X_pos).type(torch.FloatTensor)
         self.dX_pos = torch.from_numpy(self.dX_pos).type(torch.FloatTensor)
 

@@ -222,8 +222,8 @@ class CalvinSkillEnv(PlayTableSimEnv):
 
     def get_init_orn(self):
         """Gets the initial orientation of the end effector based on the chosen skill."""
-        return np.array([3.14, -0.3, 1.5])  # With Tilt
-        # return np.array([3.14, 0.0, 1.5]) # No Tilt
+        # return np.array([3.14, -0.3, 1.5])  # With Tilt
+        return np.array([3.14, 0.0, 1.5])  # No Tilt
 
     def sample_ee_pose(self):
         if self.init_pos is None:
@@ -238,6 +238,9 @@ class CalvinSkillEnv(PlayTableSimEnv):
         offset[0] = np.random.uniform(-self.ee_noise[0], self.ee_noise[0], 1)[0]
         offset[1] = np.random.uniform(-self.ee_noise[1] / 1.5, self.ee_noise[1] / 2, 1)[0]
         offset[2] = np.random.uniform(-self.ee_noise[2] / 2, self.ee_noise[2], 1)[0]
+        # offset[0] = np.random.uniform(-self.ee_noise[0], self.ee_noise[0], 1)[0]
+        # offset[1] = np.random.uniform(-self.ee_noise[1], self.ee_noise[1], 1)[0]
+        # offset[2] = np.random.uniform(-self.ee_noise[2], self.ee_noise[2], 1)[0]
         gripper_pos = self.centroid + offset
         gripper_orn = self.init_gripper_orn
         return gripper_pos, gripper_orn

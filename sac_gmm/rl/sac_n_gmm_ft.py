@@ -288,20 +288,20 @@ class SACNGMM_FT(TaskRL):
         self.actor.load_state_dict(actor_state_dict)
 
         # Get only critic related state_dict
-        critic_state_dict = {
-            k.replace("critic.", ""): v
-            for k, v in ckpt["state_dict"].items()
-            if k.replace("critic.", "") in self.critic.state_dict()
-        }
-        self.critic.load_state_dict(critic_state_dict)
+        # critic_state_dict = {
+        #     k.replace("critic.", ""): v
+        #     for k, v in ckpt["state_dict"].items()
+        #     if k.replace("critic.", "") in self.critic.state_dict()
+        # }
+        # self.critic.load_state_dict(critic_state_dict)
 
-        # Get only critic_target related state_dict
-        critic_state_dict = {
-            k.replace("critic_target.", ""): v
-            for k, v in ckpt["state_dict"].items()
-            if k.replace("critic_target.", "") in self.critic_target.state_dict()
-        }
-        self.critic_target.load_state_dict(critic_state_dict)
+        # # Get only critic_target related state_dict
+        # critic_state_dict = {
+        #     k.replace("critic_target.", ""): v
+        #     for k, v in ckpt["state_dict"].items()
+        #     if k.replace("critic_target.", "") in self.critic_target.state_dict()
+        # }
+        # self.critic_target.load_state_dict(critic_state_dict)
 
         # Get only model related state_dict
         model_state_dict = {

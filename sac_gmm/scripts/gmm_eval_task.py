@@ -62,7 +62,7 @@ def evaluate(env, actor, max_steps, render=False, record=False, out_dir=None, nu
     for episode in tqdm(range(1, num_rollouts + 1)):
         skill_id = 0
         episode_return, episode_env_steps = 0, 0
-        obs = env.reset(start_skill=0)
+        obs = env.reset()
         # Recording setup
         if record and (episode == rand_idx):
             env.reset_recording()

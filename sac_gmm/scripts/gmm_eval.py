@@ -49,7 +49,7 @@ def evaluate(env, gmm, target, max_steps, render=False, record=False, out_dir=No
         x = observation["robot_obs"]
         for step in range(max_steps):
             # GMM predict functions handles it all
-            dx_pos, dx_ori, is_nan = gmm.predict(x[:3])
+            dx_pos, dx_ori, is_nan = gmm.predict(x)
 
             # Action
             action = np.append(dx_pos, np.append(dx_ori, -1))

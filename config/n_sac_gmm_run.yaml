@@ -2,7 +2,7 @@ defaults:
   - setup
   - setup_task
   - callbacks: default
-  - datamodule: calvin_ds2
+  - datamodule: calvin_ds3
   - rl: sac_gmm
   - agent: n_sac_gmm_calvin
   - logger: wandb
@@ -14,7 +14,12 @@ defaults:
 
 show_gui: false
 
-gmm_type: 2
+gmm_type: 3
+skill:
+  max_steps: 128
+  n_components: 4
+
+sparse_reward: false
 
 # evaluation frequency:
 eval_frequency: 50
@@ -31,11 +36,18 @@ record: true
 
 task_order: "ABCD"
 
+# model_ckpts: [
+#   "logs/sacgmm-train/2024_01_11/11_08_30/model_weights/last.ckpt",
+#   "logs/sacgmm-train/2024_01_11/11_18_18/model_weights/last.ckpt",
+#   "logs/sacgmm-train/2024_01_11/11_19_09/model_weights/last.ckpt",
+#   "logs/sacgmm-train/2024_01_11/11_19_30/model_weights/last.ckpt"
+#   ]
+
 model_ckpts: [
-  "logs/sacgmm-train/2023_11_19/23_03_43/model_weights/last.ckpt",
-  "logs/sacgmm-train/2023_11_19/23_07_06/model_weights/last.ckpt",
-  "logs/sacgmm-train/2023_11_19/23_16_05/model_weights/last.ckpt",
-  "logs/sacgmm-train/2023_11_19/23_16_21/model_weights/last.ckpt"
+  "logs/sacgmm-train/2024_01_12/10_54_48/model_weights/last.ckpt",
+  "logs/sacgmm-train/2024_01_12/10_55_01/model_weights/last.ckpt",
+  "logs/sacgmm-train/2024_01_12/10_55_11/model_weights/last.ckpt",
+  "logs/sacgmm-train/2024_01_12/10_55_27/model_weights/episode_number=200.0_total-env-steps=21842.0_accuracy=1.0.ckpt"
   ]
 
 hydra:

@@ -21,6 +21,9 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
+OBS_KEY = "rgb_gripper"
+# OBS_KEY = "robot_obs"
+
 LETTERS_TO_SKILLS = {
     "A": "open_drawer",
     "B": "turn_on_lightbulb",
@@ -55,6 +58,7 @@ class CALVIN_NSACGMMAgent(BaseAgent):
         rl: DictConfig,
         model_ckpts: list,
         device: str,
+        sparse_reward: bool,
     ) -> None:
         super().__init__(
             env=calvin_env,
@@ -70,6 +74,7 @@ class CALVIN_NSACGMMAgent(BaseAgent):
         # Environment
         self.env.set_task(self.task.skills)
         self.env.max_episode_steps = self.task.max_steps
+        self.env.sparse_reward = sparse_reward
 
         # Refine parameters
         self.priors_change_range = priors_change_range
@@ -78,26 +83,28 @@ class CALVIN_NSACGMMAgent(BaseAgent):
         self.adapt_cov = adapt_cov
         self.mean_shift = mean_shift
         self.adapt_per_skill = adapt_per_skill
-        self.gmm_window = self.task.max_steps // (self.adapt_per_skill * len(self.task.skills))
+        self.gmm_window = 16  ## self.task.max_steps // (self.adapt_per_skill * len(self.task.skills))
 
         # One SkillActorWithNSACGMM per set of skills
-        self.actor = SkillActorWithNSACGMM(self.task)
+        self.skill_actor = SkillActorWithNSACGMM(self.task)
         # The order of skills inside actor should always be the same as the order of skills in the SKILLS enum
-        self.actor.skill_names = self.task.skills
+        self.skill_actor.skill_names = self.task.skills
         # GMM
-        self.actor.make_skills(gmm)
+        self.skill_actor.make_skills(gmm)
         # Load GMM weights of each skill
-        self.actor.load_models()
+        self.skill_actor.load_models()
         # Use Dataset to set skill parameters - goal, fixed_ori, pos_dt, ori_dt
-        self.actor.set_skill_params(datamodule.dataset)
-        if "Manifold" in self.actor.name:
-            self.actor.make_manifolds()
-        self.initial_gmms = copy.deepcopy(self.actor.skills)
+        self.skill_actor.set_skill_params(datamodule.dataset)
+        if "Manifold" in self.skill_actor.name:
+            self.skill_actor.make_manifolds()
+        self.initial_gmms = copy.deepcopy(self.skill_actor.skills)
         # Refine Actors to refine each skill
-        self.sacgmms = self.actor.make_sacgmms(rl, model_ckpts, root_dir, device, self.get_action_space())
+        self.sacgmms, self.models = self.skill_actor.make_sacgmms(
+            rl, model_ckpts, root_dir, device, self.get_action_space(), self.env.get_observation_space()[OBS_KEY]
+        )
 
         # Set initial pos and orn
-        self.env.store_skill_info(self.actor.skills)
+        self.env.store_skill_info(self.skill_actor.skills)
         # # record setup
         self.video_dir = os.path.join(exp_dir, "videos")
         os.makedirs(self.video_dir, exist_ok=True)
@@ -128,15 +135,17 @@ class CALVIN_NSACGMMAgent(BaseAgent):
 
             while episode_env_steps < self.task.max_steps:
                 # Change dynamical system
-                self.actor.copy_model(self.initial_gmms, skill_id)
-                gmm_change = self.get_action(self.sacgmms[skill_id], self.obs, "deterministic", device)
+                self.skill_actor.copy_model(self.initial_gmms, skill_id)
+                gmm_change = self.get_action(
+                    self.sacgmms[skill_id], self.models[skill_id], self.obs, "deterministic", device
+                )
                 self.update_gaussians(gmm_change, skill_id)
 
                 # Act with the dynamical system in the environment
                 # x = self.obs["position"]
 
                 for _ in range(self.gmm_window):
-                    env_action, _ = self.actor.act(self.obs["robot_obs"], skill_id)
+                    env_action, _ = self.skill_actor.act(self.obs["robot_obs"], skill_id)
                     self.obs, reward, done, info = self.env.step(env_action)
                     episode_return += reward
                     episode_env_steps += 1
@@ -190,10 +199,11 @@ class CALVIN_NSACGMMAgent(BaseAgent):
             fc_input = features.squeeze()
             return fc_input.float()
 
-    def get_action(self, actor, observation, strategy="stochastic", device="cuda"):
+    def get_action(self, actor, model, observation, strategy="stochastic", device="cuda"):
         """Interface to get action from SAC Actor,
         ready to be used in the environment"""
         actor.eval()
+        model.eval()
         if strategy == "random":
             return self.get_action_space().sample()
         elif strategy == "zeros":
@@ -204,11 +214,12 @@ class CALVIN_NSACGMMAgent(BaseAgent):
             deterministic = True
         else:
             raise Exception("Strategy not implemented")
-        input_state = self.get_state_from_observation(actor.encoder, observation, device)
-        # enc_state = model.encoder({"obs": input_state.float()}).squeeze(0)
-        # input_state = self.get_state_from_observation(model.encoder, observation, skill_id, device)
-        action, _ = actor.get_actions(input_state, deterministic=deterministic, reparameterize=False)
+        with torch.no_grad():
+            obs_tensor = torch.from_numpy(observation[OBS_KEY]).to(device)
+            state = model.encoder({"obs": obs_tensor.float()}).squeeze(0)
+        action, _ = actor.get_actions(state, deterministic=deterministic, reparameterize=False)
         actor.train()
+        model.train()
         return action.detach().cpu().numpy()
 
 

@@ -46,7 +46,7 @@ def train_gmm(cfg: DictConfig) -> None:
 
     # Setup logger
     logger_name = f"{cfg.skill.name}_{gmm.name}_type{gmm.gmm_type}_{gmm.n_components}"
-    gmm.logger = setup_logger(cfg, name=logger_name)
+    gmm.logger = logger  # setup_logger(cfg, name=logger_name)
 
     gmm.fit(dataset=train_dataset)
     log_rank_0(f"Training Finished. Trained gmm params are saved in the {gmm.model_dir} directory")

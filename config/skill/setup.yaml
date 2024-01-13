@@ -1,4 +1,4 @@
-skills_dir: ${root}/skills_ds
+skills_dir: ${root}/archive/full/skills_ds
 
 pos_dt: 0.02
 ori_dt: 0.05

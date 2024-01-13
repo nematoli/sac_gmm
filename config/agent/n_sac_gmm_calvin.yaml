@@ -9,6 +9,7 @@ num_eval_episodes: ${num_eval_episodes}
 
 priors_change_range: 0.0
 mu_change_range: 0.05
+quat_change_range: 0.05
 
 task: ${skill}
 gmm: ${gmm}
@@ -24,3 +25,4 @@ record: ${record}
 rl: ${rl}
 model_ckpts: ${model_ckpts}
 device: ${device}
+sparse_reward: false
