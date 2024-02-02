@@ -51,12 +51,14 @@ record: true
 # model_ckpt: "logs/sac-n-gmm-train/2023_11_16/18_24_08/model_weights/last.ckpt"
 # model_ckpt: "logs/sac-n-gmm-train/2023_11_16/21_00_24/model_weights/episode_number=0_total-env-steps=600531.0_episode_avg_return=0-v1.ckpt"
 # model_ckpt: "logs/sac-n-gmm-train/2023_12_21/15_02_26/model_weights/last.ckpt" # Fresh Full 250K (Seed 1)
-model_ckpt: "logs/sac-n-gmm-train/2023_12_28/14_15_26/model_weights/last.ckpt" # Fresh Full 250K (Seed 2)
+# model_ckpt: "logs/sac-n-gmm-train/2023_12_28/14_15_26/model_weights/last.ckpt" # Fresh Full 250K (Seed 2)
 # model_ckpt: "logs/sac-n-gmm-train/2023_12_21/15_14_37/model_weights/last.ckpt" # Fresh Full 400K
 # model_ckpt: "logs/sac-n-gmm-train/2023_12_21/15_03_18/model_weights/last.ckpt" # Fresh 10-4 250K
 # model_ckpt: "logs/sac-n-gmm-train/2023_12_21/15_15_06/model_weights/last.ckpt" # Fresh 10-4 400K
-rb_dir: null #"logs/sac-n-gmm-train/2023_12_19/09_05_11/replay_buffer/"
+# model_ckpt: "logs/sac-n-gmm-train/2024_01_13/08_41_54/model_weights/last.ckpt" # Fresh Full 500K (Seed 1)
 
+rb_dir: null #"logs/sac-n-gmm-train/2023_12_19/09_05_11/replay_buffer/"
+model_ckpt: "logs/sac-n-gmm-train/2024_01_27/11_03_47/model_weights/last.ckpt"
 # Logging
 logger:
   group: sac_n_gmm_ft
@@ -72,3 +74,5 @@ hydra:
       override_dirname:
         exclude_keys:
           - log_dir
+
+# CUDA_VISIBLE_DEVICES=0 python sac_gmm/scripts/sac_n_gmm_eval.py num_init_steps=2 num_eval_episodes=50 task_order=ABCD

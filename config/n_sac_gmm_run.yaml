@@ -34,7 +34,7 @@ goal_centered: false # this must be false during evaluation
 render: false
 record: true
 
-task_order: "ABCD"
+task_order: "ABCDEFG"
 
 # model_ckpts: [
 #   "logs/sacgmm-train/2024_01_11/11_08_30/model_weights/last.ckpt",
@@ -47,7 +47,11 @@ model_ckpts: [
   "logs/sacgmm-train/2024_01_12/10_54_48/model_weights/last.ckpt",
   "logs/sacgmm-train/2024_01_12/10_55_01/model_weights/last.ckpt",
   "logs/sacgmm-train/2024_01_12/10_55_11/model_weights/last.ckpt",
-  "logs/sacgmm-train/2024_01_12/10_55_27/model_weights/episode_number=200.0_total-env-steps=21842.0_accuracy=1.0.ckpt"
+  "logs/sacgmm-train/2024_01_12/10_55_27/model_weights/episode_number=200.0_total-env-steps=21842.0_accuracy=1.0.ckpt",
+  "logs/sacgmm-train/2024_01_26/18_25_04/model_weights/last.ckpt",
+  "logs/sacgmm-train/2024_01_26/18_23_54/model_weights/last.ckpt",
+  "logs/sacgmm-train/2024_01_28/09_52_01/model_weights/last.ckpt"
+
   ]
 
 hydra:

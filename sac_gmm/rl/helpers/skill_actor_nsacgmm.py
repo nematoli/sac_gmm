@@ -46,6 +46,10 @@ class SkillActorWithNSACGMM:
         model_ckpt_dict["turn_on_lightbulb"] = model_ckpts[1]
         model_ckpt_dict["move_slider_left"] = model_ckpts[2]
         model_ckpt_dict["turn_on_led"] = model_ckpts[3]
+        if len(model_ckpts) == 7:
+            model_ckpt_dict["close_drawer"] = model_ckpts[4]
+            model_ckpt_dict["turn_off_lightbulb"] = model_ckpts[5]
+            model_ckpt_dict["move_slider_right"] = model_ckpts[6]
         # encoder = hydra.utils.instantiate(sacgmm_cfg.encoder)
         for id, skill in enumerate(self.skill_names):
             ckpt = torch.load(os.path.join(root_dir, model_ckpt_dict[skill]))

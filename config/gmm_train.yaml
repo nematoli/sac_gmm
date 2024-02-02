@@ -1,7 +1,7 @@
 defaults:
   - setup
   - setup_single_skill
-  - datamodule: calvin_ds2
+  - datamodule: calvin_ds3
   - logger: wandb
 
 logger:
@@ -11,12 +11,12 @@ show_gui: false
 
 
 # GMM Type
-gmm_type: 2
+gmm_type: 3
 
 skill_name: open_drawer
 skill:
   name: ${skill_name}
-  n_components: 3 # components change for RiepybdlibGMM
+  n_components: 4 # components change for RiepybdlibGMM
 
 # Dataset params:
 train: true # false to load validation dataset
