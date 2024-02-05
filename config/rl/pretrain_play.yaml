@@ -1,0 +1,20 @@
+defaults:
+  - model: tdmpc_custom
+
+
+_target_: sac_gmm.rl.pretrain_play.PretrainOnPlay
+_recursive_: false
+
+batch_size: 256
+
+# Model
+model_lr: 1e-4
+model_tau: 0.99
+
+# Evaluation frequency:
+eval_frequency: ${eval_frequency}
+
+n_skill: 1
+horizon: 16
+pretrain_data_path: "/home/lagandua/projects/skimo_base/refining-skill-sequences/data/calvin.gz"
+pretrain_train_split: 0.99
