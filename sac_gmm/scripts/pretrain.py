@@ -30,7 +30,6 @@ def pretrain(cfg: DictConfig) -> None:
     if cfg.exp_dir is None:
         cfg.exp_dir = hydra.core.hydra_config.HydraConfig.get()["runtime"]["output_dir"]
     model_dir = Path(cfg.exp_dir) / "model_weights/"
-    cfg.callbacks.checkpoint.dirpath = model_dir
     os.makedirs(model_dir, exist_ok=True)
 
     if cfg.seed is None:
@@ -47,13 +46,13 @@ def pretrain(cfg: DictConfig) -> None:
     algo = hydra.utils.instantiate(cfg.rl)
 
     train_logger = setup_logger(cfg)
-    callbacks = setup_callbacks(cfg.callbacks)
 
     trainer_args = {
         **cfg.trainer,
         "logger": train_logger,
-        "callbacks": callbacks,
         "benchmark": False,
+        "check_val_every_n_epoch": cfg.eval_frequency,
+        "max_epochs": cfg.max_epochs,
     }
 
     trainer = Trainer(**trainer_args)

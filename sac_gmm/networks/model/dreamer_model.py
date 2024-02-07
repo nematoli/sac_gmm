@@ -50,7 +50,6 @@ class Encoder(nn.Module):
             elif len(v.shape) == 1:
                 self.encoders[k] = DenseEncoder(
                     gym.spaces.flatdim(v),
-                    cfg.embed_dim,
                     cfg.hidden_dims,
                     cfg.dense_act,
                     cfg.symlog,

@@ -38,7 +38,7 @@ class TDMPCCustomModel(nn.Module):
 
     def imagine_step(self, state, ac):
         out = torch.cat([state, ac], dim=-1)
-        return self.dynamics(out), self.reward(out).squeeze(-1)
+        return self.dynamics(out)
 
     def load_state_dict(self, ckpt):
         try:

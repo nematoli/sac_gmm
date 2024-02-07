@@ -24,6 +24,10 @@ class CALVINPlayDataset(IterableDataset):
         sampler = SeqSampler(horizon + 1)
 
         self._pretrain_buffer = ReplayBufferEpisode(buffer_keys, None, sampler.sample_func_tensor, precision)
+        if "gripper" in data_path or "static" in data_path:
+            image = True
+        else:
+            image = False
         data = pickle.load(gzip.open(data_path, "rb"))
         data_size = len(data)
 
@@ -31,7 +35,13 @@ class CALVINPlayDataset(IterableDataset):
             if (train and i < data_size * train_split) or (not train and i >= data_size * train_split):
                 if len(d["obs"]) < len(d["dones"]):
                     continue  # Skip incomplete trajectories.
-                d["obs"] = d["obs"][:, :21]
+                if image:
+                    if "gripper" in data_path:
+                        d["obs"] = d["rgb_gripper"].astype(float) / 255.0
+                    elif "static" in data_path:
+                        d["obs"] = d["rgb_static"].astype(float) / 255.0
+                else:
+                    d["obs"] = d["obs"][:, :21]
                 new_d = dict(ob=d["obs"], ac=d["actions"], done=d["dones"])
                 new_d["done"][-1] = 1.0  # Force last step to be done.
                 self._pretrain_buffer.store_episode(new_d, False)
