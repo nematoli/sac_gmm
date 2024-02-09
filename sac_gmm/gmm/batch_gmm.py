@@ -5,7 +5,15 @@ import torch
 
 
 class BatchGMM(object):
-    def __init__(self, n_components, priors=None, means=None, covariances=None, verbose=0, random_state=None):
+    def __init__(
+        self,
+        n_components,
+        priors=None,
+        means=None,
+        covariances=None,
+        verbose=0,
+        random_state=None,
+    ):
         self.n_components = n_components
         if torch.is_tensor(priors):
             self.priors = priors
@@ -57,25 +65,36 @@ class BatchGMM(object):
 
         batch_size = batch_x.shape[0]
         indices = np.asarray(indices, dtype=int)
-        batch_x = torch.atleast_2d(torch.from_numpy(batch_x))
+        if not torch.is_tensor(batch_x):
+            batch_x = torch.from_numpy(batch_x)
+        batch_x = torch.atleast_2d(batch_x)
         n_features = self.means.shape[2] - len(indices)
         means = torch.empty((batch_size, self.n_components, n_features))
-        covariances = torch.empty((batch_size, self.n_components, n_features, n_features))
+        covariances = torch.empty(
+            (batch_size, self.n_components, n_features, n_features)
+        )
 
         marginal_norm_factors = torch.empty((batch_size, self.n_components))
         marginal_prior_exponents = torch.empty((batch_size, self.n_components))
 
         for k in range(self.n_components):
-            mvn = BatchMVN(mean=self.means[:, k], covariance=self.covariances[:, k], random_state=self.random_state)
+            mvn = BatchMVN(
+                mean=self.means[:, k],
+                covariance=self.covariances[:, k],
+                random_state=self.random_state,
+            )
             conditioned = mvn.condition(indices, batch_x)
             means[:, k] = conditioned.mean
             covariances[:, k] = conditioned.covariance
 
-            marginal_norm_factors[:, k], marginal_prior_exponents[:, k] = mvn.marginalize(
-                indices
-            ).to_norm_factor_and_exponents(batch_x)
+            (
+                marginal_norm_factors[:, k],
+                marginal_prior_exponents[:, k],
+            ) = mvn.marginalize(indices).to_norm_factor_and_exponents(batch_x)
 
-        priors = _safe_probability_density(self.priors * marginal_norm_factors, marginal_prior_exponents)
+        priors = _safe_probability_density(
+            self.priors * marginal_norm_factors, marginal_prior_exponents
+        )
 
         return BatchGMM(
             n_components=self.n_components,
@@ -91,7 +110,9 @@ class BatchGMM(object):
     def one_sample_confidence_region(self, alpha):
         self._check_initialized()
         batch_size = self.means.shape[0]
-        mvn_indices = np.apply_along_axis(self.random_sample_once, axis=1, arr=self.priors).squeeze()
+        mvn_indices = np.apply_along_axis(
+            self.random_sample_once, axis=1, arr=self.priors
+        ).squeeze()
         return BatchMVN(
             mean=self.means[range(batch_size), mvn_indices],
             covariance=self.covariances[range(batch_size), mvn_indices],

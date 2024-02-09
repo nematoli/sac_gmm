@@ -1,0 +1,12 @@
+defaults:
+  - default
+  - encoder: default
+  - actor: default
+  - critic: default
+  - model: tdmpc_custom
+  - replay_buffer: default
+
+model_ckpt: ${model_ckpt}
+horizon: 10
+_target_: sac_gmm.rl.sac_gmm_mb.SACGMM_MB
+_recursive_: false

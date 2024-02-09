@@ -1,0 +1,59 @@
+defaults:
+  - setup
+  - setup_single_skill
+  - callbacks: default
+  - datamodule: calvin_ds2
+  - rl: sac_gmm_mb
+  - agent: sac_gmm_mb_calvin
+  - logger: wandb
+  - trainer: default
+
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+  - _self_
+
+show_gui: false
+
+# GMM params
+gmm_type: 1
+
+# Skill
+skill_name: open_drawer
+skill:
+  name: ${skill_name}
+  max_steps: 128
+  n_components: 4 # components change for RiepybdlibGMM
+
+# Experiment length
+max_env_steps: 125000
+
+# evaluation frequency:
+eval_frequency: 50
+num_init_steps: 2
+num_eval_episodes: 10
+
+# Dataset params:
+train: true # false to load validation dataset
+goal_centered: true # this must be false during evaluation
+
+# Visualization
+render: false
+record: true
+
+model_ckpt: "logs/pretrain/2024_02_08/12_09_03/sacgmm2/lagandua_2024_02_08_12_09_03_.1634/checkpoints/epoch=297499-step=297500.ckpt"
+
+# Logging
+logger:
+  group: sacgmm-mb-static
+
+hydra:
+  run:
+    dir: ${log_dir}/sacgmm-train/${now:%Y_%m_%d}/${now:%H_%M_%S}
+  sweep:
+    dir: ${log_dir}/sacgmm-train/${now:%Y_%m_%d}/${now:%H_%M_%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir

@@ -45,7 +45,7 @@ class PretrainOnPlay(pl.LightningModule):
         super().__init__()
         # Important: This property activates manual optimization.
         self.automatic_optimization = False
-        self.device2 = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device2 = torch.device("cuda")
 
         self.batch_size = batch_size
         self._horizon = horizon
@@ -85,14 +85,13 @@ class PretrainOnPlay(pl.LightningModule):
             batch: current mini batch of replay data
             nb_batch: batch number
         """
-        for _ in range(self.train_iter):
-            losses = self.loss(batch)
-            self.log_loss(losses)
+        losses = self.loss(batch)
+        self.log_loss(losses)
 
-            self._update_iter += 1
-            # Update target networks.
-            if self._update_iter % self.target_update_freq == 0:
-                self.soft_update(self.model_target, self.model, self.model_tau)
+        self._update_iter += 1
+        # Update target networks.
+        if self._update_iter % self.target_update_freq == 0:
+            self.soft_update(self.model_target, self.model, self.model_tau)
 
     def validation_step(self, batch, batch_idx):
         # Evaluate model on one validation batch

@@ -3,6 +3,7 @@ from gmr.utils import check_random_state
 import scipy as sp
 from scipy.stats import chi2, norm
 import torch
+from torch.distributions.multivariate_normal import MultivariateNormal
 
 
 def invert_indices(n_features, indices):
@@ -35,6 +36,14 @@ class BatchMVN(object):
         if self.covariance is not None:
             self.covariance = torch.asarray(self.covariance)
 
+        try:
+            self.L = torch.linalg.cholesky(self.covariance, upper=False)
+        except RuntimeError:
+            # Degenerated covariance, try to add regularization
+            self.L = torch.linalg.cholesky(
+                self.covariance + 1e-3 * torch.eye(self.mean.shape[-1]), upper=False
+            )
+
     def _check_initialized(self):
         if self.mean is None:
             raise ValueError("Mean has not been initialized")
@@ -65,7 +74,9 @@ class BatchMVN(object):
             indices,
             x,
         )
-        return BatchMVN(mean=mean, covariance=covariance, random_state=self.random_state)
+        return BatchMVN(
+            mean=mean, covariance=covariance, random_state=self.random_state
+        )
 
     def marginalize(self, indices):
         """Marginalize over everything except the given indices.
@@ -83,7 +94,9 @@ class BatchMVN(object):
         self._check_initialized()
         return BatchMVN(
             mean=self.mean[:, indices],
-            covariance=self.covariance[:, indices[0] : indices[-1] + 1, indices[0] : indices[-1] + 1],
+            covariance=self.covariance[
+                :, indices[0] : indices[-1] + 1, indices[0] : indices[-1] + 1
+            ],
             random_state=self.random_state,
         )
 
@@ -119,7 +132,9 @@ class BatchMVN(object):
             L = torch.linalg.cholesky(self.covariance, upper=False)
         except RuntimeError:
             # Degenerated covariance, try to add regularization
-            L = torch.linalg.cholesky(self.covariance + 1e-3 * torch.eye(n_features), upper=False)
+            L = torch.linalg.cholesky(
+                self.covariance + 1e-3 * torch.eye(n_features), upper=False
+            )
 
         X_minus_mean = X - self.mean
 
@@ -135,7 +150,11 @@ class BatchMVN(object):
         # We can avoid covariance inversion when computing
         # (X - mean) Sigma^-1 (X - mean)^T  with this trick,
         # since Sigma^-1 = L^T^-1 L^-1.
-        X_normalized = torch.transpose(torch.linalg.solve_triangular(L, X_minus_mean.unsqueeze(-1), upper=False), 2, 1)
+        X_normalized = torch.transpose(
+            torch.linalg.solve_triangular(L, X_minus_mean.unsqueeze(-1), upper=False),
+            2,
+            1,
+        )
 
         exponent = -0.5 * torch.sum(X_normalized**2, axis=2)
 
@@ -157,7 +176,19 @@ class BatchMVN(object):
         # MAKE THIS BATCH FRIENDLY
         # self._check_initialized()
         batch_indices = np.arange(self.mean.shape[0])[mask]
-        return torch.from_numpy(np.array([rand_mvn(self.mean[i], self.covariance[i]) for i in batch_indices])).float()
+        return (
+            self.mean[batch_indices]
+            + torch.bmm(
+                self.L[batch_indices],
+                torch.randn(len(batch_indices), self.mean.shape[1], 1),
+            ).squeeze()
+        )
+
+        # return torch.from_numpy(
+        #     np.array(
+        #         [rand_mvn(self.mean[i], self.covariance[i]) for i in batch_indices]
+        #     )
+        # ).float()
 
     def _one_sample_confidence_region(self, alpha):
         x = self.sample(np.ones(self.mean.shape[0], dtype=bool))
@@ -189,7 +220,9 @@ class BatchMVN(object):
         # we have one degree of freedom less than number of dimensions
         n_dof = x.shape[1] - 1
         if n_dof >= 1:
-            return (self.squared_mahalanobis_distance(x) <= chi2(n_dof).ppf(alpha)).squeeze()
+            return (
+                self.squared_mahalanobis_distance(x) <= chi2(n_dof).ppf(alpha)
+            ).squeeze()
         else:  # 1D
             raise NotImplementedError("1D not implemented")
 
@@ -210,7 +243,9 @@ class BatchMVN(object):
 
 
 def rand_mvn(mean, covariance):
-    return np.random.mtrand._rand.multivariate_normal(mean, covariance, size=1).reshape(-1)
+    return np.random.mtrand._rand.multivariate_normal(mean, covariance, size=1).reshape(
+        -1
+    )
 
 
 def _batch_validate_tensor(u, dtype=None):
@@ -226,7 +261,9 @@ def batch_mahalanobis(u, v, VI):
     v = _batch_validate_tensor(v)
     VI = torch.atleast_3d(VI)
     delta = u - v
-    m = torch.bmm(torch.bmm(delta.unsqueeze(1), torch.transpose(VI, 2, 1)), delta.unsqueeze(-1)).squeeze()
+    m = torch.bmm(
+        torch.bmm(delta.unsqueeze(1), torch.transpose(VI, 2, 1)), delta.unsqueeze(-1)
+    ).squeeze()
     return torch.sqrt(m).reshape(-1, 1)
 
 
@@ -256,7 +293,9 @@ def batch_regression_coefficients(batch_covariance, i_out, i_in, batch_cov_12=No
         mean[i1] + regression_coeffs.dot((X - mean[i2]).T).T
     """
     if batch_cov_12 is None:
-        batch_cov_12 = batch_covariance[:, i_out[0] : i_out[-1] + 1, i_in[0] : i_in[-1] + 1]
+        batch_cov_12 = batch_covariance[
+            :, i_out[0] : i_out[-1] + 1, i_in[0] : i_in[-1] + 1
+        ]
     batch_cov_22 = batch_covariance[:, i_in[0] : i_in[-1] + 1, i_in[0] : i_in[-1] + 1]
     batch_prec_22 = torch.linalg.pinv(batch_cov_22, hermitian=True)
     return torch.bmm(batch_cov_12, batch_prec_22)
@@ -292,13 +331,22 @@ def batch_condition(batch_mean, batch_covariance, i_out, i_in, batch_X):
         Covariance of the conditional distribution
     """
     batch_cov_12 = batch_covariance[:, i_out[0] : i_out[-1] + 1, i_in[0] : i_in[-1] + 1]
-    batch_cov_11 = batch_covariance[:, i_out[0] : i_out[-1] + 1, i_out[0] : i_out[-1] + 1]
-    regression_coeffs = batch_regression_coefficients(batch_covariance, i_out, i_in, batch_cov_12=batch_cov_12)
+    batch_cov_11 = batch_covariance[
+        :, i_out[0] : i_out[-1] + 1, i_out[0] : i_out[-1] + 1
+    ]
+    regression_coeffs = batch_regression_coefficients(
+        batch_covariance, i_out, i_in, batch_cov_12=batch_cov_12
+    )
 
     diff = batch_X - batch_mean[:, i_in]
     batch_mean = (
-        batch_mean[:, i_out] + torch.transpose(torch.bmm(regression_coeffs, diff.unsqueeze(-1)), 1, 2).squeeze()
+        batch_mean[:, i_out]
+        + torch.transpose(
+            torch.bmm(regression_coeffs, diff.unsqueeze(-1)), 1, 2
+        ).squeeze()
     )
 
-    batch_covariance = batch_cov_11 - torch.bmm(regression_coeffs, torch.transpose(batch_cov_12, 1, 2))
+    batch_covariance = batch_cov_11 - torch.bmm(
+        regression_coeffs, torch.transpose(batch_cov_12, 1, 2)
+    )
     return batch_mean, batch_covariance

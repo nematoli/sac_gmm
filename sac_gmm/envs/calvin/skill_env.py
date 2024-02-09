@@ -55,6 +55,9 @@ class CalvinSkillEnv(PlayTableSimEnv):
         observation_space["rgb_gripper"] = gym.spaces.Box(
             low=-1, high=1, shape=(self.gripper_width, self.gripper_width, 3)
         )
+        observation_space["rgb_static"] = gym.spaces.Box(
+            low=-1, high=1, shape=(self.gripper_width, self.gripper_width, 3)
+        )
         return gym.spaces.Dict(observation_space)
 
     def get_obs(self):
@@ -62,8 +65,17 @@ class CalvinSkillEnv(PlayTableSimEnv):
 
         nobs = {}
         nobs["robot_obs"] = np.concatenate([obs["robot_obs"], obs["scene_obs"]])[:21]
-        nobs["rgb_gripper"] = cv2.resize(
-            obs["rgb_obs"]["rgb_gripper"], (self.gripper_width, self.gripper_width), interpolation=cv2.INTER_AREA
+        nobs["rgb_gripper"] = (
+            cv2.resize(
+                obs["rgb_obs"]["rgb_gripper"], (self.gripper_width, self.gripper_width), interpolation=cv2.INTER_AREA
+            )
+            / 255.0
+        )
+        nobs["rgb_static"] = (
+            cv2.resize(
+                obs["rgb_obs"]["rgb_static"], (self.gripper_width, self.gripper_width), interpolation=cv2.INTER_AREA
+            )
+            / 255.0
         )
         return nobs
 
@@ -222,8 +234,8 @@ class CalvinSkillEnv(PlayTableSimEnv):
 
     def get_init_orn(self):
         """Gets the initial orientation of the end effector based on the chosen skill."""
-        # return np.array([3.14, -0.3, 1.5])  # With Tilt
-        return np.array([3.14, 0.0, 1.5])  # No Tilt
+        return np.array([3.14, -0.3, 1.5])  # With Tilt
+        # return np.array([3.14, 0.0, 1.5])  # No Tilt
 
     def sample_ee_pose(self):
         if self.init_pos is None:

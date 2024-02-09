@@ -13,10 +13,10 @@ show_gui: false
 
 
 # Experiment length
-max_epochs: 200000
+max_epochs: 100000
 
 # evaluation frequency:
-eval_frequency: 5000
+eval_frequency: 500
 num_init_steps: 256
 num_eval_episodes: 10
 

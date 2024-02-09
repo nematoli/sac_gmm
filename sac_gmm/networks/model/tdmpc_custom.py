@@ -18,17 +18,19 @@ class TDMPCCustomModel(nn.Module):
         super().__init__()
 
     def make_model_dynamics(self, cfg, input_dim, action_dim):
-        self.cfg = None
+        self.cfg = cfg
         self.dynamics = MLP(
             input_dim + action_dim,
             input_dim,
             [cfg.num_units] * cfg.num_layers,
             cfg.dense_act,
         )
-        self.reward = Critic(
+
+    def make_model_reward(self, cfg, input_dim, action_dim):
+        self.reward = MLP(
             input_dim + action_dim,
-            [cfg.num_units] * cfg.num_layers,
             1,
+            [cfg.num_units] * cfg.num_layers,
             cfg.dense_act,
         )
 
@@ -39,6 +41,10 @@ class TDMPCCustomModel(nn.Module):
     def imagine_step(self, state, ac):
         out = torch.cat([state, ac], dim=-1)
         return self.dynamics(out)
+
+    def imagine_reward(self, state, ac):
+        out = torch.cat([state, ac], dim=-1)
+        return self.reward(out)
 
     def load_state_dict(self, ckpt):
         try:

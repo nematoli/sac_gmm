@@ -15,7 +15,7 @@ model_tau: 0.99
 eval_frequency: ${eval_frequency}
 
 n_skill: 1
-horizon: 16
+horizon: 10
 pretrain_data_path: "/home/lagandua/projects/skimo_base/refining-skill-sequences/data/calvin_w_static.gz"
 pretrain_train_split: 0.99
 target_update_freq: 2

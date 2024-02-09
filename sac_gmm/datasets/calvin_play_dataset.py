@@ -46,6 +46,8 @@ class CALVINPlayDataset(IterableDataset):
                 new_d["done"][-1] = 1.0  # Force last step to be done.
                 self._pretrain_buffer.store_episode(new_d, False)
 
+        data = None
+
     def __iter__(self) -> Iterator:
         batch = self._pretrain_buffer.sample(self.batch_size)
         yield batch

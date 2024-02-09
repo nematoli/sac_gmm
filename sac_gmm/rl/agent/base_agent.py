@@ -66,7 +66,7 @@ class BaseAgent(object):
             state_dim += 3
         if "robot_obs" in keys:
             state_dim += 3
-        if "rgb_gripper" in keys:
+        if "rgb_gripper" in keys or "rgb_static" in keys:
             # state_dim += feature_size
             state_dim = feature_size
         if "obs" in keys:
