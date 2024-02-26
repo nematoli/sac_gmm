@@ -78,7 +78,7 @@ class SACNGMM(TaskRL):
             nb_batch: batch number
         """
         reward, self.episode_done = self.agent.play_step(
-            self.actor, self.model, "stochastic", self.replay_buffer, self.device
+            self.actor, self.model, "stochastic", self.replay_buffer, self.device2
         )
         self.episode_return += reward
         self.episode_play_steps += 1
@@ -256,8 +256,8 @@ class SACNGMM(TaskRL):
         if OBS_KEY == "rgb_gripper" and self.episode_done and (self.episode_idx % self.eval_frequency == 0):
             # Log image and decoded image
             rand_idx = torch.randint(0, batch_obs[OBS_KEY].shape[0], (1,)).item()
-            image = batch_obs[OBS_KEY][rand_idx].detach()
-            decoded_image = recon_obs["obs"].mean[rand_idx].detach()
+            image = batch_obs[OBS_KEY][rand_idx].detach() * 255.0
+            decoded_image = recon_obs["obs"].mean[rand_idx].detach() * 255.0
             self.log_image(image, "eval/gripper")
             self.log_image(decoded_image, "eval/decoded_gripper")
         return model_loss_dict

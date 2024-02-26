@@ -1,6 +1,6 @@
 defaults:
   - gmm: riepybdlib_gmm # manifold_gmm or bayesian_gmm or riepybdlib_gmm
-  - skill: A2H # open_drawer / close_drawer /  
+  - skill: ABCD # open_drawer / close_drawer /  
   - env: default_task # open_drawer / close_drawer / ?
 
   - _self_

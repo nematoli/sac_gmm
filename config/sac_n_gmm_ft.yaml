@@ -58,7 +58,8 @@ record: true
 # model_ckpt: "logs/sac-n-gmm-train/2024_01_13/08_41_54/model_weights/last.ckpt" # Fresh Full 500K (Seed 1)
 
 rb_dir: null #"logs/sac-n-gmm-train/2023_12_19/09_05_11/replay_buffer/"
-model_ckpt: "logs/sac-n-gmm-train/2024_01_27/11_03_47/model_weights/last.ckpt"
+model_ckpt: "logs/sac-n-gmm-train/2024_02_07/16_56_40/model_weights/last.ckpt"
+
 # Logging
 logger:
   group: sac_n_gmm_ft

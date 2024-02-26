@@ -19,7 +19,8 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-OBS_KEY = "rgb_gripper"
+OBS_KEY = "rgb_static"
+# OBS_KEY = "rgb_gripper"
 # OBS_KEY = "robot_obs"
 
 
@@ -73,7 +74,7 @@ class CALVINSACGMMAgent(BaseAgent):
         self.quat_change_range = quat_change_range
         self.adapt_cov = adapt_cov
         self.mean_shift = mean_shift
-        self.gmm_window = 16
+        self.gmm_window = 10
 
         # Record setup
         self.video_dir = os.path.join(exp_dir, "videos")
@@ -199,8 +200,8 @@ class CALVINSACGMMAgent(BaseAgent):
 
     def get_state_from_observation(self, encoder, obs, device="cuda"):
         if isinstance(obs, dict):
-            if "rgb_gripper" in obs:
-                x = obs["rgb_gripper"]
+            if "rgb_gripper" in obs or "rgb_static" in obs:
+                x = obs["rgb_gripper"] if "rgb_gripper" in obs else obs["rgb_static"]
                 if not torch.is_tensor(x):
                     x = torch.tensor(x).to(device)
                 if len(x.shape) < 4:

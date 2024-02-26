@@ -69,8 +69,11 @@ class CalvinRandSkillEnv(PlayTableSimEnv):
 
         nobs = {}
         nobs["robot_obs"] = np.concatenate([obs["robot_obs"], obs["scene_obs"]])[:21]
-        nobs["rgb_gripper"] = cv2.resize(
-            obs["rgb_obs"]["rgb_gripper"], (self.gripper_width, self.gripper_width), interpolation=cv2.INTER_AREA
+        nobs["rgb_gripper"] = (
+            cv2.resize(
+                obs["rgb_obs"]["rgb_gripper"], (self.gripper_width, self.gripper_width), interpolation=cv2.INTER_AREA
+            )
+            / 255.0
         )
         return nobs
 

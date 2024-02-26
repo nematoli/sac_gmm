@@ -15,7 +15,8 @@ def log_rank_0(*args, **kwargs):
     logger.info(*args, **kwargs)
 
 
-OBS_KEY = "rgb_gripper"
+OBS_KEY = "rgb_static"
+# OBS_KEY = "rgb_gripper"
 # OBS_KEY = "robot_obs"
 
 
@@ -217,11 +218,11 @@ class SACGMM(SkillRL):
         model_loss_dict["recon_loss"] = recon_loss
 
         # Visualize Decoded Images
-        if OBS_KEY == "rgb_gripper" and self.episode_done and (self.episode_idx % self.eval_frequency == 0):
+        if "rgb" in OBS_KEY and self.episode_done and (self.episode_idx % self.eval_frequency == 0):
             # Log image and decoded image
             rand_idx = torch.randint(0, batch_obs[OBS_KEY].shape[0], (1,)).item()
-            image = batch_obs[OBS_KEY][rand_idx].detach()
-            decoded_image = recon_obs["obs"].mean[rand_idx].detach()
-            self.log_image(image, "eval/gripper")
-            self.log_image(decoded_image, "eval/decoded_gripper")
+            image = batch_obs[OBS_KEY][rand_idx].detach() * 255.0
+            decoded_image = recon_obs["obs"].mean[rand_idx].detach() * 255.0
+            self.log_image(image, f"eval/{OBS_KEY}")
+            self.log_image(decoded_image, f"eval/decoded_{OBS_KEY}")
         return model_loss_dict

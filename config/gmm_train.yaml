@@ -1,7 +1,7 @@
 defaults:
   - setup
   - setup_single_skill
-  - datamodule: calvin_ds3
+  - datamodule: calvin_ds
   - logger: wandb
 
 logger:
@@ -11,7 +11,7 @@ show_gui: false
 
 
 # GMM Type
-gmm_type: 3
+gmm_type: 1
 
 skill_name: open_drawer
 skill:

@@ -58,6 +58,7 @@ class TaskRL(pl.LightningModule):
 
         self.batch_size = batch_size
         self.replay_buffer = hydra.utils.instantiate(replay_buffer)
+        self.device2 = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # Encoder
         # self.encoder = hydra.utils.instantiate(encoder)
@@ -77,21 +78,21 @@ class TaskRL(pl.LightningModule):
         # ob_space = gym.spaces.Dict({"obs": gym.spaces.Box(low=-1, high=1, shape=(model.input_dim,))})
         ob_space = gym.spaces.Dict({"obs": self.agent.env.get_observation_space()[OBS_KEY]})
         self.model.make_enc_dec(model, ob_space, model.state_dim)
-        self.model.to(self.device)
+        self.model.to(self.device2)
 
         # Actor
         actor.input_dim = model.state_dim + self.skill_vector_size
         actor.action_dim = self.action_dim
-        self.actor = hydra.utils.instantiate(actor).to(self.device)
+        self.actor = hydra.utils.instantiate(actor).to(self.device2)
         self.actor.set_action_space(self.action_space)
         # self.actor.set_encoder(self.encoder)
 
         # Critic
         self.critic_tau = critic_tau
         critic.input_dim = model.state_dim + self.skill_vector_size + self.action_dim
-        self.critic = hydra.utils.instantiate(critic).to(self.device)
+        self.critic = hydra.utils.instantiate(critic).to(self.device2)
 
-        self.critic_target = hydra.utils.instantiate(critic).to(self.device)
+        self.critic_target = hydra.utils.instantiate(critic).to(self.device2)
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # Entropy: Set target entropy to -|A|
@@ -210,16 +211,16 @@ class TaskRL(pl.LightningModule):
             next_obs = next_obs.float()
 
         # Verifying device
-        if skill_ids.device != self.device:
-            skill_ids = skill_ids.to(self.device)
-        if reward.device != self.device:
-            reward = reward.to(self.device)
-        if actions.device != self.device:
-            actions = actions.to(self.device)
-        if next_skill_ids.device != self.device:
-            next_skill_ids = next_skill_ids.to(self.device)
-        if dones.device != self.device:
-            dones = dones.to(self.device)
+        if skill_ids.device != self.device2:
+            skill_ids = skill_ids.to(self.device2)
+        if reward.device != self.device2:
+            reward = reward.to(self.device2)
+        if actions.device != self.device2:
+            actions = actions.to(self.device2)
+        if next_skill_ids.device != self.device2:
+            next_skill_ids = next_skill_ids.to(self.device2)
+        if dones.device != self.device2:
+            dones = dones.to(self.device2)
         batch = obs, skill_ids, actions, reward, next_obs, next_skill_ids, dones
         return batch
 

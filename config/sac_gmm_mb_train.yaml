@@ -2,7 +2,7 @@ defaults:
   - setup
   - setup_single_skill
   - callbacks: default
-  - datamodule: calvin_ds2
+  - datamodule: calvin_ds
   - rl: sac_gmm_mb
   - agent: sac_gmm_mb_calvin
   - logger: wandb
@@ -18,18 +18,18 @@ show_gui: false
 gmm_type: 1
 
 # Skill
-skill_name: open_drawer
+skill_name: move_slider_left
 skill:
   name: ${skill_name}
   max_steps: 128
   n_components: 4 # components change for RiepybdlibGMM
 
 # Experiment length
-max_env_steps: 125000
+max_env_steps: 250000
 
 # evaluation frequency:
 eval_frequency: 50
-num_init_steps: 2
+num_init_steps: 256
 num_eval_episodes: 10
 
 # Dataset params:
@@ -40,7 +40,7 @@ goal_centered: true # this must be false during evaluation
 render: false
 record: true
 
-model_ckpt: "logs/pretrain/2024_02_08/12_09_03/sacgmm2/lagandua_2024_02_08_12_09_03_.1634/checkpoints/epoch=297499-step=297500.ckpt"
+model_ckpt: "logs/pretrain/2024_02_10/10_06_51/sacgmm2/lagandua_2024_02_10_10_06_51_.6416/checkpoints/epoch=199999-step=200000.ckpt"
 
 # Logging
 logger:

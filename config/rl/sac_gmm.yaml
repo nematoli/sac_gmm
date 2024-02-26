@@ -3,7 +3,7 @@ defaults:
   - encoder: default
   - actor: default
   - critic: default
-  - model: dreamer
+  - model: tdmpc_custom
   - replay_buffer: default
 
 _target_: sac_gmm.rl.sac_gmm.SACGMM
