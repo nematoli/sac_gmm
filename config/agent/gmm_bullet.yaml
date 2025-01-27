@@ -1,0 +1,8 @@
+defaults:
+  - default
+  
+bullet_env: ${env}
+name: GMM
+
+_target_: sac_gmm.agents.bullet.gmm_agent.GMMAgent
+_recursive_: false

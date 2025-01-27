@@ -1,0 +1,3 @@
+defaults:
+  - bullet_setup
+  - bullet: real_door

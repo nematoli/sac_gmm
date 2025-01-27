@@ -1,0 +1,75 @@
+# Name to identify the Python type of the environment from the ENV_TYPES registry
+type: hatch
+is_source: true
+
+# Action frequency in Hz. Only divisors of 240 are supported.
+action_frequency: 30
+
+# Relative Y-position at which the hatch is considered open.
+goal_threshold: 0.15 # Meters
+
+# Configuration of the hatch door
+door:
+  # Path to the URDF file of the door
+  path: package://rl_tasks/objects/hatch_door.urdf
+
+# Configuration of the hatch frame
+frame:
+  # Path to the URDF file of the door
+  path: package://rl_tasks/objects/hatch_frame.urdf
+  # Name of the link relative to which the goal is calculated
+  reference_link: base_link
+  # Bounds of the position sampling of the frame.
+  # XYZ world coordinates in meters.
+  sampler:
+    min: [0.3, -0.1, 0.04, -0.0]
+    max: [0.35,  0.1, 0.04,  0.0]
+
+# Observational noise
+noise:
+  # Noise of "position" observation
+  position:
+    variance: 0.0
+    constant: true # Constant over one episode
+  gripper_width:
+    variance: 0.0
+    constant: true # Constant over one episode
+  # Force experienced at robot wrist
+  force:
+    variance: 0.0
+    constant: true # Constant over one episode
+  # Torque experienced at robot wrist
+  torque:
+    variance: 0.0
+    constant: true # Constant over one episode
+  # Direct reading of the door's relative Y-position
+  doorpos:
+    variance: 0.0
+    constant: true # Constant over one episode
+
+# Robot configuration
+robot:
+  # Path to the URDF file of the robot
+  path: package://rl_tasks/robots/panda_hand.urdf
+  # Name of end-effector link
+  eef: panda_hand_tcp
+  # Name of the joint measuring external wrench
+  ft_joint: panda_hand_joint
+  # Name of finger joints
+  fingers:
+    - panda_finger_joint1
+    - panda_finger_joint2
+  # Configuration of initial pose sampler
+  initial_pose:
+    # Starting pose for IK-solver
+    q: [0, -0.2, 0.0, -2.5, 1.6, 2.6, 0.7853981633974483, 0]
+    # Fixed end-effector orientation
+    orientation: [-3.145, 0, 1.57]
+    # Sampler bounds for end-effector location
+    position:
+      min: [0.35, -0.05, 0.3]
+      max: [0.45,  0.05, 0.35]
+    # Starting gripper width
+    gripper_width: 0.05
+  # Controller used to interpret actions
+  controller: relative   # Options: relative, virtual

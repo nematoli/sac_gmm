@@ -1,3 +1,4 @@
+logs/
 media/
 outputs/
 bin/
@@ -117,7 +118,6 @@ celerybeat.pid
 # Environments
 .env
 .venv
-env/
 venv/
 ENV/
 env.bak/
@@ -148,3 +148,18 @@ dmypy.json
 cython_debug/
 nohup.out
 temp/
+
+demonstrations/
+logs/
+skills_ds/
+dataset/
+logs/
+skills_ds/
+dataset/
+runs/
+
+
+# artifacts
+*.npy
+*.npz
+*.gif

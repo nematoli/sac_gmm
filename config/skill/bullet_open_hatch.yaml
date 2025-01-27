@@ -1,0 +1,13 @@
+defaults:
+  - setup
+
+# Dataset params:
+name: bullet_open_hatch
+state_type: 'pos'
+
+# GMM params
+n_components: 3
+
+max_steps: 128
+
+# gt_keypoint: [0.03, 0.25, 0.04]

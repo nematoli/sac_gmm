@@ -1,0 +1,7 @@
+defaults:
+  - calvin_setup
+  - calvin_env: calvin_default
+  - override calvin_env/scene: calvin_scene_A
+
+is_source: true
+

@@ -1,0 +1,5 @@
+_target_: sac_gmm.keypoint.key_nets.KeypointMock
+_recursive_: false
+
+kp_noise_high: 0.05
+kp_noise_low:  0.0

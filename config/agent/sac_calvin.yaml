@@ -1,0 +1,8 @@
+defaults:
+  - default
+
+name: SAC
+calvin_env: ${env}
+
+_target_: sac_gmm.agents.calvin.sac_agent.SACAgent
+_recursive_: false

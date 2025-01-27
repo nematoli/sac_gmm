@@ -1,0 +1,59 @@
+# Name to identify the Python type of the environment from the ENV_TYPES registry
+type: real_door
+
+# Action frequency in Hz. Only divisors of 240 are supported.
+action_frequency: 30
+
+# Angle at which the door is considered open.
+open_angle: 0.4 # Radians
+
+# World TF-frame in which to plan motions
+reference_frame: panda_link0
+# Name of TF-frame of the door
+door_frame: obs_door
+# Name of TF-frame in which the opening angle is measured
+# as rotation around the Z-axis
+door_measurement_frame: obs_door_frame
+
+# Z-height in reference frame at which it is safe to withdraw from the handle
+handle_safe_height: 0.35
+# Margin of error on matching the height-goal when withdrawing from the handle
+handle_safe_delta: 0.01
+
+# Robot configuration
+robot:
+  # Prefix for the /panda_states topic
+  state_prefix: /franka_state_controller
+  # Prefix of the controller namespace
+  controllers_prefix: /controllers
+  # Name of the reference frame for motion generation
+  reference_frame: panda_link0
+  # Name of the end-effector link
+  endeffector_frame: panda_link8
+  # Configuration of the initial pose
+  initial_pose:
+    # Starting pose for IK-solver and for frequent robot reset
+    q: [-0.020128424041196656, -0.472276300484674, 0.17956246357043829, -2.5826434897686763, 1.714088937969333, 3.3030420469045634, -2.4632187721501624]  # Starting point for IK and for frequent robot reset
+    # Starting position of gripper
+    gripper_width: 0.05
+    # Starting position sampler of robot end-effector
+    position:
+      min: [0.45, -0.05, 0.37]
+      max: [0.52,  0.05, 0.44]
+  # Reset robot pose after n episodes
+  joint_reset_frequency: 5
+  # Impedance settings for the end-effector
+  stiffness:
+    linear: 600
+    angular: 20
+  # Threshold for termination due tu experienced external linear force
+  f_ext_limit: [12, 12, 35]
+  # Set to True if robot is on the FMM. Enables check of tower collisions.
+  is_fmm: False
+
+teleop:
+  gamepad:
+    # Cols.:  LX  LY  RX  RY  DX  DY  LT  RT   A  LB  RB  L3  R3 BIAS
+    motion: [[ 0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0],
+             [ 0,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0],
+             [ 0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0]]

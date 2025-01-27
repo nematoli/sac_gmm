@@ -1,0 +1,16 @@
+defaults:
+  - default
+
+name: SACGMM
+bullet_env: ${env}
+
+priors_change_range: 0.0
+mu_change_range: 0.03
+adapt_per_episode: 4
+
+_target_: sac_gmm.agents.bullet.sac_gmm_agent.SACGMMAgent
+_recursive_: false
+
+
+
+

@@ -1,0 +1,13 @@
+defaults:
+  - setup
+
+# Dataset params:
+name: bullet_open_door
+state_type: 'pos'
+
+# GMM params
+n_components: 3
+
+max_steps: 256
+
+# gt_keypoint: [0.18, -0.25,  0.37]

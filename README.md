@@ -23,13 +23,40 @@ export SACGMM_ROOT=$(pwd)/sac_gmm
 Install requirements:
 ```bash
 cd SACGMM_ROOT
-conda create -n sacgmm_venv python=3.7
+conda create -n sacgmm_venv python=3.8
 conda activate sacgmm_venv
 sh install.sh
 ```
 
-## Download
 
+For Development:
+```bash
+pip install -r requirements-dev.txt
+pre-commit install
+```
+
+
+## Download
+Download the [CALVIN dataset](https://github.com/mees/calvin) and place it inside [dataset/](./dataset/). 
+
+## Skill Library
+
+### Step 1: Extract skill demos from the CALVIN dataset
+Configure [config/demos.yaml](./config/demos.yaml).
+```
+> python sacgmm/extract_demos.py skill='open_drawer'
+```
+
+### Step 2: Train and evaluate skill libraries (Dynamical Systems) with ManifoldGMM 
+Configure [config/gmm_train.yaml](./config/gmm_train.yaml).
+```
+> python sac_gmm/scripts/gmm_train.py skill='open_drawer'
+```
+
+Configure [config/gmm_eval.yaml](./config/gmm_eval.yaml).
+```
+> python sac_gmm/scripts/gmm_eval.py skill='open_drawer'
+```
 
 ### Pre-trained Models
 We provide our final models for ...

@@ -1,0 +1,3 @@
+_target_:  sac_gmm.gmm.manifold_gmm.ManifoldGMM
+skill: ${skill}
+plot: true

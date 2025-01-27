@@ -1,0 +1,18 @@
+defaults:
+  - setup
+  - skill_setup
+  - override datamodule: calvin_extract
+
+hydra:
+  run:
+    dir: ${log_dir}/extract-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/extract-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir
+          - datamodule.dataset.data_dir
+          - datamodule.dataset.num_workers

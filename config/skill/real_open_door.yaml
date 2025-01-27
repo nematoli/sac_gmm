@@ -1,0 +1,11 @@
+defaults:
+  - setup
+
+# Dataset params:
+name: real_open_door
+state_type: 'pos'
+
+# GMM params
+n_components: 3
+
+max_steps: 128

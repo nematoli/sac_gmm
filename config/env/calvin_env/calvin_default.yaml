@@ -1,0 +1,13 @@
+seed: 0
+use_vr: false
+show_gui: ${show_gui}
+data_path: data
+save_dir: /tmp
+record: true
+
+defaults:
+  - cameras: static_and_gripper
+  - env: play_table_env
+  - scene: calvin_scene_A
+  - robot: panda_longer_finger
+  - tasks: customized_tasks

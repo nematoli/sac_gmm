@@ -1,0 +1,3 @@
+_target_: sac_gmm.keypoint.key_nets.KeypointDetector
+_recursive_: false
+feature_size: ${encoder.feature_size}

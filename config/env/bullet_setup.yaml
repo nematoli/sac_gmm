@@ -1,0 +1,4 @@
+# Environment params
+env_name: bullet
+show_gui: ${show_gui}
+obs_space: ${obs_space}

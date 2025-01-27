@@ -1,0 +1,12 @@
+
+_target_: sac_gmm.models.kis_gmm_model.KISGMM
+_recursive_: false
+
+sac: ${sac}
+agent: ${agent}
+
+kp_det: ${kp_det}
+kp_lr: 3e-5
+
+augmenter: ${augmenter}
+

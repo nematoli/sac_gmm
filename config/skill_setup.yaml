@@ -1,0 +1,17 @@
+defaults:
+  - gmm: bayesian_gmm # manifold_gmm or bayesian_gmm
+  - sac: default
+  - encoder: default
+  - kp_mock: default
+  - datamodule: calvin_skill # calvin_skill, bullet_skill
+  - skill: calvin_close_drawer # calvin_close_drawer / calvin_open_drawer / bullet_open_hatch / bullet_open_door
+  - env: calvin_scene_D # calvin_scene_D / bullet_open_hatch / bullet_open_door
+  - agent: kis_gmm_calvin  # gmm_calvin, sac_gmm_calvin, kis_gmm_calvin, gmm_bullet, sac_gmm_bullet, kis_gmm_bullet
+
+  - _self_
+
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+goal_centered: true
+obs_space: ["pos", "gripper"] # ["state"], ["pos", "joints"], ["pos", "joints", "gripper"], ["state", "gripper"]

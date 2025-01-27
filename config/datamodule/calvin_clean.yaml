@@ -1,0 +1,7 @@
+defaults:
+  - dataset: calvin_skill
+  - transforms: calvin
+
+dataset:
+  flatten: false
+  goal_centered: false

@@ -1,0 +1,26 @@
+defaults:
+  - setup
+  - skill_setup
+  - lightning: kis_gmm_model
+
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+  - _self_
+
+
+# evaluation frequency:
+num_init_steps: 0
+num_eval_episodes: 100
+num_eval_seeds: 3
+
+hydra:
+  run:
+    dir: ${log_dir}/agent-eval-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/agent-eval-runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir

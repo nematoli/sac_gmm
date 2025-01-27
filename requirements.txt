@@ -6,7 +6,12 @@ pytorch-lightning
 gmr
 scikit-learn
 numpy
-pybulletX
 gym
 tqdm
 scipy
+imageio[ffmpeg]
+termcolor
+pymanopt
+mayavi
+wandb
+lightning-bolts
