@@ -8,6 +8,28 @@
 
 We present **SAC-_N_-GMM**, a single agent that learns to refine and sequence several robot skills to complete tasks. 
 
+## Policy Rollouts in CALVIN
+Below we show rollouts of **SAC-_N_-GMM** policy fine-tuned to refine and stitch four and seven skill tasks:
+<table>
+  <tr>
+    <!-- First two GIFs with one caption -->
+    <td align="center">
+      <img src="docs/ABCD.gif" alt="First GIF" width="200" />
+      <img src="docs/DCBA.gif" alt="Second GIF" width="200" />
+      <br />
+      <b>Four Skill Tasks</b>
+    </td>
+    <!-- Next two GIFs -->
+    <td align="center">
+      <img src="docs/ABCDEFG.gif" alt="Third GIF" width="200" />
+      <img src="docs/CDABGEF.gif" alt="Fourth GIF" width="200" />
+      <br />
+      <b>Seven Skill Tasks</b>
+    </td>
+  </tr>
+</table>
+
+
 ## Installation
 To begin, clone this repository locally
 ```bash
