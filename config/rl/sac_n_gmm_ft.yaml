@@ -9,5 +9,5 @@ defaults:
 model_ckpt: ${model_ckpt}
 rb_dir: ${rb_dir}
 
-_target_: sac_gmm.rl.sac_n_gmm_ft.SACNGMM_FT
+_target_: sac_n_gmm.rl.sac_n_gmm_ft.SACNGMM_FT
 _recursive_: false

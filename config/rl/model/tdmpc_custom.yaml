@@ -1,4 +1,4 @@
-_target_: sac_gmm.networks.model.tdmpc_custom.TDMPCCustomModel
+_target_: sac_n_gmm.networks.model.tdmpc_custom.TDMPCCustomModel
 _recursive_: false
 
 input_dim: ??

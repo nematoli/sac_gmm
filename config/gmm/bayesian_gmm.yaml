@@ -1,4 +1,4 @@
-_target_:  sac_gmm.gmm.bayesian_gmm.BayesianGMM
+_target_:  sac_n_gmm.gmm.bayesian_gmm.BayesianGMM
 skill: ${skill}
 max_iter: 500
 plot: true

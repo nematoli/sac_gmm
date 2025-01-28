@@ -1,4 +1,4 @@
-_target_: sac_gmm.networks.model.dreamer_model.DreamerModel
+_target_: sac_n_gmm.networks.model.dreamer_model.DreamerModel
 _recursive_: false
 
 state_dim: 256

@@ -6,6 +6,6 @@ defaults:
   - model: tdmpc_custom
   - replay_buffer: replay_buffer_task
 
-_target_: sac_gmm.rl.sac_n_gmm_mb.SACNGMM_MB
+_target_: sac_n_gmm.rl.sac_n_gmm_mb.SACNGMM_MB
 _recursive_: false
 

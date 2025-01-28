@@ -1,4 +1,4 @@
-_target_: sac_gmm.rl.agent.calvin.sac_n_gmm_ft_calvin.CALVIN_SACNGMMAgent_FT
+_target_: sac_n_gmm.rl.agent.calvin.sac_n_gmm_ft_calvin.CALVIN_SACNGMMAgent_FT
 _recursive_: false
 
 calvin_env: ${env}

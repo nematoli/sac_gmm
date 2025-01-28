@@ -2,7 +2,7 @@ seed: null
 slurm: false
 device: cuda
 
-root: /home/${developer}/projects/sac_gmm
+root: /home/${developer}/projects/sac_n_gmm
 log_dir: ${root}/logs
 demos_dir: ${root}/demonstrations
 exp_dir: null

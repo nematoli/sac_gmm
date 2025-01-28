@@ -158,6 +158,7 @@ logs/
 skills_ds/
 dataset/
 runs/
+wandb/
 
 
 # artifacts

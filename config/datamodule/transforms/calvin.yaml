@@ -1,5 +1,5 @@
 robot_obs:
-  - _target_: sac_gmm.utils.transforms.ArrayToTensor
+  - _target_: sac_n_gmm.utils.transforms.ArrayToTensor
 
 rgb:
   - _target_: torchvision.transforms.ToTensor
@@ -12,6 +12,6 @@ depth:
   - _target_: torchvision.transforms.Resize
     size: 64
     interpolation: nearest
-  - _target_: sac_gmm.utils.transforms.AddGaussianNoise
+  - _target_: sac_n_gmm.utils.transforms.AddGaussianNoise
     mean: 0
     std: 0

@@ -1,4 +1,4 @@
-"""Setup sac_gmm installation."""
+"""Setup sac_n_gmm installation."""
 
 from os import path as op
 import re
@@ -10,7 +10,7 @@ def _read(f):
     return open(op.join(op.dirname(__file__), f)).read() if op.exists(f) else ""
 
 
-_meta = _read("sac_gmm/__init__.py")
+_meta = _read("sac_n_gmm/__init__.py")
 
 
 def find_meta(_meta, string):
@@ -24,13 +24,13 @@ meta = dict(
     name=find_meta(_meta, "__project__"),
     version=find_meta(_meta, "__version__"),
     license=find_meta(_meta, "__license__"),
-    description="Robot Skill Adaptation via Soft Actor-Critic Gaussian Mixture Models",
+    description="Robot Skill Refining and Sequencing for Long-Horizon Manipulation Tasks",
     platforms=("Any"),
     zip_safe=False,
-    keywords="pytorch sac_gmm".split(),
+    keywords="pytorch sac_n_gmm".split(),
     author=find_meta(_meta, "__author__"),
     author_email=find_meta(_meta, "__email__"),
-    url=" https://github.com/nematoli/sac_gmm",
+    url=" https://github.com/acl21/sac_n_gmm",
     packages=find_packages(exclude=["tests"]),
 )
 
