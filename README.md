@@ -64,13 +64,13 @@ If you find the code useful, please cite:
 
 **SAC-_N_-GMM**
 ```bibtex
-@inproceedings{nematollahi22icra,
+@inproceedings{chandra2024sacngmm,
     author  = {Akshay L Chandra and Iman Nematollahi and Tim Welschehold},
-    title   = {SAC-N -GMM: Robot Skill Refining and Sequencing for Long-Horizon Manipulation Tasks},
+    title   = {SAC-N-GMM: Robot Skill Refining and Sequencing for Long-Horizon Manipulation Tasks},
     booktitle = {Master's Project},
-    journal={Robot Learning Lab, Freiburg}
+    publisher = {Robot Learning Lab, Freiburg},
     year = 2024,
-    url={https://akshaychandra.com/assets/pdf/masterproject-report.pdf},
+    url = {https://akshaychandra.com/assets/pdf/masterproject-report.pdf},
 }
 ```
 
